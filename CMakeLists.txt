@@ -22,28 +22,12 @@ find_package(Qt6 REQUIRED COMPONENTS
 
 # find liblo for OSC
 if(WIN32)
-    # on Windows, look for liblo in common locations or use vcpkg
-    find_path(LIBLO_INCLUDE_DIRS lo/lo.h
-        PATHS
-        "$ENV{VCPKG_ROOT}/installed/x64-windows/include"
-        "C:/vcpkg/installed/x64-windows/include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/external/liblo/include"
-    )
-    find_library(LIBLO_LIBRARIES
-        NAMES lo liblo
-        PATHS
-        "$ENV{VCPKG_ROOT}/installed/x64-windows/lib"
-        "C:/vcpkg/installed/x64-windows/lib"
-        "${CMAKE_CURRENT_SOURCE_DIR}/external/liblo/lib"
-    )
-    if(NOT LIBLO_INCLUDE_DIRS OR NOT LIBLO_LIBRARIES)
-        message(WARNING "liblo not found - OSC functionality will be disabled. Install via: vcpkg install liblo")
-        set(LIBLO_DISABLED TRUE)
-        add_compile_definitions(LIBLO_DISABLED)
-    endif()
+    # on Windows, use vcpkg (via CMAKE_TOOLCHAIN_FILE)
+    find_path(LIBLO_INCLUDE_DIRS lo/lo.h REQUIRED)
+    find_library(LIBLO_LIBRARIES NAMES lo liblo REQUIRED)
 else()
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(LIBLO REQUIRED liblo)
+    pkg_check_modules(LIBLO REQUIRED IMPORTED_TARGET liblo)
 endif()
 
 # source files
@@ -145,10 +129,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Network
 )
 
-# add liblo if available
-if(NOT LIBLO_DISABLED)
+# add liblo for OSC support
+if(WIN32)
     target_include_directories(${PROJECT_NAME} PRIVATE ${LIBLO_INCLUDE_DIRS})
     target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBLO_LIBRARIES})
+else()
+    target_link_libraries(${PROJECT_NAME} PRIVATE PkgConfig::LIBLO)
 endif()
 
 # platform-specific settings

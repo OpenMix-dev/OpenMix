@@ -7,9 +7,7 @@
 #include <QTimer>
 #include <QUdpSocket>
 
-#ifndef LIBLO_DISABLED
 #include <lo/lo.h>
-#endif
 
 namespace StageBlend {
 
@@ -87,11 +85,9 @@ class X32Protocol : public MixerProtocol {
     void updateLatency(qint64 roundTripMs);
     void processResponse(const QString& path, const QVariant& value);
 
-#ifndef LIBLO_DISABLED
     // liblo server for receiving
     lo_server_thread m_oscServer = nullptr;
     lo_address m_oscAddress = nullptr;
-#endif
 
     // qt UDP socket (alternative to liblo for sending)
     QUdpSocket m_socket;
@@ -132,11 +128,9 @@ class X32Protocol : public MixerProtocol {
     qint64 m_lastResponseTime = 0;
     bool m_waitingForXinfo = false;
 
-#ifndef LIBLO_DISABLED
     // OSC callback (static for liblo)
     static int oscHandler(const char* path, const char* types, lo_arg** argv, int argc,
                           lo_message msg, void* user_data);
-#endif
 };
 
 } // namespace StageBlend

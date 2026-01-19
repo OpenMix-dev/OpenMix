@@ -49,13 +49,6 @@ X32Protocol::X32Protocol(QObject* parent) : MixerProtocol(parent) {
 X32Protocol::~X32Protocol() { disconnect(); }
 
 bool X32Protocol::connect(const QString& host, int port) {
-#ifdef LIBLO_DISABLED
-    Q_UNUSED(host);
-    Q_UNUSED(port);
-    setStatus("OSC support not available (liblo not installed)");
-    emit connectionError("OSC support not available");
-    return false;
-#else
     if (m_connectionState == ConnectionState::Connected ||
         m_connectionState == ConnectionState::Connecting) {
         disconnect();
@@ -96,7 +89,6 @@ bool X32Protocol::connect(const QString& host, int port) {
     m_connectionTimer.start(m_connectionTimeoutMs);
 
     return true;
-#endif
 }
 
 void X32Protocol::disconnect() {
@@ -105,12 +97,10 @@ void X32Protocol::disconnect() {
     m_reconnectTimer.stop();
     m_requestTimeoutTimer.stop();
 
-#ifndef LIBLO_DISABLED
     if (m_oscAddress) {
         lo_address_free(m_oscAddress);
         m_oscAddress = nullptr;
     }
-#endif
 
     m_socket.close();
     m_parameterCache.clear();
@@ -126,13 +116,8 @@ void X32Protocol::disconnect() {
 }
 
 void X32Protocol::sendParameter(const QString& path, const QVariant& value) {
-#ifdef LIBLO_DISABLED
-    if (m_connectionState != ConnectionState::Connected)
-        return;
-#else
     if (m_connectionState != ConnectionState::Connected || !m_oscAddress)
         return;
-#endif
 
     switch (value.typeId()) {
     case QMetaType::Float:
@@ -159,13 +144,8 @@ void X32Protocol::sendParameter(const QString& path, const QVariant& value) {
 QVariant X32Protocol::getParameter(const QString& path) { return m_parameterCache.value(path); }
 
 void X32Protocol::requestParameter(const QString& path) {
-#ifdef LIBLO_DISABLED
-    if (m_connectionState != ConnectionState::Connected)
-        return;
-#else
     if (m_connectionState != ConnectionState::Connected || !m_oscAddress)
         return;
-#endif
 
     // track request for timeout
     PendingRequest req;
@@ -179,12 +159,7 @@ void X32Protocol::requestParameter(const QString& path) {
 }
 
 void X32Protocol::requestParameterAsync(const QString& path, ParameterCallback callback) {
-#ifdef LIBLO_DISABLED
-    bool canSend = (m_connectionState == ConnectionState::Connected);
-#else
-    bool canSend = (m_connectionState == ConnectionState::Connected && m_oscAddress);
-#endif
-    if (!canSend) {
+    if (m_connectionState != ConnectionState::Connected || !m_oscAddress) {
         if (callback) {
             callback(path, QVariant(), false);
         }
@@ -314,10 +289,6 @@ void X32Protocol::onRequestTimeoutCheck() {
 }
 
 void X32Protocol::onReconnectAttempt() {
-#ifdef LIBLO_DISABLED
-    setConnectionState(ConnectionState::Disconnected);
-    return;
-#else
     if (m_reconnectAttempts >= m_maxReconnectAttempts) {
         setStatus("Reconnection failed - max attempts reached");
         setConnectionState(ConnectionState::Disconnected);
@@ -360,50 +331,30 @@ void X32Protocol::onReconnectAttempt() {
     m_waitingForXinfo = true;
     sendOscMessage("/xinfo");
     m_connectionTimer.start(m_connectionTimeoutMs);
-#endif
 }
 
 void X32Protocol::sendOscMessage(const QString& path) {
-#ifndef LIBLO_DISABLED
     if (!m_oscAddress)
         return;
     lo_send(m_oscAddress, path.toUtf8().constData(), nullptr);
-#else
-    Q_UNUSED(path);
-#endif
 }
 
 void X32Protocol::sendOscMessage(const QString& path, float value) {
-#ifndef LIBLO_DISABLED
     if (!m_oscAddress)
         return;
     lo_send(m_oscAddress, path.toUtf8().constData(), "f", value);
-#else
-    Q_UNUSED(path);
-    Q_UNUSED(value);
-#endif
 }
 
 void X32Protocol::sendOscMessage(const QString& path, int value) {
-#ifndef LIBLO_DISABLED
     if (!m_oscAddress)
         return;
     lo_send(m_oscAddress, path.toUtf8().constData(), "i", value);
-#else
-    Q_UNUSED(path);
-    Q_UNUSED(value);
-#endif
 }
 
 void X32Protocol::sendOscMessage(const QString& path, const QString& value) {
-#ifndef LIBLO_DISABLED
     if (!m_oscAddress)
         return;
     lo_send(m_oscAddress, path.toUtf8().constData(), "s", value.toUtf8().constData());
-#else
-    Q_UNUSED(path);
-    Q_UNUSED(value);
-#endif
 }
 
 void X32Protocol::parseOscMessage(const QByteArray& data) {
