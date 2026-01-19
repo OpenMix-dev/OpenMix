@@ -1,0 +1,111 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-base-dev liblo-dev build-essential cmake
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StageBlend-linux
+          path: build/StageBlend
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.6.0'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2019_64'
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Deploy Qt
+        run: |
+          cd build/Release
+          windeployqt --release StageBlend.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StageBlend-windows
+          path: build/Release/
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install qt@6 liblo
+
+      - name: Configure
+        run: |
+          export PATH="/opt/homebrew/opt/qt@6/bin:$PATH"
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt@6
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Deploy Qt
+        run: |
+          /opt/homebrew/opt/qt@6/bin/macdeployqt build/StageBlend.app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StageBlend-macos
+          path: build/StageBlend.app
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Package
+        run: |
+          cd StageBlend-linux && tar czf ../StageBlend-linux.tar.gz StageBlend && cd ..
+          cd StageBlend-windows && zip -r ../StageBlend-windows.zip . && cd ..
+          cd StageBlend-macos && zip -r ../StageBlend-macos.zip StageBlend.app && cd ..
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            StageBlend-linux.tar.gz
+            StageBlend-windows.zip
+            StageBlend-macos.zip
