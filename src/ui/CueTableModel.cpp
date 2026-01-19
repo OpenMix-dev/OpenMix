@@ -340,11 +340,16 @@ void CueTableModel::onCueUpdated(int index) {
 }
 
 void CueTableModel::onCueMoved(int from, int to) {
-    // the CueList has already moved the item, we just need to notify the view
-    // TODO: use qt's moveRows. currently using dataChanged for simplicity
-    int minRow = qMin(from, to);
-    int maxRow = qMax(from, to);
-    emit dataChanged(index(minRow, 0), index(maxRow, ColCount - 1));
+    // use moveRows from Qt to update the view
+    // CueList already moved the item, this just notifies the view
+    // so selections/scroll position/other visual states stay in sync
+    //
+    // destinationChild is the row before the moved rows, so
+    // moving down → to + 1, moving up → to
+    int destRow = (from < to) ? to + 1 : to;
+
+    beginMoveRows(QModelIndex(), from, from, QModelIndex(), destRow);
+    endMoveRows();
 
     // adjust highlight indices
     if (m_currentIndex == from) {

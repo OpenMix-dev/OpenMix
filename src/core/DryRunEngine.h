@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Cue.h"
 #include <QJsonObject>
 #include <QObject>
 #include <QPair>
@@ -76,15 +77,15 @@ class DryRunEngine : public QObject {
 
   private:
     // simulate a fade & return timeline
-    QVector<QPair<qint64, QJsonObject>> simulateFade(const QJsonObject& startState,
-                                                     const QJsonObject& endState,
-                                                     double durationSec, int samplesPerSecond = 10);
+    QVector<QPair<qint64, QJsonObject>>
+    simulateFade(const QJsonObject& startState, const QJsonObject& endState, double durationSec,
+                 FadeCurve curve = FadeCurve::Linear, int samplesPerSecond = 10);
 
     // expand macro cue recursively
     QStringList expandMacro(const QString& cueId, QSet<QString>& visited);
 
     // calculate fade interpolation
-    static double interpolate(double progress, int curveType);
+    static double interpolate(double progress, FadeCurve curve);
 
     CueList* m_cueList = nullptr;
     CueValidator* m_validator = nullptr;

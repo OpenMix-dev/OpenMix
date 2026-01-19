@@ -85,7 +85,7 @@ DryRunResult DryRunEngine::executeDryRun(int cueIndex) {
                 endState[it.key()] = it.value();
             }
 
-            result.timeline = simulateFade(currentState, endState, fadeTime);
+            result.timeline = simulateFade(currentState, endState, fadeTime, cue.fadeCurve());
             currentState = endState;
             result.totalDuration = fadeTime;
         }
@@ -241,7 +241,7 @@ QJsonObject DryRunEngine::predictedFinalState(int cueIndex) {
 
 QVector<QPair<qint64, QJsonObject>> DryRunEngine::simulateFade(const QJsonObject& startState,
                                                                const QJsonObject& endState,
-                                                               double durationSec,
+                                                               double durationSec, FadeCurve curve,
                                                                int samplesPerSecond) {
     QVector<QPair<qint64, QJsonObject>> timeline;
 
@@ -256,6 +256,9 @@ QVector<QPair<qint64, QJsonObject>> DryRunEngine::simulateFade(const QJsonObject
         double progress = static_cast<double>(i) / numSamples;
         qint64 time = static_cast<qint64>(i * intervalMs);
 
+        // apply fade curve to get curved progress
+        double curvedProgress = interpolate(progress, curve);
+
         QJsonObject state = startState;
 
         // interpolate each parameter
@@ -266,7 +269,7 @@ QVector<QPair<qint64, QJsonObject>> DryRunEngine::simulateFade(const QJsonObject
             if (endVal.isDouble()) {
                 double start = startState.contains(path) ? startState[path].toDouble() : 0.0;
                 double end = endVal.toDouble();
-                double current = start + (end - start) * progress;
+                double current = start + (end - start) * curvedProgress;
                 state[path] = current;
             } else {
                 // non-numeric values switch at midpoint
@@ -311,10 +314,38 @@ QStringList DryRunEngine::expandMacro(const QString& cueId, QSet<QString>& visit
     return expansion;
 }
 
-double DryRunEngine::interpolate(double progress, int curveType) {
-    // linear interpolation for dry run
-    // TODO: match PlaybackEngine's curves
-    return qBound(0.0, progress, 1.0);
+double DryRunEngine::interpolate(double progress, FadeCurve curve) {
+    // clamp progress to [0, 1]
+    progress = qBound(0.0, progress, 1.0);
+
+    switch (curve) {
+    case FadeCurve::Linear:
+        return progress;
+
+    case FadeCurve::EaseIn:
+        // quadratic ease in: progress^2
+        return progress * progress;
+
+    case FadeCurve::EaseOut:
+        // quadratic ease out: 1 - (1 - progress)^2
+        return 1.0 - (1.0 - progress) * (1.0 - progress);
+
+    case FadeCurve::SCurve:
+        // smooth S-curve (ease in-out)
+        if (progress < 0.5) {
+            return 2.0 * progress * progress;
+        } else {
+            return 1.0 - std::pow(-2.0 * progress + 2.0, 2.0) / 2.0;
+        }
+
+    case FadeCurve::Exponential:
+        // exponential curve
+        // (exp(progress * 3) - 1) / (exp(3) - 1)
+        return (std::exp(progress * 3.0) - 1.0) / (std::exp(3.0) - 1.0);
+
+    default:
+        return progress;
+    }
 }
 
 } // namespace StageBlend

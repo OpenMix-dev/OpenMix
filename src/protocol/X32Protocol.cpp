@@ -587,10 +587,34 @@ void X32Protocol::setConnectionState(ConnectionState state) {
 
 // factory function implementation
 MixerProtocol* createMixerProtocol(const QString& type, QObject* parent) {
-    if (type.toLower() == "x32" || type.toLower() == "m32") {
+    QString lowerType = type.toLower();
+
+    // behringer X32/M32 series (OSC protocol)
+    if (lowerType == "x32" || lowerType == "m32") {
         return new X32Protocol(parent);
     }
-    // TODO: add yamaha, allen-heath, etc.
+
+    // yamaha digital mixers (not yet implemented)
+    // yamaha CL/QL series use proprietary protocol over TCP
+    // yamaha TF series use SCP (Studio Manager Communication Protocol)
+    if (lowerType == "yamaha" || lowerType == "cl" || lowerType == "ql" || lowerType == "tf") {
+        return nullptr;
+    }
+
+    // allen & heath digital mixers (not yet implemented)
+    // dLive/Avantis use TCP-based protocol
+    // SQ series use MIDI over TCP
+    if (lowerType == "allen-heath" || lowerType == "dlive" || lowerType == "avantis" ||
+        lowerType == "sq") {
+        return nullptr;
+    }
+
+    // midas M32 is X32-compatible
+    if (lowerType == "midas") {
+        return new X32Protocol(parent);
+    }
+
+    // unknown protocol type
     return nullptr;
 }
 
