@@ -10,7 +10,6 @@ int main(int argc, char* argv[]) {
     QApplication::setApplicationName("OpenMix");
     QApplication::setApplicationVersion("0.1.0");
     QApplication::setOrganizationName("OpenMix");
-    QApplication::setOrganizationDomain("OpenMix.org");
 
     QApplication::setStyle(QStyleFactory::create("Fusion"));
 
