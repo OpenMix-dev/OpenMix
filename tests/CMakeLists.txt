@@ -1,7 +1,5 @@
-# Tests CMakeLists.txt
 find_package(Qt6 REQUIRED COMPONENTS Test)
 
-# Test for Cue
 add_executable(test_cue
     test_cue.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
@@ -15,7 +13,6 @@ target_include_directories(test_cue PRIVATE
 )
 add_test(NAME CueTest COMMAND test_cue)
 
-# Test for CueList
 add_executable(test_cuelist
     test_cuelist.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp

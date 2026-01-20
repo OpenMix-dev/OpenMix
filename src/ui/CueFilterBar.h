@@ -6,7 +6,7 @@ class QLineEdit;
 class QComboBox;
 class QPushButton;
 
-namespace StageBlend {
+namespace OpenMix {
 
 class CueFilterProxyModel;
 
@@ -40,4 +40,4 @@ class CueFilterBar : public QWidget {
     QPushButton* m_clearButton;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

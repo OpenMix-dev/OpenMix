@@ -1,7 +1,7 @@
 #include "OperationMode.h"
 #include <QSettings>
 
-namespace StageBlend {
+namespace OpenMix {
 
 OperationModeManager::OperationModeManager(QObject* parent) : QObject(parent) {}
 
@@ -80,40 +80,19 @@ bool OperationModeManager::canNewShow() const {
     return true;
 }
 
-bool OperationModeManager::canSaveShow() const {
-    // always allow saving
-    return true;
-}
+bool OperationModeManager::canSaveShow() const { return true; }
 
-bool OperationModeManager::canGo() const {
-    // always allow GO
-    return true;
-}
+bool OperationModeManager::canGo() const { return true; }
 
-bool OperationModeManager::canStop() const {
-    // always allow stop
-    return true;
-}
+bool OperationModeManager::canStop() const { return true; }
 
-bool OperationModeManager::canNavigateCues() const {
-    // always allow navigation
-    return true;
-}
+bool OperationModeManager::canNavigateCues() const { return true; }
 
-bool OperationModeManager::canUsePanic() const {
-    // always allow panic
-    return true;
-}
+bool OperationModeManager::canUsePanic() const { return true; }
 
-bool OperationModeManager::canViewTimeline() const {
-    // always allow timeline viewing
-    return true;
-}
+bool OperationModeManager::canViewTimeline() const { return true; }
 
-bool OperationModeManager::canViewMixerFeedback() const {
-    // always allow mixer feedback viewing
-    return true;
-}
+bool OperationModeManager::canViewMixerFeedback() const { return true; }
 
 void OperationModeManager::setShowModePassword(const QString& password) {
     if (password.isEmpty()) {
@@ -156,21 +135,35 @@ bool OperationModeManager::switchToProgrammerMode(const QString& password) {
 void OperationModeManager::switchToShowMode() { setMode(AppMode::ShowMode); }
 
 void OperationModeManager::saveToSettings() {
-    QSettings settings("StageBlend", "StageBlend");
+    QSettings settings("OpenMix", "OpenMix");
     settings.beginGroup("OperationMode");
 
-    // note: we don't save the current mode, so always start in programmer mode
-    // we do save the password hash for persistence
+    // save password hash
     settings.setValue("PasswordHash", m_passwordHash);
+
+    settings.setValue("SaveModeEnabled", m_saveMode);
+    if (m_saveMode) {
+        settings.setValue("Mode", m_mode == AppMode::Programmer ? "programmer" : "showmode");
+    }
 
     settings.endGroup();
 }
 
 void OperationModeManager::loadFromSettings() {
-    QSettings settings("StageBlend", "StageBlend");
+    QSettings settings("OpenMix", "OpenMix");
     settings.beginGroup("OperationMode");
 
     m_passwordHash = settings.value("PasswordHash").toString();
+
+    m_saveMode = settings.value("SaveModeEnabled", false).toBool();
+    if (m_saveMode) {
+        QString savedMode = settings.value("Mode", "programmer").toString();
+        if (savedMode == "showmode") {
+            m_mode = AppMode::ShowMode;
+        } else {
+            m_mode = AppMode::Programmer;
+        }
+    }
 
     settings.endGroup();
 }
@@ -181,4 +174,4 @@ QString OperationModeManager::hashPassword(const QString& password) const {
     return QString::fromLatin1(hash.toHex());
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

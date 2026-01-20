@@ -1,0 +1,52 @@
+#pragma once
+
+#include <QObject>
+#include <QTimer>
+#include <QUdpSocket>
+#include <QVariant>
+#include <lo/lo.h>
+
+namespace OpenMix {
+
+class OscTransport : public QObject {
+    Q_OBJECT
+
+  public:
+    explicit OscTransport(QObject* parent = nullptr);
+    ~OscTransport() override;
+
+    bool connect(const QString& host, int port);
+    void disconnect();
+    bool isConnected() const { return m_connected; }
+
+    void send(const QString& path);
+    void send(const QString& path, float value);
+    void send(const QString& path, int value);
+    void send(const QString& path, const QString& value);
+    void send(const QString& path, const QVariant& value);
+
+    QString host() const { return m_host; }
+    int port() const { return m_port; }
+
+  signals:
+    void connected();
+    void disconnected();
+    void connectionError(const QString& error);
+    void messageReceived(const QString& path, const QVariant& value);
+    void rawMessageReceived(const QByteArray& data);
+
+  private slots:
+    void onReadyRead();
+
+  private:
+    void parseOscMessage(const QByteArray& data);
+    QVariant parseOscArgument(const QByteArray& data, int& offset, char type);
+
+    lo_address m_oscAddress = nullptr;
+    QUdpSocket m_socket;
+    QString m_host;
+    int m_port = 0;
+    bool m_connected = false;
+};
+
+} // namespace OpenMix

@@ -4,7 +4,7 @@
 #include <QDateTime>
 #include <cmath>
 
-namespace StageBlend {
+namespace OpenMix {
 
 FadeInstance::FadeInstance(const QString& cueId, const QJsonObject& startParams,
                            const QJsonObject& endParams, double durationSec, FadeCurve curve)
@@ -21,10 +21,8 @@ QJsonObject FadeInstance::update(qint64 currentTime) {
     qint64 elapsed = currentTime - m_startTime;
     m_progress = qMin(1.0, elapsed / (m_duration * 1000.0));
 
-    // apply fade curve to get curved progress
     double curvedProgress = PlaybackEngine::interpolate(m_progress, m_curve);
 
-    // interpolate all parameters
     m_currentValues = QJsonObject();
     for (auto it = m_endParams.begin(); it != m_endParams.end(); ++it) {
         QString path = it.key();
@@ -36,14 +34,12 @@ QJsonObject FadeInstance::update(qint64 currentTime) {
             double currentVal = startVal + (targetVal - startVal) * curvedProgress;
             m_currentValues[path] = currentVal;
         } else if (endVal.typeId() == QMetaType::Int) {
-            // for integer values (like mute on/off), switch at midpoint or end
             if (m_progress >= 0.5) {
                 m_currentValues[path] = endVal.toInt();
             } else {
                 m_currentValues[path] = m_startParams.value(path).toInt();
             }
         } else {
-            // for other types, use end value when complete
             if (m_progress >= 1.0) {
                 m_currentValues[path] = it.value();
             }
@@ -60,8 +56,10 @@ QVariant FadeInstance::interpolatedValue(const QString& path) const {
     return QVariant();
 }
 
+void FadeInstance::adjustStartTime(qint64 offset) { m_startTime += offset; }
+
 PlaybackEngine::PlaybackEngine(QObject* parent) : QObject(parent) {
-    m_fadeTimer.setInterval(16); // ~60fps
+    m_fadeTimer.setInterval(16);
     connect(&m_fadeTimer, &QTimer::timeout, this, &PlaybackEngine::onFadeTimerTick);
 
     m_autoFollowTimer.setSingleShot(true);
@@ -106,7 +104,6 @@ double PlaybackEngine::fadeProgress() const {
     if (m_activeFades.isEmpty()) {
         return 0.0;
     }
-    // return the maximum progress of all active fades
     double maxProgress = 0.0;
     for (const FadeInstance& fade : m_activeFades) {
         maxProgress = qMax(maxProgress, fade.progress());
@@ -115,7 +112,6 @@ double PlaybackEngine::fadeProgress() const {
 }
 
 void PlaybackEngine::go() {
-    // if auto-follow is armed (OnButtonPress), execute the pending follow
     if (m_autoFollowArmed) {
         m_autoFollowArmed = false;
         emit autoFollowArmed(false);
@@ -124,7 +120,6 @@ void PlaybackEngine::go() {
     if (!m_cueList || m_standbyIndex < 0)
         return;
 
-    // check lockout
     if (m_guard && m_guard->isGoLocked()) {
         emit goLockout(m_guard->lockoutReason());
         return;
@@ -132,7 +127,6 @@ void PlaybackEngine::go() {
 
     const Cue& cue = m_cueList->at(m_standbyIndex);
 
-    // validate cue before execution
     if (m_validator) {
         ValidationResult result = m_validator->validate(cue, m_cueList);
         if (!result.valid) {
@@ -141,7 +135,6 @@ void PlaybackEngine::go() {
         }
     }
 
-    // capture safe state before execution
     if (m_guard) {
         QString cueNumber = QString::number(cue.number(), 'f', 1);
         m_guard->captureSafeState(tr("Before cue %1").arg(cueNumber));
@@ -162,6 +155,7 @@ void PlaybackEngine::stop() {
     m_autoFollowArmed = false;
     m_currentMacroId.clear();
     m_macroChildIndex = 0;
+    m_macroPendingChildren.clear();
 
     setState(PlaybackState::Stopped);
     setCurrentIndex(-1);
@@ -176,6 +170,7 @@ void PlaybackEngine::stop() {
 
 void PlaybackEngine::pause() {
     if (m_state == PlaybackState::Fading) {
+        m_pauseStartTime = QDateTime::currentMSecsSinceEpoch();
         m_fadeTimer.stop();
         setState(PlaybackState::Paused);
     }
@@ -183,12 +178,14 @@ void PlaybackEngine::pause() {
 
 void PlaybackEngine::resume() {
     if (m_state == PlaybackState::Paused && !m_activeFades.isEmpty()) {
-        // adjust fade start times to account for pause duration
         qint64 now = QDateTime::currentMSecsSinceEpoch();
+        qint64 pauseDuration = now - m_pauseStartTime;
+
         for (FadeInstance& fade : m_activeFades) {
-            // this is a simplification - in practice you'd track pause time
-            // for now, just restart the timer
+            fade.adjustStartTime(pauseDuration);
         }
+
+        m_pauseStartTime = 0;
         m_fadeTimer.start();
         setState(PlaybackState::Fading);
     }
@@ -242,7 +239,6 @@ void PlaybackEngine::executeCue(int index) {
     setCurrentIndex(index);
     emit cueExecuted(index);
 
-    // set standby to next cue
     if (index + 1 < m_cueList->count()) {
         setStandbyIndex(index + 1);
     }
@@ -254,6 +250,47 @@ void PlaybackEngine::executeCueById(const QString& id) {
     int index = m_cueList->indexOf(id);
     if (index >= 0) {
         executeCue(index);
+    }
+}
+
+void PlaybackEngine::executePanicFade(const QJsonObject& targetValues, double durationSec,
+                                      FadeCurve curve) {
+    if (!m_mixer || targetValues.isEmpty())
+        return;
+
+    cancelPanicFade();
+
+    QJsonObject startParams = m_mixer->captureCurrentState();
+
+    m_panicFadeId = "panic_" + QString::number(QDateTime::currentMSecsSinceEpoch());
+    m_panicFadeActive = true;
+
+    FadeInstance fade(m_panicFadeId, startParams, targetValues, durationSec, curve);
+    m_activeFades.append(fade);
+
+    setState(PlaybackState::Fading);
+
+    if (!m_fadeTimer.isActive()) {
+        m_fadeTimer.start();
+    }
+}
+
+void PlaybackEngine::cancelPanicFade() {
+    if (!m_panicFadeActive)
+        return;
+
+    for (int i = m_activeFades.size() - 1; i >= 0; --i) {
+        if (m_activeFades[i].cueId() == m_panicFadeId) {
+            m_activeFades.removeAt(i);
+            break;
+        }
+    }
+
+    m_panicFadeActive = false;
+    m_panicFadeId.clear();
+
+    if (m_activeFades.isEmpty() && m_state == PlaybackState::Fading) {
+        setState(PlaybackState::Running);
     }
 }
 
@@ -294,7 +331,6 @@ void PlaybackEngine::executeCueInternal(const Cue& cue) {
 
     switch (cue.type()) {
     case CueType::Snapshot:
-        // instant recall
         m_mixer->recallSnapshot(cue);
         setState(PlaybackState::Running);
         handleAutoFollow(cue);
@@ -306,18 +342,14 @@ void PlaybackEngine::executeCueInternal(const Cue& cue) {
         break;
 
     case CueType::Stop:
-        // could be used to mute channels or stop something
-        m_mixer->recallSnapshot(cue);
-        setState(PlaybackState::Running);
-        emit cueCompleted(m_currentIndex);
+        executeStopCue(cue);
         break;
 
     case CueType::GoTo:
-        // jump to another cue - could parse target from notes or parameters
+        executeGoToCue(cue);
         break;
 
     case CueType::Wait:
-        // just wait, then auto-follow
         handleAutoFollow(cue);
         emit cueCompleted(m_currentIndex);
         break;
@@ -330,25 +362,21 @@ void PlaybackEngine::executeCueInternal(const Cue& cue) {
 
 void PlaybackEngine::startFade(const Cue& cue) {
     if (cue.fadeTime() <= 0) {
-        // no fade time, just recall instantly
         m_mixer->recallSnapshot(cue);
         emit cueCompleted(m_currentIndex);
         handleAutoFollow(cue);
         return;
     }
 
-    // store start parameters (current mixer state)
     QJsonObject startParams = m_mixer->captureCurrentState();
     QJsonObject endParams = cue.parameters();
 
-    // create new fade instance (allows overlapping fades)
     FadeInstance fade(cue.id(), startParams, endParams, cue.fadeTime(), cue.fadeCurve());
     m_activeFades.append(fade);
 
     emit fadeStarted(cue.id());
     setState(PlaybackState::Fading);
 
-    // start timer if not already running
     if (!m_fadeTimer.isActive()) {
         m_fadeTimer.start();
     }
@@ -366,7 +394,6 @@ void PlaybackEngine::executeMacroCue(const Cue& cue) {
     }
 
     if (cue.macroExecutionMode() == MacroExecutionMode::Parallel) {
-        // execute all child cues simultaneously
         for (const QString& childId : childIds) {
             const Cue* childCue = m_cueList->findById(childId);
             if (childCue) {
@@ -377,19 +404,122 @@ void PlaybackEngine::executeMacroCue(const Cue& cue) {
         emit cueCompleted(m_currentIndex);
         handleAutoFollow(cue);
     } else {
-        // sequential execution - execute first child, others via auto-follow
         m_currentMacroId = cue.id();
         m_macroChildIndex = 0;
+        m_macroPendingChildren = childIds;
 
         const Cue* firstChild = m_cueList->findById(childIds.first());
         if (firstChild) {
+            m_macroPendingChildren.removeFirst();
             executeCueInternal(*firstChild);
             emit macroChildExecuted(cue.id(), childIds.first());
             m_macroChildIndex = 1;
-
-            // continue with next children after this one completes
-            // this is handled by checking in onFadeTimerTick / cueCompleted
         }
+    }
+}
+
+void PlaybackEngine::executeNextMacroChild() {
+    if (m_currentMacroId.isEmpty() || m_macroPendingChildren.isEmpty() || !m_cueList) {
+        if (!m_currentMacroId.isEmpty()) {
+            const Cue* macroCue = m_cueList->findById(m_currentMacroId);
+
+            m_currentMacroId.clear();
+            m_macroPendingChildren.clear();
+            m_macroChildIndex = 0;
+
+            emit cueCompleted(m_currentIndex);
+
+            if (macroCue) {
+                handleAutoFollow(*macroCue);
+            }
+        }
+        return;
+    }
+
+    QString childId = m_macroPendingChildren.takeFirst();
+    const Cue* childCue = m_cueList->findById(childId);
+    if (childCue) {
+        executeCueInternal(*childCue);
+        emit macroChildExecuted(m_currentMacroId, childId);
+        m_macroChildIndex++;
+    } else {
+        executeNextMacroChild();
+    }
+}
+
+void PlaybackEngine::executeGoToCue(const Cue& cue) {
+    if (!m_cueList)
+        return;
+
+    QString target = cue.gotoTarget();
+    if (target.isEmpty()) {
+        emit cueCompleted(m_currentIndex);
+        return;
+    }
+
+    int targetIndex = -1;
+
+    bool isNumber = false;
+    double cueNumber = target.toDouble(&isNumber);
+    if (isNumber) {
+        targetIndex = m_cueList->indexOfNumber(cueNumber);
+    }
+
+    if (targetIndex < 0) {
+        targetIndex = m_cueList->indexOf(target);
+    }
+
+    if (targetIndex < 0) {
+        emit cueCompleted(m_currentIndex);
+        return;
+    }
+
+    setStandbyIndex(targetIndex);
+
+    if (cue.gotoAutoExecute()) {
+        go();
+    }
+
+    emit cueCompleted(m_currentIndex);
+}
+
+void PlaybackEngine::executeStopCue(const Cue& cue) {
+    m_fadeTimer.stop();
+    m_activeFades.clear();
+    m_autoFollowTimer.stop();
+    m_autoFollowArmed = false;
+
+    m_currentMacroId.clear();
+    m_macroPendingChildren.clear();
+    m_macroChildIndex = 0;
+
+    switch (cue.stopBehavior()) {
+    case StopBehavior::StopFadesOnly:
+        setState(PlaybackState::Stopped);
+        emit cueCompleted(m_currentIndex);
+        break;
+
+    case StopBehavior::StopAndApply:
+        if (m_mixer && !cue.parameters().isEmpty()) {
+            m_mixer->recallSnapshot(cue);
+        }
+        setState(PlaybackState::Running);
+        emit cueCompleted(m_currentIndex);
+        handleAutoFollow(cue);
+        break;
+
+    case StopBehavior::StopAndFadeOut:
+        if (m_mixer && !cue.parameters().isEmpty() && cue.fadeTime() > 0) {
+            startFade(cue);
+        } else {
+            if (m_mixer && !cue.parameters().isEmpty()) {
+                m_mixer->recallSnapshot(cue);
+            }
+            setState(PlaybackState::Running);
+            emit cueCompleted(m_currentIndex);
+            handleAutoFollow(cue);
+        }
+        break;
     }
 }
 
@@ -400,20 +530,16 @@ void PlaybackEngine::handleAutoFollow(const Cue& cue) {
 
     switch (cue.autoFollowCondition()) {
     case AutoFollowCondition::Always:
-        // start timer immediately with the delay
         m_autoFollowTimer.start(static_cast<int>(cue.autoFollowDelay() * 1000));
         break;
 
     case AutoFollowCondition::AfterFadeComplete:
-        // for fades, timer is started in checkFadeCompletion()
-        // for non-fades, start immediately
         if (cue.type() != CueType::Fade) {
             m_autoFollowTimer.start(static_cast<int>(cue.autoFollowDelay() * 1000));
         }
         break;
 
     case AutoFollowCondition::OnButtonPress:
-        // set armed flag, require explicit GO
         m_autoFollowArmed = true;
         emit autoFollowArmed(true);
         break;
@@ -421,14 +547,22 @@ void PlaybackEngine::handleAutoFollow(const Cue& cue) {
 }
 
 void PlaybackEngine::checkFadeCompletion() {
-    // remove completed fades & emit signals
+    bool panicFadeWasCompleted = false;
+
     for (int i = m_activeFades.size() - 1; i >= 0; --i) {
         if (m_activeFades[i].isComplete()) {
             QString cueId = m_activeFades[i].cueId();
             m_activeFades.removeAt(i);
+
+            if (cueId == m_panicFadeId) {
+                m_panicFadeActive = false;
+                m_panicFadeId.clear();
+                panicFadeWasCompleted = true;
+                continue;
+            }
+
             emit fadeCompleted(cueId);
 
-            // handle auto-follow for AfterFadeComplete condition
             if (m_cueList) {
                 const Cue* completedCue = m_cueList->findById(cueId);
                 if (completedCue && completedCue->autoFollow() &&
@@ -440,11 +574,19 @@ void PlaybackEngine::checkFadeCompletion() {
         }
     }
 
-    // update state based on remaining fades
+    if (panicFadeWasCompleted) {
+        emit panicFadeCompleted();
+    }
+
     if (m_activeFades.isEmpty()) {
         if (m_state == PlaybackState::Fading) {
             setState(PlaybackState::Running);
-            emit cueCompleted(m_currentIndex);
+
+            if (!m_currentMacroId.isEmpty()) {
+                executeNextMacroChild();
+            } else if (!panicFadeWasCompleted) {
+                emit cueCompleted(m_currentIndex);
+            }
         }
     }
 }
@@ -457,7 +599,6 @@ void PlaybackEngine::onFadeTimerTick() {
 
     qint64 now = QDateTime::currentMSecsSinceEpoch();
 
-    // merge all active fade values (latest fade wins for conflicts)
     QJsonObject mergedValues;
 
     for (FadeInstance& fade : m_activeFades) {
@@ -467,7 +608,6 @@ void PlaybackEngine::onFadeTimerTick() {
         }
     }
 
-    // send merged values to mixer
     if (m_mixer) {
         for (auto it = mergedValues.begin(); it != mergedValues.end(); ++it) {
             QVariant val = it.value().toVariant();
@@ -475,20 +615,14 @@ void PlaybackEngine::onFadeTimerTick() {
         }
     }
 
-    // emit overall progress
     emit fadeProgressChanged(fadeProgress());
 
-    // check for completed fades
     checkFadeCompletion();
 }
 
-void PlaybackEngine::onAutoFollowTimerTimeout() {
-    go(); // execute next cue
-}
+void PlaybackEngine::onAutoFollowTimerTimeout() { go(); }
 
-// static method for fade curve interpolation
 double PlaybackEngine::interpolate(double progress, FadeCurve curve) {
-    // clamp progress to [0, 1]
     progress = qBound(0.0, progress, 1.0);
 
     switch (curve) {
@@ -521,4 +655,4 @@ double PlaybackEngine::interpolate(double progress, FadeCurve curve) {
     }
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

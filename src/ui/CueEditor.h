@@ -10,7 +10,7 @@ class QCheckBox;
 class QPushButton;
 class QFormLayout;
 
-namespace StageBlend {
+namespace OpenMix {
 
 class Application;
 class Cue;
@@ -60,4 +60,4 @@ class CueEditor : public QWidget {
     QPushButton* m_captureButton;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

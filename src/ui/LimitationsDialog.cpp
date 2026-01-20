@@ -7,7 +7,7 @@
 #include <QTextBrowser>
 #include <QVBoxLayout>
 
-namespace StageBlend {
+namespace OpenMix {
 
 LimitationsDialog::LimitationsDialog(QWidget* parent) : QDialog(parent) {
     setWindowTitle(tr("Important Information"));
@@ -20,7 +20,7 @@ void LimitationsDialog::setupUi() {
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
     mainLayout->setSpacing(16);
 
-    // header with icon
+    // header w/ icon
     QHBoxLayout* headerLayout = new QHBoxLayout();
 
     QLabel* iconLabel = new QLabel(this);
@@ -29,7 +29,7 @@ void LimitationsDialog::setupUi() {
     headerLayout->addWidget(iconLabel);
 
     QLabel* titleLabel = new QLabel(
-        tr("<h2>Welcome to StageBlend</h2>"
+        tr("<h2>Welcome to OpenMix</h2>"
            "<p>Please read the following important information before using this software.</p>"),
         this);
     titleLabel->setWordWrap(true);
@@ -45,7 +45,7 @@ void LimitationsDialog::setupUi() {
         "<li><b>Mixer Support:</b> Only Behringer X32/M32 mixers are currently supported. "
         "Yamaha, Allen & Heath, & other brands are not yet implemented.</li>"
         "<li><b>Protocol:</b> OSC (Open Sound Control) only. MIDI control is not supported.</li>"
-        "<li><b>Parameter Control:</b> StageBlend controls individual parameters only. "
+        "<li><b>Parameter Control:</b> OpenMix controls individual parameters only. "
         "Scene/snapshot recall on the mixer is not supported.</li>"
         "<li><b>Network Latency:</b> Fade accuracy depends on network conditions. "
         "Wired Ethernet connections are strongly recommended.</li>"
@@ -110,13 +110,13 @@ void LimitationsDialog::onAcknowledgeClicked() {
 bool LimitationsDialog::dontShowAgain() const { return m_dontShowCheckbox->isChecked(); }
 
 bool LimitationsDialog::shouldShow() {
-    QSettings settings("StageBlend", "StageBlend");
+    QSettings settings("OpenMix", "OpenMix");
     return !settings.value("LimitationsDialog/dontShowAgain", false).toBool();
 }
 
 void LimitationsDialog::setDontShowAgain(bool dontShow) {
-    QSettings settings("StageBlend", "StageBlend");
+    QSettings settings("OpenMix", "OpenMix");
     settings.setValue("LimitationsDialog/dontShowAgain", dontShow);
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

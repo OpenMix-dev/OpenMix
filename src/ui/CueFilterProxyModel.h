@@ -3,7 +3,7 @@
 #include "core/Cue.h"
 #include <QSortFilterProxyModel>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class CueFilterProxyModel : public QSortFilterProxyModel {
     Q_OBJECT
@@ -47,4 +47,4 @@ class CueFilterProxyModel : public QSortFilterProxyModel {
     QString m_textFilter;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

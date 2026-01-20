@@ -6,9 +6,9 @@
 #include <QFont>
 #include <QIODevice>
 
-namespace StageBlend {
+namespace OpenMix {
 
-const QString CueTableModel::s_mimeType = QStringLiteral("application/x-stageblend-cue-index");
+const QString CueTableModel::s_mimeType = QStringLiteral("application/x-openmix-cue-index");
 
 CueTableModel::CueTableModel(CueList* cueList, QObject* parent)
     : QAbstractTableModel(parent), m_cueList(cueList) {
@@ -376,4 +376,4 @@ void CueTableModel::onListCleared() {
     endResetModel();
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

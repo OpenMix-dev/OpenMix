@@ -1,12 +1,13 @@
 #include "Show.h"
 
-namespace StageBlend {
+namespace OpenMix {
 
 QJsonObject MixerConfig::toJson() const {
     QJsonObject json;
     json["type"] = type;
     json["host"] = host;
     json["port"] = port;
+    json["dcaCount"] = dcaCount;
     return json;
 }
 
@@ -15,6 +16,7 @@ MixerConfig MixerConfig::fromJson(const QJsonObject& json) {
     config.type = json["type"].toString("x32");
     config.host = json["host"].toString();
     config.port = json["port"].toInt(10023);
+    config.dcaCount = json["dcaCount"].toInt(8);
     return config;
 }
 
@@ -78,4 +80,4 @@ void Show::fromJson(const QJsonObject& json) {
     emit nameChanged(m_name);
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

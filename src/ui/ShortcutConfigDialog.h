@@ -6,7 +6,7 @@
 #include <QPushButton>
 #include <QTableWidget>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class ShortcutManager;
 
@@ -43,4 +43,4 @@ class ShortcutConfigDialog : public QDialog {
     int m_editingRow = -1;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

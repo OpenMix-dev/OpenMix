@@ -27,8 +27,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: StageBlend-linux
-          path: build/StageBlend
+          name: OpenMix-linux
+          path: build/OpenMix
 
   build-windows:
     runs-on: windows-latest
@@ -55,12 +55,12 @@ jobs:
       - name: Deploy Qt
         run: |
           cd build/Release
-          windeployqt --release StageBlend.exe
+          windeployqt --release OpenMix.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: StageBlend-windows
+          name: OpenMix-windows
           path: build/Release/
 
   build-macos:
@@ -81,13 +81,13 @@ jobs:
 
       - name: Deploy Qt
         run: |
-          /opt/homebrew/opt/qt@6/bin/macdeployqt build/StageBlend.app
+          /opt/homebrew/opt/qt@6/bin/macdeployqt build/OpenMix.app
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: StageBlend-macos
-          path: build/StageBlend.app
+          name: OpenMix-macos
+          path: build/OpenMix.app
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -101,14 +101,14 @@ jobs:
 
       - name: Package
         run: |
-          cd StageBlend-linux && tar czf ../StageBlend-linux.tar.gz StageBlend && cd ..
-          cd StageBlend-windows && zip -r ../StageBlend-windows.zip . && cd ..
-          cd StageBlend-macos && zip -r ../StageBlend-macos.zip StageBlend.app && cd ..
+          cd OpenMix-linux && tar czf ../OpenMix-linux.tar.gz OpenMix && cd ..
+          cd OpenMix-windows && zip -r ../OpenMix-windows.zip . && cd ..
+          cd OpenMix-macos && zip -r ../OpenMix-macos.zip OpenMix.app && cd ..
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            StageBlend-linux.tar.gz
-            StageBlend-windows.zip
-            StageBlend-macos.zip
+            OpenMix-linux.tar.gz
+            OpenMix-windows.zip
+            OpenMix-macos.zip

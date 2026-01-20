@@ -1,7 +1,7 @@
 #include "core/CueList.h"
 #include <QtTest/QtTest>
 
-using namespace StageBlend;
+using namespace OpenMix;
 
 class TestCueList : public QObject {
     Q_OBJECT

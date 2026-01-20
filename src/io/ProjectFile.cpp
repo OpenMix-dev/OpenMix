@@ -5,7 +5,7 @@
 #include <QJsonDocument>
 #include <QSettings>
 
-namespace StageBlend {
+namespace OpenMix {
 
 bool ProjectFile::save(const Show* show, const QString& filePath, QString* errorMsg) {
     if (!show) {
@@ -78,26 +78,21 @@ bool ProjectFile::load(Show* show, const QString& filePath, QString* errorMsg) {
 QString ProjectFile::recentProjectsKey() { return "recentProjects"; }
 
 QStringList ProjectFile::recentProjects() {
-    QSettings settings("StageBlend", "StageBlend");
+    QSettings settings("OpenMix", "OpenMix");
     return settings.value(recentProjectsKey()).toStringList();
 }
 
 void ProjectFile::addRecentProject(const QString& filePath) {
-    QSettings settings("StageBlend", "StageBlend");
+    QSettings settings("OpenMix", "OpenMix");
     QStringList recent = settings.value(recentProjectsKey()).toStringList();
 
-    // remove if already exists
     recent.removeAll(filePath);
-
-    // add to front
     recent.prepend(filePath);
 
-    // trim to max size
     while (recent.size() > maxRecentProjects()) {
         recent.removeLast();
     }
 
-    // remove non-existent files
     QStringList validRecent;
     for (const QString& path : recent) {
         if (QFileInfo::exists(path)) {
@@ -109,15 +104,15 @@ void ProjectFile::addRecentProject(const QString& filePath) {
 }
 
 void ProjectFile::removeRecentProject(const QString& filePath) {
-    QSettings settings("StageBlend", "StageBlend");
+    QSettings settings("OpenMix", "OpenMix");
     QStringList recent = settings.value(recentProjectsKey()).toStringList();
     recent.removeAll(filePath);
     settings.setValue(recentProjectsKey(), recent);
 }
 
 void ProjectFile::clearRecentProjects() {
-    QSettings settings("StageBlend", "StageBlend");
+    QSettings settings("OpenMix", "OpenMix");
     settings.remove(recentProjectsKey());
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

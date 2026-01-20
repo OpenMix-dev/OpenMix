@@ -7,7 +7,7 @@
 #include <QString>
 #include <QVector>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class CueList;
 class CueValidator;
@@ -47,27 +47,15 @@ class DryRunEngine : public QObject {
   public:
     explicit DryRunEngine(QObject* parent = nullptr);
 
-    // set the cue list to operate on
     void setCueList(CueList* cueList);
-
-    // set the validator for pre-execution checks
     void setValidator(CueValidator* validator);
-
-    // set the initial mixer state (for calculating fade start values)
     void setInitialState(const QJsonObject& state);
     QJsonObject initialState() const { return m_initialState; }
 
-    // execute dry run of a single cue
     DryRunResult executeDryRun(int cueIndex);
     DryRunResult executeDryRunById(const QString& cueId);
-
-    // execute dry run of a sequence of cues (following auto-follows)
     QVector<DryRunResult> executeDryRunSequence(int startIndex, int maxCues = 100);
-
-    // predict the mixer state at a specific time after cue start
     QJsonObject predictedStateAtTime(int cueIndex, double secondsAfterStart);
-
-    // get the predicted final state after a cue completes
     QJsonObject predictedFinalState(int cueIndex);
 
   signals:
@@ -76,15 +64,10 @@ class DryRunEngine : public QObject {
     void sequenceCompleted(const QVector<DryRunResult>& results);
 
   private:
-    // simulate a fade & return timeline
     QVector<QPair<qint64, QJsonObject>>
     simulateFade(const QJsonObject& startState, const QJsonObject& endState, double durationSec,
                  FadeCurve curve = FadeCurve::Linear, int samplesPerSecond = 10);
-
-    // expand macro cue recursively
     QStringList expandMacro(const QString& cueId, QSet<QString>& visited);
-
-    // calculate fade interpolation
     static double interpolate(double progress, FadeCurve curve);
 
     CueList* m_cueList = nullptr;
@@ -92,4 +75,4 @@ class DryRunEngine : public QObject {
     QJsonObject m_initialState;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

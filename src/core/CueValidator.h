@@ -5,7 +5,7 @@
 #include <QSet>
 #include <QString>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class Cue;
 class CueList;
@@ -65,13 +65,9 @@ class CueValidator : public QObject {
   public:
     explicit CueValidator(QObject* parent = nullptr);
 
-    // validate a single cue
     ValidationResult validate(const Cue& cue, const CueList* cueList) const;
-
-    // validate all cues in a cue list
     ValidationResult validateAll(const CueList* cueList) const;
 
-    // validate specific aspects
     bool validateMacroIds(const Cue& cue, const CueList* cueList,
                           QList<ValidationIssue>& issues) const;
     bool validateParameters(const Cue& cue, QList<ValidationIssue>& issues) const;
@@ -84,12 +80,9 @@ class CueValidator : public QObject {
     void validationCompleted(const ValidationResult& result);
 
   private:
-    // helper to detect circular references
     bool hasCircularReference(const QString& cueId, const CueList* cueList, QSet<QString>& visited,
                               QSet<QString>& recursionStack) const;
-
-    // helper to collect all parameter paths in a macro tree
     QSet<QString> collectMacroParameters(const Cue& cue, const CueList* cueList) const;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

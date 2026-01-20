@@ -8,7 +8,7 @@
 #include <QStyle>
 #include <QVBoxLayout>
 
-namespace StageBlend {
+namespace OpenMix {
 
 RecoveryDialog::RecoveryDialog(const CrashState& state, QWidget* parent) : QDialog(parent) {
     setWindowTitle(tr("Session Recovery"));
@@ -21,7 +21,7 @@ void RecoveryDialog::setupUi(const CrashState& state) {
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
     mainLayout->setSpacing(16);
 
-    // top section with icon & message
+    // top section w/ icon & message
     QHBoxLayout* topLayout = new QHBoxLayout();
 
     m_iconLabel = new QLabel(this);
@@ -30,7 +30,7 @@ void RecoveryDialog::setupUi(const CrashState& state) {
     topLayout->addWidget(m_iconLabel);
 
     QVBoxLayout* messageLayout = new QVBoxLayout();
-    m_messageLabel = new QLabel(tr("<b>StageBlend did not exit cleanly</b>"), this);
+    m_messageLabel = new QLabel(tr("<b>OpenMix did not exit cleanly</b>"), this);
     messageLayout->addWidget(m_messageLabel);
 
     m_detailsLabel = new QLabel(this);
@@ -128,4 +128,4 @@ void RecoveryDialog::onOpenBackupClicked() {
     accept();
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

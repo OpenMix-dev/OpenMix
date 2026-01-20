@@ -13,22 +13,23 @@
 #include <QLockFile>
 #include <QStandardPaths>
 
-namespace StageBlend {
+#ifdef Q_OS_WIN
+#include <windows.h>
+#else
+#include <signal.h>
+#include <sys/types.h>
+#endif
+
+namespace OpenMix {
 
 CrashRecovery::CrashRecovery(QObject* parent) : QObject(parent) {
     connect(&m_autoSaveTimer, &QTimer::timeout, this, &CrashRecovery::onAutoSaveTimeout);
 
-    // load any existing crash state on construction
     loadCrashState();
-
-    // create lock file to indicate active session
     createLockFile();
 }
 
-CrashRecovery::~CrashRecovery() {
-    // don't remove lock file here - markCleanExit() should be called explicitly
-    m_autoSaveTimer.stop();
-}
+CrashRecovery::~CrashRecovery() { m_autoSaveTimer.stop(); }
 
 bool CrashRecovery::hasCrashState() const { return m_crashStateLoaded && m_crashState.isValid; }
 
@@ -43,17 +44,14 @@ bool CrashRecovery::recoverFromCrash(Show* show) {
         return false;
     }
 
-    // restore show data from crash state
     if (!m_crashState.showData.isEmpty()) {
         show->fromJson(m_crashState.showData);
     }
 
-    // restore playback position
     if (m_engine && m_crashState.standbyCueIndex >= 0) {
         m_engine->goToIndex(m_crashState.standbyCueIndex);
     }
 
-    // clear the crash state after successful recovery
     clearCrashState();
 
     emit recoveryCompleted(true);
@@ -76,20 +74,16 @@ void CrashRecovery::saveState() {
     state["timestamp"] = QDateTime::currentMSecsSinceEpoch();
     state["projectPath"] = m_show->filePath();
 
-    // save playback state
     if (m_engine) {
         state["currentCueIndex"] = m_engine->currentCueIndex();
         state["standbyCueIndex"] = m_engine->standbyCueIndex();
     }
 
-    // save show data
     state["showData"] = m_show->toJson();
 
-    // ensure config directory exists
     QDir dir;
     dir.mkpath(configDir());
 
-    // write state file
     QFile file(crashStatePath());
     if (file.open(QIODevice::WriteOnly)) {
         QJsonDocument doc(state);
@@ -98,11 +92,14 @@ void CrashRecovery::saveState() {
         emit stateSaved();
     }
 
-    // update lock file timestamp
     QFile lockFile(lockFilePath());
     if (lockFile.exists()) {
         lockFile.open(QIODevice::WriteOnly);
-        lockFile.write(QByteArray::number(QDateTime::currentMSecsSinceEpoch()));
+        QJsonObject lockData;
+        lockData["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+        lockData["pid"] = QCoreApplication::applicationPid();
+        QJsonDocument doc(lockData);
+        lockFile.write(doc.toJson(QJsonDocument::Compact));
         lockFile.close();
     }
 }
@@ -136,7 +133,7 @@ QString CrashRecovery::lockFilePath() { return configDir() + "/lock"; }
 QString CrashRecovery::configDir() {
     QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     if (path.isEmpty()) {
-        path = QDir::homePath() + "/.stageblend";
+        path = QDir::homePath() + "/.OpenMix";
     }
     return path;
 }
@@ -149,7 +146,11 @@ bool CrashRecovery::createLockFile() {
 
     QFile file(lockFilePath());
     if (file.open(QIODevice::WriteOnly)) {
-        file.write(QByteArray::number(QDateTime::currentMSecsSinceEpoch()));
+        QJsonObject lockData;
+        lockData["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+        lockData["pid"] = QCoreApplication::applicationPid();
+        QJsonDocument doc(lockData);
+        file.write(doc.toJson(QJsonDocument::Compact));
         file.close();
         return true;
     }
@@ -164,46 +165,83 @@ bool CrashRecovery::isLockFileStale() const {
         return false;
     }
 
-    // check if lock file is older than threshold
     QFile file(lockFilePath());
     if (file.open(QIODevice::ReadOnly)) {
-        qint64 timestamp = file.readAll().toLongLong();
+        QByteArray data = file.readAll();
         file.close();
 
-        qint64 now = QDateTime::currentMSecsSinceEpoch();
-        qint64 age = (now - timestamp) / 1000; // age in seconds
-
-        return age > LOCK_FILE_STALE_SECONDS;
+        QJsonParseError error;
+        QJsonDocument doc = QJsonDocument::fromJson(data, &error);
+        if (error.error == QJsonParseError::NoError && doc.isObject()) {
+            QJsonObject obj = doc.object();
+            qint64 timestamp = obj["timestamp"].toVariant().toLongLong();
+            qint64 now = QDateTime::currentMSecsSinceEpoch();
+            qint64 age = (now - timestamp) / 1000;
+            return age > LOCK_FILE_STALE_SECONDS;
+        }
     }
 
-    // if we can't read the file, use modification time
-    qint64 age = info.lastModified().secsTo(QDateTime::currentDateTime());
-    return age > LOCK_FILE_STALE_SECONDS;
+    return true;
+}
+
+qint64 CrashRecovery::readPidFromLockFile() const {
+    QFile file(lockFilePath());
+    if (file.open(QIODevice::ReadOnly)) {
+        QByteArray data = file.readAll();
+        file.close();
+
+        QJsonParseError error;
+        QJsonDocument doc = QJsonDocument::fromJson(data, &error);
+        if (error.error == QJsonParseError::NoError && doc.isObject()) {
+            return doc.object()["pid"].toVariant().toLongLong();
+        }
+    }
+    return 0;
+}
+
+bool CrashRecovery::isProcessRunning(qint64 pid) const {
+    if (pid <= 0) {
+        return false;
+    }
+
+    if (pid == QCoreApplication::applicationPid()) {
+        return false;
+    }
+
+#ifdef Q_OS_WIN
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
+    if (process != nullptr) {
+        DWORD exitCode = 0;
+        bool running = GetExitCodeProcess(process, &exitCode) && exitCode == STILL_ACTIVE;
+        CloseHandle(process);
+        return running;
+    }
+    return false;
+#else
+    return kill(static_cast<pid_t>(pid), 0) == 0;
+#endif
 }
 
 void CrashRecovery::loadCrashState() {
     QString statePath = crashStatePath();
     QString lockPath = lockFilePath();
 
-    // check if crash state file exists
     if (!QFile::exists(statePath)) {
         m_crashStateLoaded = false;
         return;
     }
 
-    // check if lock file exists (indicates another instance or crash)
     bool lockExists = QFile::exists(lockPath);
     bool lockStale = isLockFileStale();
 
-    // if lock exists & is not stale, another instance might be running
     if (lockExists && !lockStale) {
-        // could be another instance - don't treat as crash
-        // in a production app, you'd want to check if the process is actually running
-        m_crashStateLoaded = false;
-        return;
+        qint64 pid = readPidFromLockFile();
+        if (isProcessRunning(pid)) {
+            m_crashStateLoaded = false;
+            return;
+        }
     }
 
-    // lock exists but is stale, or no lock - this was likely a crash
     QFile file(statePath);
     if (!file.open(QIODevice::ReadOnly)) {
         m_crashStateLoaded = false;
@@ -234,4 +272,4 @@ void CrashRecovery::loadCrashState() {
     emit crashDetected(m_crashState);
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

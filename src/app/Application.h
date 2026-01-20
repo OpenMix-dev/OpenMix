@@ -5,7 +5,7 @@
 #include <QPointer>
 #include <QUndoStack>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class Show;
 class PlaybackEngine;
@@ -91,4 +91,4 @@ class Application : public QObject {
     CrashRecovery* m_crashRecovery;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

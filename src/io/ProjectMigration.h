@@ -4,7 +4,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace StageBlend {
+namespace OpenMix {
 
 constexpr int PROJECT_VERSION_CURRENT = 3;
 constexpr int PROJECT_VERSION_MIN_SUPPORTED = 1;
@@ -49,4 +49,4 @@ class ProjectMigration {
     static void migrateCuesV2toV3(QJsonArray& cues, QStringList& warnings);
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

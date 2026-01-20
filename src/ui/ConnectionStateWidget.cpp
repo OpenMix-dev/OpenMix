@@ -2,7 +2,7 @@
 #include <QPainter>
 #include <QPainterPath>
 
-namespace StageBlend {
+namespace OpenMix {
 
 ConnectionStateWidget::ConnectionStateWidget(QWidget* parent) : QWidget(parent) {
     setMinimumHeight(24);
@@ -120,4 +120,4 @@ void ConnectionStateWidget::onBlinkTimer() {
     update();
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

@@ -7,19 +7,19 @@ int main(int argc, char* argv[]) {
     QApplication qtApp(argc, argv);
 
     // metadata
-    QApplication::setApplicationName("StageBlend");
+    QApplication::setApplicationName("OpenMix");
     QApplication::setApplicationVersion("0.1.0");
-    QApplication::setOrganizationName("StageBlend");
-    QApplication::setOrganizationDomain("stageblend.org");
+    QApplication::setOrganizationName("OpenMix");
+    QApplication::setOrganizationDomain("OpenMix.org");
 
     QApplication::setStyle(QStyleFactory::create("Fusion"));
 
     // create app instance
-    StageBlend::Application app;
+    OpenMix::Application app;
     app.initialize();
 
     // create & show main window
-    StageBlend::MainWindow mainWindow(&app);
+    OpenMix::MainWindow mainWindow(&app);
     app.setMainWindow(&mainWindow);
     mainWindow.show();
 

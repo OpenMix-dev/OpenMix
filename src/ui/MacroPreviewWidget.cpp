@@ -5,7 +5,7 @@
 #include <QHeaderView>
 #include <QSet>
 
-namespace StageBlend {
+namespace OpenMix {
 
 MacroPreviewWidget::MacroPreviewWidget(QWidget* parent) : QWidget(parent) {
     m_layout = new QVBoxLayout(this);
@@ -208,4 +208,4 @@ QString MacroPreviewWidget::executionModeString(const Cue* cue) const {
     return QString();
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

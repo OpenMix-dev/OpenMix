@@ -7,7 +7,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 
-namespace StageBlend {
+namespace OpenMix {
 
 CueFilterBar::CueFilterBar(CueFilterProxyModel* proxyModel, QWidget* parent)
     : QWidget(parent), m_proxyModel(proxyModel) {
@@ -164,4 +164,4 @@ void CueFilterBar::onClearFilters() {
     emit filtersChanged();
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

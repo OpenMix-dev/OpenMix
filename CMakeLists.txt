@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(StageBlend
+project(OpenMix
     VERSION 0.1.0
     DESCRIPTION "Open Source Theatre Sound Mixing Control"
     LANGUAGES CXX
@@ -22,7 +22,6 @@ find_package(Qt6 REQUIRED COMPONENTS
 
 # find liblo for OSC
 if(WIN32)
-    # on Windows, use vcpkg (via CMAKE_TOOLCHAIN_FILE)
     find_path(LIBLO_INCLUDE_DIRS lo/lo.h REQUIRED)
     find_library(LIBLO_LIBRARIES NAMES lo liblo REQUIRED)
 else()
@@ -63,7 +62,29 @@ set(SOURCES
     src/ui/ShortcutConfigDialog.cpp
     src/ui/RecoveryDialog.cpp
     src/ui/LimitationsDialog.cpp
-    src/protocol/X32Protocol.cpp
+
+    src/protocol/MixerProtocol.cpp
+    src/protocol/MixerCapabilities.cpp
+    src/protocol/ProtocolFactory.cpp
+    src/protocol/transport/OscTransport.cpp
+    src/protocol/transport/TcpTransport.cpp
+    # Behringer / Midas protocols
+    src/protocol/behringer/X32Protocol.cpp
+    src/protocol/behringer/WingProtocol.cpp
+
+    src/protocol/allenheath/AllenHeathMidiProtocol.cpp
+    src/protocol/allenheath/SQProtocol.cpp
+    src/protocol/allenheath/GLDProtocol.cpp
+    src/protocol/allenheath/AllenHeathTcpProtocol.cpp
+    src/protocol/allenheath/AvantisProtocol.cpp
+    src/protocol/allenheath/DLiveProtocol.cpp
+
+    src/protocol/yamaha/YamahaTcpProtocol.cpp
+    src/protocol/yamaha/YamahaTFProtocol.cpp
+    src/protocol/yamaha/YamahaQLProtocol.cpp
+    src/protocol/yamaha/YamahaCLProtocol.cpp
+    src/protocol/yamaha/YamahaDM7Protocol.cpp
+
     src/io/ProjectFile.cpp
     src/io/AutosaveManager.cpp
     src/io/CrashRecovery.cpp
@@ -102,8 +123,29 @@ set(HEADERS
     src/ui/ShortcutConfigDialog.h
     src/ui/RecoveryDialog.h
     src/ui/LimitationsDialog.h
+
     src/protocol/MixerProtocol.h
-    src/protocol/X32Protocol.h
+    src/protocol/MixerCapabilities.h
+    src/protocol/ProtocolFactory.h
+    src/protocol/transport/OscTransport.h
+    src/protocol/transport/TcpTransport.h
+    # Behringer / Midas protocols
+    src/protocol/behringer/X32Protocol.h
+    src/protocol/behringer/WingProtocol.h
+
+    src/protocol/allenheath/AllenHeathMidiProtocol.h
+    src/protocol/allenheath/SQProtocol.h
+    src/protocol/allenheath/GLDProtocol.h
+    src/protocol/allenheath/AllenHeathTcpProtocol.h
+    src/protocol/allenheath/AvantisProtocol.h
+    src/protocol/allenheath/DLiveProtocol.h
+
+    src/protocol/yamaha/YamahaTcpProtocol.h
+    src/protocol/yamaha/YamahaTFProtocol.h
+    src/protocol/yamaha/YamahaQLProtocol.h
+    src/protocol/yamaha/YamahaCLProtocol.h
+    src/protocol/yamaha/YamahaDM7Protocol.h
+
     src/io/ProjectFile.h
     src/io/AutosaveManager.h
     src/io/CrashRecovery.h
@@ -145,7 +187,7 @@ if(WIN32)
 elseif(APPLE)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         MACOSX_BUNDLE TRUE
-        MACOSX_BUNDLE_BUNDLE_NAME "StageBlend"
+        MACOSX_BUNDLE_BUNDLE_NAME "OpenMix"
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
     )

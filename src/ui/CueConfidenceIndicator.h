@@ -3,7 +3,7 @@
 #include <QColor>
 #include <QWidget>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class Cue;
 class CueList;
@@ -69,4 +69,4 @@ class CueConfidenceIndicator : public QWidget {
     bool m_hovered = false;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

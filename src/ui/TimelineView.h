@@ -3,7 +3,7 @@
 #include <QGraphicsView>
 #include <QVector>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class Application;
 class CueList;
@@ -68,4 +68,4 @@ class TimelineView : public QGraphicsView {
     static constexpr int CUE_MARGIN = 5;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

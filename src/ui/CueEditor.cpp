@@ -16,7 +16,7 @@
 #include <QTextEdit>
 #include <QVBoxLayout>
 
-namespace StageBlend {
+namespace OpenMix {
 
 CueEditor::CueEditor(Application* app, QWidget* parent) : QWidget(parent), m_app(app) {
     setupUi();
@@ -259,4 +259,4 @@ void CueEditor::onCaptureSnapshot() {
     }
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

@@ -4,7 +4,7 @@
 #include <QMutexLocker>
 #include <QTextStream>
 
-namespace StageBlend {
+namespace OpenMix {
 
 QString PlaybackLogEntry::typeString() const {
     switch (type) {
@@ -297,4 +297,4 @@ void PlaybackLogger::pruneOldEntries() {
     }
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

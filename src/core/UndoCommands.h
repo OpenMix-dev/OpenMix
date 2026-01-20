@@ -3,7 +3,7 @@
 #include "Cue.h"
 #include <QUndoCommand>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class CueList;
 
@@ -92,4 +92,4 @@ class BatchEditCommand : public QUndoCommand {
     bool m_firstRedo = true;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

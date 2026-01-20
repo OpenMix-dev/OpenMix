@@ -5,7 +5,7 @@
 #include <QStringList>
 #include <QTimer>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class Application;
 class Show;
@@ -68,4 +68,4 @@ class AutosaveManager : public QObject {
     int m_maxAutosaves = 3;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

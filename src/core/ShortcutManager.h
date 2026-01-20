@@ -8,7 +8,7 @@
 #include <QString>
 #include <QTimer>
 
-namespace StageBlend {
+namespace OpenMix {
 
 struct ShortcutInfo {
     QString id;
@@ -78,4 +78,4 @@ class ShortcutManager : public QObject {
     static constexpr int KEYPAD_TIMEOUT_MS = 1500; // 1.5 seconds to complete cue number
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

@@ -5,12 +5,13 @@
 #include <QObject>
 #include <QString>
 
-namespace StageBlend {
+namespace OpenMix {
 
 struct MixerConfig {
-    QString type; // "x32", "yamaha", "allen-heath"
-    QString host;
-    int port = 10023; // default X32 port
+    QString type;     // protocol ID: "x32", "wing", "sq7", "cl5", etc.
+    QString host;     // IP address or hostname
+    int port = 10023; // default X32 port (will be updated per console type)
+    int dcaCount = 8; // number of DCAs (varies by console)
 
     QJsonObject toJson() const;
     static MixerConfig fromJson(const QJsonObject& json);
@@ -22,7 +23,6 @@ class Show : public QObject {
   public:
     explicit Show(QObject* parent = nullptr);
 
-    // project metadata
     QString name() const { return m_name; }
     void setName(const QString& name);
 
@@ -32,27 +32,21 @@ class Show : public QObject {
     QString notes() const { return m_notes; }
     void setNotes(const QString& notes) { m_notes = notes; }
 
-    // file path
     QString filePath() const { return m_filePath; }
     void setFilePath(const QString& path) { m_filePath = path; }
 
-    // modified state
     bool isModified() const { return m_modified; }
     void setModified(bool modified);
 
-    // cue list
     CueList* cueList() { return &m_cueList; }
     const CueList* cueList() const { return &m_cueList; }
 
-    // mixer configuration
     MixerConfig mixerConfig() const { return m_mixerConfig; }
     void setMixerConfig(const MixerConfig& config) { m_mixerConfig = config; }
 
-    // serialization
     QJsonObject toJson() const;
     void fromJson(const QJsonObject& json);
 
-    // create new empty show
     void newShow();
 
   signals:
@@ -71,4 +65,4 @@ class Show : public QObject {
     MixerConfig m_mixerConfig;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

@@ -1,11 +1,12 @@
 #pragma once
 
+#include "Cue.h"
 #include <QJsonObject>
 #include <QObject>
 #include <QString>
 #include <QVector>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class PlaybackEngine;
 class MixerProtocol;
@@ -22,40 +23,34 @@ class PlaybackGuard : public QObject {
   public:
     explicit PlaybackGuard(PlaybackEngine* engine, QObject* parent = nullptr);
 
-    // configure the mixer protocol for panic operations
     void setMixer(MixerProtocol* mixer);
 
-    // gO lockout during critical fades
     void setLockoutEnabled(bool enabled);
     bool isLockoutEnabled() const { return m_lockoutEnabled; }
 
-    // threshold: lockout GO when fade is below this progress (default 10%)
     void setLockoutThreshold(double progressPercent);
     double lockoutThreshold() const { return m_lockoutThreshold; }
 
-    // check if GO is currently locked
     bool isGoLocked() const;
     QString lockoutReason() const;
 
-    // safe state capture & management
     void captureSafeState(const QString& description);
     void clearSafeState();
     bool hasSafeState() const { return !m_safeState.parameters.isEmpty(); }
     SafeState safeState() const { return m_safeState; }
 
-    // define default safe values (faders→0, mutes→on)
     void setDefaultSafeValues(const QJsonObject& values);
     QJsonObject defaultSafeValues() const { return m_defaultSafeValues; }
 
-    // emergency operations
-    void panic(double fadeOutSeconds = 0.5);     // fade to safe state
-    void panicImmediate();                       // instant snap to safe state
-    void panicAndRestore(double fadeOutSeconds); // panic then restore
+    void setPanicFadeCurve(FadeCurve curve) { m_panicFadeCurve = curve; }
+    FadeCurve panicFadeCurve() const { return m_panicFadeCurve; }
 
-    // check if currently in panic mode
+    void panic(double fadeOutSeconds = 0.5);
+    void panicImmediate();
+    void panicAndRestore(double fadeOutSeconds);
+
     bool isPanicActive() const { return m_panicActive; }
 
-    // restore from panic to last captured safe state
     void restoreFromPanic(double fadeInSeconds = 1.0);
 
   signals:
@@ -79,19 +74,19 @@ class PlaybackGuard : public QObject {
     PlaybackEngine* m_engine;
     MixerProtocol* m_mixer = nullptr;
 
-    // lockout settings
     bool m_lockoutEnabled = true;
-    double m_lockoutThreshold = 0.10; // 10%
+    double m_lockoutThreshold = 0.10;
     bool m_wasLocked = false;
 
-    // safe state
     SafeState m_safeState;
-    SafeState m_prePanicState; // state before panic for restoration
+    SafeState m_prePanicState;
     QJsonObject m_defaultSafeValues;
 
-    // panic state
     bool m_panicActive = false;
     bool m_restorationPending = false;
+    bool m_restoreFadeActive = false;
+
+    FadeCurve m_panicFadeCurve = FadeCurve::Linear;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

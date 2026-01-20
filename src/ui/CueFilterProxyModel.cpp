@@ -2,7 +2,7 @@
 #include "CueTableModel.h"
 #include "core/CueList.h"
 
-namespace StageBlend {
+namespace OpenMix {
 
 CueFilterProxyModel::CueFilterProxyModel(QObject* parent) : QSortFilterProxyModel(parent) {
     setFilterCaseSensitivity(Qt::CaseInsensitive);
@@ -180,4 +180,4 @@ bool CueFilterProxyModel::lessThan(const QModelIndex& left, const QModelIndex& r
     return QSortFilterProxyModel::lessThan(left, right);
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

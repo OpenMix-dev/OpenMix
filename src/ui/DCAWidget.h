@@ -6,7 +6,7 @@ class QSlider;
 class QPushButton;
 class QLabel;
 
-namespace StageBlend {
+namespace OpenMix {
 
 class DCAWidget : public QWidget {
     Q_OBJECT
@@ -55,4 +55,4 @@ class DCAWidget : public QWidget {
     QLabel* m_levelLabel;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

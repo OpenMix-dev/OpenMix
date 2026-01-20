@@ -5,7 +5,7 @@
 #include <QSet>
 #include <cmath>
 
-namespace StageBlend {
+namespace OpenMix {
 
 DryRunEngine::DryRunEngine(QObject* parent) : QObject(parent) {}
 
@@ -33,7 +33,6 @@ DryRunResult DryRunEngine::executeDryRun(int cueIndex) {
     result.cueNumber = cue.number();
     result.cueName = cue.name();
 
-    // validate cue first
     if (m_validator) {
         ValidationResult validation = m_validator->validate(cue, m_cueList);
         result.validationPassed = validation.valid;
@@ -51,13 +50,11 @@ DryRunResult DryRunEngine::executeDryRun(int cueIndex) {
         }
     }
 
-    // simulate execution based on type
     QJsonObject currentState = m_initialState;
     qint64 currentTime = 0;
 
     switch (cue.type()) {
     case CueType::Snapshot: {
-        // instant change to target parameters
         QJsonObject targetParams = cue.parameters();
         for (auto it = targetParams.begin(); it != targetParams.end(); ++it) {
             currentState[it.key()] = it.value();
@@ -71,14 +68,12 @@ DryRunResult DryRunEngine::executeDryRun(int cueIndex) {
     case CueType::Fade: {
         double fadeTime = cue.fadeTime();
         if (fadeTime <= 0) {
-            // instant fade
             QJsonObject targetParams = cue.parameters();
             for (auto it = targetParams.begin(); it != targetParams.end(); ++it) {
                 currentState[it.key()] = it.value();
             }
             result.timeline.append(qMakePair(currentTime, currentState));
         } else {
-            // simulate fade timeline
             QJsonObject endState = currentState;
             QJsonObject targetParams = cue.parameters();
             for (auto it = targetParams.begin(); it != targetParams.end(); ++it) {
@@ -95,7 +90,6 @@ DryRunResult DryRunEngine::executeDryRun(int cueIndex) {
     }
 
     case CueType::Macro: {
-        // expand macro & track child cues
         QSet<QString> visited;
         result.macroExpansion = expandMacro(cue.id(), visited);
 
@@ -103,8 +97,6 @@ DryRunResult DryRunEngine::executeDryRun(int cueIndex) {
             result.warnings.append("Macro cue has no child cues");
         }
 
-        // sum up all child fade times
-        // (actual timing depends on execution mode)
         double totalChildDuration = 0.0;
         for (const QString& childId : result.macroExpansion) {
             const Cue* childCue = m_cueList->findById(childId);
@@ -112,27 +104,24 @@ DryRunResult DryRunEngine::executeDryRun(int cueIndex) {
                 if (cue.macroExecutionMode() == MacroExecutionMode::Sequential) {
                     totalChildDuration += childCue->fadeTime();
                 } else {
-                    // parallel: total duration is max of all children
                     totalChildDuration = qMax(totalChildDuration, childCue->fadeTime());
                 }
             }
         }
         result.totalDuration = totalChildDuration;
-        result.finalState = currentState; // would need recursive simulation for accurate result
+        result.finalState = currentState; // TODO: recursive simulation for accurate result
         result.wouldSucceed = !result.macroExpansion.isEmpty() || !cue.childCueIds().isEmpty();
         break;
     }
 
     case CueType::Wait: {
-        // just a delay
         result.totalDuration = cue.autoFollowDelay();
-        result.finalState = currentState;
+        result.finalState = currentState; // TODO: recursive simulation for accurate result
         result.wouldSucceed = true;
         break;
     }
 
     case CueType::Stop: {
-        // apply parameters
         QJsonObject targetParams = cue.parameters();
         for (auto it = targetParams.begin(); it != targetParams.end(); ++it) {
             currentState[it.key()] = it.value();
@@ -144,7 +133,6 @@ DryRunResult DryRunEngine::executeDryRun(int cueIndex) {
     }
 
     case CueType::GoTo: {
-        // just navigates, no mixer changes
         result.finalState = currentState;
         result.wouldSucceed = true;
         result.warnings.append("GoTo cue - no mixer changes simulated");
@@ -152,7 +140,6 @@ DryRunResult DryRunEngine::executeDryRun(int cueIndex) {
     }
     }
 
-    // add auto-follow delay to duration
     if (cue.autoFollow()) {
         result.totalDuration += cue.autoFollowDelay();
     }
@@ -184,22 +171,18 @@ QVector<DryRunResult> DryRunEngine::executeDryRunSequence(int startIndex, int ma
     int cueCount = 0;
 
     while (currentIndex >= 0 && currentIndex < m_cueList->count() && cueCount < maxCues) {
-        // set the current state for this cue's dry run
         setInitialState(currentState);
 
         DryRunResult result = executeDryRun(currentIndex);
         results.append(result);
 
-        // update current state for next cue
         currentState = result.finalState;
 
-        // check for auto-follow
         const Cue& cue = m_cueList->at(currentIndex);
         if (!cue.autoFollow()) {
-            break; // no auto-follow, sequence ends
+            break;
         }
 
-        // move to next cue
         currentIndex++;
         cueCount++;
     }
@@ -221,7 +204,6 @@ QJsonObject DryRunEngine::predictedStateAtTime(int cueIndex, double secondsAfter
 
     qint64 targetTime = static_cast<qint64>(secondsAfterStart * 1000);
 
-    // find state at the requested time
     QJsonObject state = m_initialState;
     for (const auto& entry : result.timeline) {
         if (entry.first <= targetTime) {
@@ -248,20 +230,16 @@ QVector<QPair<qint64, QJsonObject>> DryRunEngine::simulateFade(const QJsonObject
     int numSamples = qMax(1, static_cast<int>(durationSec * samplesPerSecond));
     double intervalMs = (durationSec * 1000.0) / numSamples;
 
-    // add initial state
     timeline.append(qMakePair(qint64(0), startState));
 
-    // generate intermediate states
     for (int i = 1; i <= numSamples; ++i) {
         double progress = static_cast<double>(i) / numSamples;
         qint64 time = static_cast<qint64>(i * intervalMs);
 
-        // apply fade curve to get curved progress
         double curvedProgress = interpolate(progress, curve);
 
         QJsonObject state = startState;
 
-        // interpolate each parameter
         for (auto it = endState.begin(); it != endState.end(); ++it) {
             QString path = it.key();
             QJsonValue endVal = it.value();
@@ -272,7 +250,6 @@ QVector<QPair<qint64, QJsonObject>> DryRunEngine::simulateFade(const QJsonObject
                 double current = start + (end - start) * curvedProgress;
                 state[path] = current;
             } else {
-                // non-numeric values switch at midpoint
                 if (progress >= 0.5) {
                     state[path] = endVal;
                 }
@@ -289,7 +266,7 @@ QStringList DryRunEngine::expandMacro(const QString& cueId, QSet<QString>& visit
     QStringList expansion;
 
     if (!m_cueList || visited.contains(cueId)) {
-        return expansion; // prevent infinite recursion
+        return expansion;
     }
 
     visited.insert(cueId);
@@ -300,12 +277,10 @@ QStringList DryRunEngine::expandMacro(const QString& cueId, QSet<QString>& visit
     }
 
     if (cue->type() != CueType::Macro) {
-        // not a macro, just return this cue
         expansion.append(cueId);
         return expansion;
     }
 
-    // expand children
     for (const QString& childId : cue->childCueIds()) {
         QStringList childExpansion = expandMacro(childId, visited);
         expansion.append(childExpansion);
@@ -315,7 +290,6 @@ QStringList DryRunEngine::expandMacro(const QString& cueId, QSet<QString>& visit
 }
 
 double DryRunEngine::interpolate(double progress, FadeCurve curve) {
-    // clamp progress to [0, 1]
     progress = qBound(0.0, progress, 1.0);
 
     switch (curve) {
@@ -348,4 +322,4 @@ double DryRunEngine::interpolate(double progress, FadeCurve curve) {
     }
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

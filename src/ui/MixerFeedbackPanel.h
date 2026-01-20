@@ -3,7 +3,7 @@
 #include <QVector>
 #include <QWidget>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class Application;
 class DCAWidget;
@@ -15,6 +15,10 @@ class MixerFeedbackPanel : public QWidget {
     explicit MixerFeedbackPanel(Application* app, QWidget* parent = nullptr);
 
     void setVisibleDCAs(const QVector<int>& dcaNumbers);
+
+    // set number of DCA widgets to display (for different console types)
+    void setDCACount(int count);
+    int dcaCount() const { return m_dcaWidgets.size(); }
 
   public slots:
     void onParameterChanged(const QString& path, const QVariant& value);
@@ -30,4 +34,4 @@ class MixerFeedbackPanel : public QWidget {
     QVector<DCAWidget*> m_dcaWidgets;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

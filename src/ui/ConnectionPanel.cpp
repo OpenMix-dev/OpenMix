@@ -2,6 +2,7 @@
 #include "ConnectionStateWidget.h"
 #include "app/Application.h"
 #include "core/Show.h"
+#include "protocol/MixerCapabilities.h"
 #include "protocol/MixerProtocol.h"
 
 #include <QComboBox>
@@ -14,7 +15,7 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
-namespace StageBlend {
+namespace OpenMix {
 
 ConnectionPanel::ConnectionPanel(Application* app, QWidget* parent) : QWidget(parent), m_app(app) {
     setupUi();
@@ -25,19 +26,33 @@ ConnectionPanel::ConnectionPanel(Application* app, QWidget* parent) : QWidget(pa
 void ConnectionPanel::setupUi() {
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
-    // protocol selection
     QGroupBox* connectionGroup = new QGroupBox(tr("Mixer Connection"), this);
     QFormLayout* formLayout = new QFormLayout(connectionGroup);
 
     m_protocolCombo = new QComboBox(this);
-    m_protocolCombo->addItem(tr("Behringer X32 / Midas M32"), "x32");
-    m_protocolCombo->addItem(tr("Yamaha CL/QL/TF/DM (Coming Soon)"), "yamaha");
-    m_protocolCombo->addItem(tr("Allen & Heath (Coming Soon)"), "allen-heath");
-    // disable unsupported protocols
-    m_protocolCombo->model()->setData(m_protocolCombo->model()->index(1, 0), false,
-                                      Qt::UserRole - 1);
-    m_protocolCombo->model()->setData(m_protocolCombo->model()->index(2, 0), false,
-                                      Qt::UserRole - 1);
+
+    m_protocolCombo->addItem(tr("Behringer X32"), "x32");
+    m_protocolCombo->addItem(tr("Midas M32"), "m32");
+    m_protocolCombo->addItem(tr("Behringer WING"), "wing");
+
+    m_protocolCombo->addItem(tr("Allen & Heath SQ-5"), "sq5");
+    m_protocolCombo->addItem(tr("Allen & Heath SQ-6"), "sq6");
+    m_protocolCombo->addItem(tr("Allen & Heath SQ-7"), "sq7");
+    m_protocolCombo->addItem(tr("Allen & Heath GLD-80"), "gld80");
+    m_protocolCombo->addItem(tr("Allen & Heath GLD-112"), "gld112");
+    m_protocolCombo->addItem(tr("Allen & Heath Avantis"), "avantis");
+    m_protocolCombo->addItem(tr("Allen & Heath dLive"), "dlive");
+
+    m_protocolCombo->addItem(tr("Yamaha TF1"), "tf1");
+    m_protocolCombo->addItem(tr("Yamaha TF3"), "tf3");
+    m_protocolCombo->addItem(tr("Yamaha TF5"), "tf5");
+    m_protocolCombo->addItem(tr("Yamaha QL1"), "ql1");
+    m_protocolCombo->addItem(tr("Yamaha QL5"), "ql5");
+    m_protocolCombo->addItem(tr("Yamaha CL1"), "cl1");
+    m_protocolCombo->addItem(tr("Yamaha CL3"), "cl3");
+    m_protocolCombo->addItem(tr("Yamaha CL5"), "cl5");
+    m_protocolCombo->addItem(tr("Yamaha DM7"), "dm7");
+
     formLayout->addRow(tr("Protocol:"), m_protocolCombo);
 
     m_hostEdit = new QLineEdit(this);
@@ -51,7 +66,6 @@ void ConnectionPanel::setupUi() {
 
     mainLayout->addWidget(connectionGroup);
 
-    // buttons
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     m_connectButton = new QPushButton(tr("Connect"), this);
     m_disconnectButton = new QPushButton(tr("Disconnect"), this);
@@ -63,11 +77,9 @@ void ConnectionPanel::setupUi() {
     buttonLayout->addWidget(m_refreshButton);
     mainLayout->addLayout(buttonLayout);
 
-    // status
     QGroupBox* statusGroup = new QGroupBox(tr("Status"), this);
     QVBoxLayout* statusLayout = new QVBoxLayout(statusGroup);
 
-    // state indicator row
     QHBoxLayout* stateRow = new QHBoxLayout();
     m_stateWidget = new ConnectionStateWidget(this);
     stateRow->addWidget(m_stateWidget);
@@ -77,7 +89,6 @@ void ConnectionPanel::setupUi() {
     stateRow->addWidget(m_statusLabel, 1);
     statusLayout->addLayout(stateRow);
 
-    // latency display
     m_latencyLabel = new QLabel(this);
     m_latencyLabel->setVisible(false);
     statusLayout->addWidget(m_latencyLabel);
@@ -86,7 +97,6 @@ void ConnectionPanel::setupUi() {
 
     mainLayout->addStretch();
 
-    // connections
     connect(m_protocolCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &ConnectionPanel::onProtocolTypeChanged);
     connect(m_connectButton, &QPushButton::clicked, this, &ConnectionPanel::onConnectClicked);
@@ -231,13 +241,9 @@ void ConnectionPanel::onDisconnected() {
 }
 
 void ConnectionPanel::onProtocolTypeChanged(int index) {
-    // update default port based on protocol
     QString type = m_protocolCombo->itemData(index).toString();
-    if (type == "x32") {
-        m_portSpin->setValue(10023);
-    } else if (type == "yamaha") {
-        m_portSpin->setValue(49280); // yamaha default
-    }
+    MixerCapabilities caps = MixerCapabilities::forProtocolId(type);
+    m_portSpin->setValue(caps.defaultPort);
 }
 
 void ConnectionPanel::updateUiState() {
@@ -255,7 +261,6 @@ void ConnectionPanel::updateUiState() {
 void ConnectionPanel::loadFromConfig() {
     MixerConfig config = m_app->show()->mixerConfig();
 
-    // set protocol
     int idx = m_protocolCombo->findData(config.type);
     if (idx >= 0) {
         m_protocolCombo->setCurrentIndex(idx);
@@ -273,4 +278,4 @@ void ConnectionPanel::saveToConfig() {
     m_app->show()->setMixerConfig(config);
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

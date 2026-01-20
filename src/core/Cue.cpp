@@ -1,9 +1,8 @@
 #include "Cue.h"
 #include <QJsonValue>
 
-namespace StageBlend {
+namespace OpenMix {
 
-// cueType conversion functions
 QString cueTypeToString(CueType type) {
     switch (type) {
     case CueType::Snapshot:
@@ -37,7 +36,6 @@ CueType stringToCueType(const QString& str) {
     return CueType::Snapshot;
 }
 
-// fadeCurve conversion functions
 QString fadeCurveToString(FadeCurve curve) {
     switch (curve) {
     case FadeCurve::Linear:
@@ -67,7 +65,6 @@ FadeCurve stringToFadeCurve(const QString& str) {
     return FadeCurve::Linear;
 }
 
-// autoFollowCondition conversion functions
 QString autoFollowConditionToString(AutoFollowCondition condition) {
     switch (condition) {
     case AutoFollowCondition::Always:
@@ -89,7 +86,6 @@ AutoFollowCondition stringToAutoFollowCondition(const QString& str) {
     return AutoFollowCondition::Always;
 }
 
-// macroExecutionMode conversion functions
 QString macroExecutionModeToString(MacroExecutionMode mode) {
     switch (mode) {
     case MacroExecutionMode::Sequential:
@@ -107,19 +103,40 @@ MacroExecutionMode stringToMacroExecutionMode(const QString& str) {
     return MacroExecutionMode::Sequential;
 }
 
+QString stopBehaviorToString(StopBehavior behavior) {
+    switch (behavior) {
+    case StopBehavior::StopFadesOnly:
+        return "stopfadesonly";
+    case StopBehavior::StopAndApply:
+        return "stopandapply";
+    case StopBehavior::StopAndFadeOut:
+        return "stopandfadeout";
+    default:
+        return "stopandapply";
+    }
+}
+
+StopBehavior stringToStopBehavior(const QString& str) {
+    if (str == "stopfadesonly")
+        return StopBehavior::StopFadesOnly;
+    if (str == "stopandfadeout")
+        return StopBehavior::StopAndFadeOut;
+    return StopBehavior::StopAndApply;
+}
+
 Cue::Cue()
     : m_id(QUuid::createUuid().toString(QUuid::WithoutBraces)), m_number(0.0),
       m_type(CueType::Snapshot), m_fadeTime(0.0), m_fadeCurve(FadeCurve::Linear),
       m_autoFollow(false), m_autoFollowDelay(0.0),
       m_autoFollowCondition(AutoFollowCondition::Always),
-      m_macroExecutionMode(MacroExecutionMode::Sequential) {}
+      m_macroExecutionMode(MacroExecutionMode::Sequential), m_gotoAutoExecute(false) {}
 
 Cue::Cue(double number, const QString& name)
     : m_id(QUuid::createUuid().toString(QUuid::WithoutBraces)), m_number(number), m_name(name),
       m_type(CueType::Snapshot), m_fadeTime(0.0), m_fadeCurve(FadeCurve::Linear),
       m_autoFollow(false), m_autoFollowDelay(0.0),
       m_autoFollowCondition(AutoFollowCondition::Always),
-      m_macroExecutionMode(MacroExecutionMode::Sequential) {}
+      m_macroExecutionMode(MacroExecutionMode::Sequential), m_gotoAutoExecute(false) {}
 
 void Cue::setParameter(const QString& path, const QVariant& value) {
     m_parameters[path] = QJsonValue::fromVariant(value);
@@ -146,7 +163,6 @@ QJsonObject Cue::toJson() const {
     json["autoFollowCondition"] = autoFollowConditionToString(m_autoFollowCondition);
     json["parameters"] = m_parameters;
 
-    // macro support
     if (!m_childCueIds.isEmpty()) {
         QJsonArray childIds;
         for (const QString& id : m_childCueIds) {
@@ -156,7 +172,13 @@ QJsonObject Cue::toJson() const {
     }
     json["macroExecutionMode"] = macroExecutionModeToString(m_macroExecutionMode);
 
-    // grouping & tags
+    if (!m_gotoTarget.isEmpty()) {
+        json["gotoTarget"] = m_gotoTarget;
+    }
+    json["gotoAutoExecute"] = m_gotoAutoExecute;
+
+    json["stopBehavior"] = stopBehaviorToString(m_stopBehavior);
+
     if (!m_group.isEmpty()) {
         json["group"] = m_group;
     }
@@ -188,7 +210,6 @@ Cue Cue::fromJson(const QJsonObject& json) {
     cue.m_autoFollowCondition = stringToAutoFollowCondition(json["autoFollowCondition"].toString());
     cue.m_parameters = json["parameters"].toObject();
 
-    // macro support
     if (json.contains("childCueIds")) {
         QJsonArray childIds = json["childCueIds"].toArray();
         for (const QJsonValue& val : childIds) {
@@ -197,7 +218,11 @@ Cue Cue::fromJson(const QJsonObject& json) {
     }
     cue.m_macroExecutionMode = stringToMacroExecutionMode(json["macroExecutionMode"].toString());
 
-    // grouping & tags
+    cue.m_gotoTarget = json["gotoTarget"].toString();
+    cue.m_gotoAutoExecute = json["gotoAutoExecute"].toBool(false);
+
+    cue.m_stopBehavior = stringToStopBehavior(json["stopBehavior"].toString());
+
     cue.m_group = json["group"].toString();
     if (json.contains("tags")) {
         QJsonArray tagsArray = json["tags"].toArray();
@@ -209,4 +234,4 @@ Cue Cue::fromJson(const QJsonObject& json) {
     return cue;
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

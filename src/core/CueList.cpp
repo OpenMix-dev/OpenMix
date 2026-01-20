@@ -1,7 +1,7 @@
 #include "CueList.h"
 #include <algorithm>
 
-namespace StageBlend {
+namespace OpenMix {
 
 CueList::CueList(QObject* parent) : QObject(parent) {}
 
@@ -121,4 +121,4 @@ void CueList::fromJson(const QJsonArray& json) {
     }
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

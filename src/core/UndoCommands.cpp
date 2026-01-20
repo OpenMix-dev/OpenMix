@@ -1,7 +1,7 @@
 #include "UndoCommands.h"
 #include "CueList.h"
 
-namespace StageBlend {
+namespace OpenMix {
 
 EditCueCommand::EditCueCommand(CueList* cueList, int index, const Cue& oldCue, const Cue& newCue,
                                QUndoCommand* parent)
@@ -161,4 +161,4 @@ void BatchEditCommand::redo() {
     }
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

@@ -1,36 +1,37 @@
 #pragma once
 
-#include "MixerProtocol.h"
+#include "../MixerCapabilities.h"
+#include "../MixerProtocol.h"
+#include "../transport/OscTransport.h"
 #include <QDateTime>
-#include <QElapsedTimer>
 #include <QMap>
 #include <QTimer>
-#include <QUdpSocket>
 
-#include <lo/lo.h>
+namespace OpenMix {
 
-namespace StageBlend {
-
-// pending request tracking for timeout handling
-struct PendingRequest {
+// pending request tracking
+struct WingPendingRequest {
     QString path;
     QDateTime timestamp;
     ParameterCallback callback;
-    qint64 sentTime; // for latency measurement
+    qint64 sentTime;
 };
 
-class X32Protocol : public MixerProtocol {
+// Behringer WING OSC protocol implementation
+// WING uses OSC but with different namespace than X32:
+// DCA paths: /dca/1-24/fader, /dca/1-24/mute
+// scene recall: /action/scenes/recall,i with scene number
+// defaults to port 2223
+class WingProtocol : public MixerProtocol {
     Q_OBJECT
 
   public:
-    explicit X32Protocol(QObject* parent = nullptr);
-    ~X32Protocol() override;
+    explicit WingProtocol(const MixerCapabilities& caps, QObject* parent = nullptr);
+    ~WingProtocol() override;
 
     // protocol identification
-    QString protocolName() const override { return "X32/M32"; }
-    QString protocolDescription() const override {
-        return "Behringer X32 / Midas M32 OSC Protocol";
-    }
+    QString protocolName() const override { return m_capabilities.displayName; }
+    QString protocolDescription() const override { return "Behringer WING OSC Protocol"; }
 
     // connection management
     bool connect(const QString& host, int port) override;
@@ -50,70 +51,63 @@ class X32Protocol : public MixerProtocol {
     void recallSnapshot(const Cue& cue) override;
     QJsonObject captureCurrentState() override;
 
+    // scene recall
+    void recallScene(int sceneNumber) override;
+
     // keep-alive
     void refresh() override;
 
     // latency monitoring
     int latencyMs() const override { return m_latencyMs; }
 
-    // x32-specific: list of parameters to capture
-    QStringList snapshotParameters() const { return m_snapshotParams; }
-    void setSnapshotParameters(const QStringList& params) { m_snapshotParams = params; }
-
-    // configuration
-    void setConnectionTimeout(int ms) { m_connectionTimeoutMs = ms; }
-    void setRequestTimeout(int ms) { m_requestTimeoutMs = ms; }
-    void setMaxReconnectAttempts(int attempts) { m_maxReconnectAttempts = attempts; }
+    // capabilities
+    const MixerCapabilities& capabilities() const override { return m_capabilities; }
 
   private slots:
-    void onReadyRead();
+    void onTransportConnected();
+    void onTransportDisconnected();
+    void onTransportError(const QString& error);
+    void onMessageReceived(const QString& path, const QVariant& value);
     void onKeepAliveTimeout();
     void onConnectionTimeout();
     void onRequestTimeoutCheck();
     void onReconnectAttempt();
 
   private:
-    void sendOscMessage(const QString& path);
-    void sendOscMessage(const QString& path, float value);
-    void sendOscMessage(const QString& path, int value);
-    void sendOscMessage(const QString& path, const QString& value);
-    void parseOscMessage(const QByteArray& data);
+    void initializeSnapshotParams();
     void setStatus(const QString& status);
     void setConnectionState(ConnectionState state);
-    void handleXinfoResponse(const QVariant& value);
+    void handleInfoResponse(const QVariant& value);
     void startReconnection();
     void updateLatency(qint64 roundTripMs);
     void processResponse(const QString& path, const QVariant& value);
 
-    // liblo server for receiving
-    lo_server_thread m_oscServer = nullptr;
-    lo_address m_oscAddress = nullptr;
+    MixerCapabilities m_capabilities;
+    OscTransport m_transport;
 
-    // qt UDP socket (alternative to liblo for sending)
-    QUdpSocket m_socket;
     QString m_host;
-    int m_port = 10023;
+    int m_port;
     ConnectionState m_connectionState = ConnectionState::Disconnected;
     QString m_statusMessage;
 
-    // keep-alive timer (X32 requires /xremote every 10 seconds)
+    // keep-alive timer (WING requires periodic messages)
     QTimer m_keepAliveTimer;
-    static constexpr int KEEPALIVE_INTERVAL = 8000; // 8 seconds
+    static constexpr int KEEPALIVE_INTERVAL = 8000;
 
     // connection timeout
     QTimer m_connectionTimer;
-    int m_connectionTimeoutMs = 5000; // 5 seconds
+    int m_connectionTimeoutMs = 5000;
 
     // reconnection
     QTimer m_reconnectTimer;
     int m_reconnectAttempts = 0;
     int m_maxReconnectAttempts = 3;
-    int m_reconnectDelayMs = 1000; // exponential backoff base
+    int m_reconnectDelayMs = 1000;
 
     // request timeout tracking
     QTimer m_requestTimeoutTimer;
-    QMap<QString, PendingRequest> m_pendingRequests;
-    int m_requestTimeoutMs = 2000; // 2 seconds
+    QMap<QString, WingPendingRequest> m_pendingRequests;
+    int m_requestTimeoutMs = 2000;
 
     // latency monitoring
     int m_latencyMs = 0;
@@ -124,13 +118,8 @@ class X32Protocol : public MixerProtocol {
     QMap<QString, QVariant> m_parameterCache;
     QStringList m_snapshotParams;
 
-    // last keep-alive response tracking
     qint64 m_lastResponseTime = 0;
-    bool m_waitingForXinfo = false;
-
-    // OSC callback (static for liblo)
-    static int oscHandler(const char* path, const char* types, lo_arg** argv, int argc,
-                          lo_message msg, void* user_data);
+    bool m_waitingForInfo = false;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

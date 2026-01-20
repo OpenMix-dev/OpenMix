@@ -3,7 +3,7 @@
 #include <QTableView>
 #include <QWidget>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class Application;
 class Cue;
@@ -53,4 +53,4 @@ class CueListView : public QWidget {
     int m_standbyCueIndex = -1;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

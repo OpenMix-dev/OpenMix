@@ -5,7 +5,7 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class Cue;
 class CueList;
@@ -46,4 +46,4 @@ class MacroPreviewWidget : public QWidget {
     QLabel* m_emptyLabel;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

@@ -7,7 +7,7 @@
 #include <QPainter>
 #include <QToolTip>
 
-namespace StageBlend {
+namespace OpenMix {
 
 CueConfidenceIndicator::CueConfidenceIndicator(QWidget* parent) : QWidget(parent) {
     setMouseTracking(true);
@@ -122,7 +122,7 @@ void CueConfidenceIndicator::mousePressEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
         emit clicked();
 
-        // show tooltip with details
+        // show tooltip w/ details
         if (!m_tooltipText.isEmpty()) {
             QToolTip::showText(event->globalPosition().toPoint(), m_tooltipText, this);
         }
@@ -192,4 +192,4 @@ void CueConfidenceIndicator::updateFromValidation(const ValidationResult& result
     update();
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

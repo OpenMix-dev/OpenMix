@@ -9,7 +9,7 @@
 #include <QWheelEvent>
 #include <cmath>
 
-namespace StageBlend {
+namespace OpenMix {
 
 TimelineView::TimelineView(Application* app, QWidget* parent) : QGraphicsView(parent), m_app(app) {
     setupScene();
@@ -264,7 +264,7 @@ void TimelineView::onCurrentCueChanged(int index) {
 
 void TimelineView::wheelEvent(QWheelEvent* event) {
     if (event->modifiers() & Qt::ControlModifier) {
-        // zoom with Ctrl+Wheel
+        // zoom w/ ctrl+wheel
         if (event->angleDelta().y() > 0) {
             zoomIn();
         } else {
@@ -292,4 +292,4 @@ void TimelineView::mousePressEvent(QMouseEvent* event) {
     }
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

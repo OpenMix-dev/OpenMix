@@ -3,7 +3,7 @@
 #include <QDateTime>
 #include <QJsonArray>
 
-namespace StageBlend {
+namespace OpenMix {
 
 MigrationResult ProjectMigration::migrate(QJsonObject& projectJson) {
     MigrationResult result;
@@ -78,7 +78,7 @@ QString ProjectMigration::versionString(int version) {
 
 void ProjectMigration::addVersionMetadata(QJsonObject& projectJson) {
     projectJson["_version"] = PROJECT_VERSION_CURRENT;
-    projectJson["_app"] = "StageBlend";
+    projectJson["_app"] = "OpenMix";
     projectJson["_appVersion"] = QCoreApplication::applicationVersion();
     projectJson["_savedAt"] = QDateTime::currentDateTime().toString(Qt::ISODate);
 }
@@ -154,4 +154,4 @@ void ProjectMigration::migrateCuesV2toV3(QJsonArray& cues, QStringList& warnings
     }
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

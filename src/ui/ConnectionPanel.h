@@ -9,7 +9,7 @@ class QComboBox;
 class QPushButton;
 class QLabel;
 
-namespace StageBlend {
+namespace OpenMix {
 
 class Application;
 class ConnectionStateWidget;
@@ -54,4 +54,4 @@ class ConnectionPanel : public QWidget {
     int m_timeoutCount = 0;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

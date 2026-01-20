@@ -27,10 +27,10 @@
 #include <QToolBar>
 #include <QUndoStack>
 
-namespace StageBlend {
+namespace OpenMix {
 
 MainWindow::MainWindow(Application* app, QWidget* parent) : QMainWindow(parent), m_app(app) {
-    setWindowTitle("StageBlend");
+    setWindowTitle("OpenMix");
     setMinimumSize(800, 600);
 
     setupUi();
@@ -67,7 +67,6 @@ void MainWindow::setupUi() {
 }
 
 void MainWindow::createActions() {
-    // file actions
     m_newAction = new QAction(tr("&New Show"), this);
     m_newAction->setShortcut(QKeySequence::New);
     connect(m_newAction, &QAction::triggered, this, &MainWindow::newShow);
@@ -88,7 +87,6 @@ void MainWindow::createActions() {
     m_exitAction->setShortcut(QKeySequence::Quit);
     connect(m_exitAction, &QAction::triggered, this, &QMainWindow::close);
 
-    // edit actions
     m_addCueAction = new QAction(tr("&Add Cue"), this);
     m_addCueAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_N));
     connect(m_addCueAction, &QAction::triggered, this, &MainWindow::addCue);
@@ -100,14 +98,12 @@ void MainWindow::createActions() {
     m_renumberAction = new QAction(tr("&Renumber Cues..."), this);
     connect(m_renumberAction, &QAction::triggered, this, &MainWindow::renumberCues);
 
-    // use undo stack's built-in actions
     m_undoAction = m_app->undoStack()->createUndoAction(this, tr("&Undo"));
     m_undoAction->setShortcut(QKeySequence::Undo);
 
     m_redoAction = m_app->undoStack()->createRedoAction(this, tr("&Redo"));
     m_redoAction->setShortcut(QKeySequence::Redo);
 
-    // playback actions
     m_goAction = new QAction(tr("&GO"), this);
     m_goAction->setShortcut(Qt::Key_Space);
     connect(m_goAction, &QAction::triggered, this, &MainWindow::go);
@@ -125,7 +121,6 @@ void MainWindow::createActions() {
     m_nextCueAction->setShortcut(Qt::Key_Down);
     connect(m_nextCueAction, &QAction::triggered, [this]() { m_app->playbackEngine()->next(); });
 
-    // safety actions
     m_panicAction = new QAction(tr("PANIC"), this);
     m_panicAction->setShortcut(Qt::SHIFT | Qt::Key_Escape);
     m_panicAction->setToolTip(tr("Emergency stop - fade all to safe values (Shift+Escape)"));
@@ -137,7 +132,6 @@ void MainWindow::createActions() {
         tr("Panic then restore to previous state (Ctrl+Shift+Escape)"));
     connect(m_panicRestoreAction, &QAction::triggered, this, &MainWindow::panicRestore);
 
-    // view actions
     m_showConnectionAction = new QAction(tr("&Connection Panel"), this);
     m_showConnectionAction->setCheckable(true);
     m_showConnectionAction->setChecked(true);
@@ -156,7 +150,6 @@ void MainWindow::createActions() {
 }
 
 void MainWindow::createMenus() {
-    // file menu
     m_fileMenu = menuBar()->addMenu(tr("&File"));
     m_fileMenu->addAction(m_newAction);
     m_fileMenu->addAction(m_openAction);
@@ -168,7 +161,6 @@ void MainWindow::createMenus() {
     m_fileMenu->addSeparator();
     m_fileMenu->addAction(m_exitAction);
 
-    // edit menu
     m_editMenu = menuBar()->addMenu(tr("&Edit"));
     m_editMenu->addAction(m_undoAction);
     m_editMenu->addAction(m_redoAction);
@@ -178,7 +170,6 @@ void MainWindow::createMenus() {
     m_editMenu->addSeparator();
     m_editMenu->addAction(m_renumberAction);
 
-    // playback menu
     m_playbackMenu = menuBar()->addMenu(tr("&Playback"));
     m_playbackMenu->addAction(m_goAction);
     m_playbackMenu->addAction(m_stopAction);
@@ -189,19 +180,17 @@ void MainWindow::createMenus() {
     m_playbackMenu->addAction(m_panicAction);
     m_playbackMenu->addAction(m_panicRestoreAction);
 
-    // view menu
     m_viewMenu = menuBar()->addMenu(tr("&View"));
     m_viewMenu->addAction(m_showConnectionAction);
     m_viewMenu->addAction(m_showTimelineAction);
     m_viewMenu->addAction(m_showMixerFeedbackAction);
 
-    // help menu
     m_helpMenu = menuBar()->addMenu(tr("&Help"));
-    QAction* aboutAction = m_helpMenu->addAction(tr("&About StageBlend"));
+    QAction* aboutAction = m_helpMenu->addAction(tr("&About OpenMix"));
     connect(aboutAction, &QAction::triggered, [this]() {
         QMessageBox::about(
-            this, tr("About StageBlend"),
-            tr("<h3>StageBlend</h3>"
+            this, tr("About OpenMix"),
+            tr("<h3>OpenMix</h3>"
                "<p>Open Source Theatre Sound Mixing Control</p>"
                "<p>Version 0.1.0</p>"
                "<p>A live-sound mixing control application for theatre productions.</p>"));
@@ -240,7 +229,6 @@ void MainWindow::createStatusBar() {
 }
 
 void MainWindow::createDockWidgets() {
-    // connection Panel - Right side
     m_connectionPanel = new ConnectionPanel(m_app, this);
     m_connectionDock = new QDockWidget(tr("Mixer Connection"), this);
     m_connectionDock->setObjectName("ConnectionDock");
@@ -252,7 +240,6 @@ void MainWindow::createDockWidgets() {
     connect(m_connectionDock, &QDockWidget::visibilityChanged, m_showConnectionAction,
             &QAction::setChecked);
 
-    // timeline View - Bottom
     m_timelineView = new TimelineView(m_app, this);
     m_timelineDock = new QDockWidget(tr("Timeline"), this);
     m_timelineDock->setObjectName("TimelineDock");
@@ -264,7 +251,6 @@ void MainWindow::createDockWidgets() {
     connect(m_timelineDock, &QDockWidget::visibilityChanged, m_showTimelineAction,
             &QAction::setChecked);
 
-    // mixer Feedback Panel - Right side (tabbed with connection panel or hidden by default)
     m_mixerFeedbackPanel = new MixerFeedbackPanel(m_app, this);
     m_mixerFeedbackDock = new QDockWidget(tr("Mixer Feedback"), this);
     m_mixerFeedbackDock->setObjectName("MixerFeedbackDock");
@@ -280,14 +266,12 @@ void MainWindow::createDockWidgets() {
 }
 
 void MainWindow::connectSignals() {
-    // show signals
     connect(m_app->show(), &Show::modifiedChanged, this, &MainWindow::updateTitle);
     connect(m_app->show(), &Show::nameChanged, this, &MainWindow::updateTitle);
     connect(m_app->show()->cueList(), &CueList::cueAdded, this, &MainWindow::updateStatusBar);
     connect(m_app->show()->cueList(), &CueList::cueRemoved, this, &MainWindow::updateStatusBar);
     connect(m_app->show()->cueList(), &CueList::listCleared, this, &MainWindow::updateStatusBar);
 
-    // playback signals
     connect(m_app->playbackEngine(), &PlaybackEngine::stateChanged, this,
             &MainWindow::onPlaybackStateChanged);
     connect(m_app->playbackEngine(), &PlaybackEngine::currentCueChanged, this,
@@ -295,21 +279,17 @@ void MainWindow::connectSignals() {
     connect(m_app->playbackEngine(), &PlaybackEngine::standbyCueChanged, this,
             &MainWindow::updateStatusBar);
 
-    // cue list view signals
     connect(m_cueListView, &CueListView::cueSelected, this, &MainWindow::onCueSelectionChanged);
     connect(m_cueListView, &CueListView::cueSelected, m_cueEditor, &CueEditor::setCue);
     connect(m_cueListView, &CueListView::cueDoubleClicked,
             [this](int index) { m_app->playbackEngine()->executeCue(index); });
 
-    // cue editor signals
     connect(m_cueEditor, &CueEditor::cueModified, [this]() { m_cueListView->refreshCurrentCue(); });
 
-    // safety signals
     connect(m_app->playbackEngine(), &PlaybackEngine::goLockout, this, &MainWindow::onGoLockout);
     connect(m_app->playbackEngine(), &PlaybackEngine::cueValidationFailed, this,
             &MainWindow::onCueValidationFailed);
 
-    // connect to PlaybackGuard if available
     PlaybackGuard* guard = m_app->playbackEngine()->guard();
     if (guard) {
         connect(guard, &PlaybackGuard::panicTriggered, this, &MainWindow::onPanicTriggered);
@@ -317,21 +297,18 @@ void MainWindow::connectSignals() {
                 &MainWindow::onLockoutStateChanged);
     }
 
-    // timeline view signals
-    connect(m_timelineView, &TimelineView::cueClicked, [this](int index) {
-        // select the cue in the list view
-        m_app->playbackEngine()->goToIndex(index);
-    });
+    connect(m_timelineView, &TimelineView::cueClicked,
+            [this](int index) { m_app->playbackEngine()->goToIndex(index); });
 }
 
 void MainWindow::loadSettings() {
-    QSettings settings("StageBlend", "StageBlend");
+    QSettings settings("OpenMix", "OpenMix");
     restoreGeometry(settings.value("geometry").toByteArray());
     restoreState(settings.value("windowState").toByteArray());
 }
 
 void MainWindow::saveSettings() {
-    QSettings settings("StageBlend", "StageBlend");
+    QSettings settings("OpenMix", "OpenMix");
     settings.setValue("geometry", saveGeometry());
     settings.setValue("windowState", saveState());
 }
@@ -360,10 +337,9 @@ bool MainWindow::maybeSave() {
         return true;
     }
 
-    QMessageBox::StandardButton ret =
-        QMessageBox::warning(this, tr("StageBlend"),
-                             tr("The show has been modified.\nDo you want to save your changes?"),
-                             QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+    QMessageBox::StandardButton ret = QMessageBox::warning(
+        this, tr("OpenMix"), tr("The show has been modified.\nDo you want to save your changes?"),
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 
     if (ret == QMessageBox::Save) {
         saveShow();
@@ -486,7 +462,7 @@ void MainWindow::updateTitle() {
     if (m_app->show()->isModified()) {
         title += " *";
     }
-    title += " - StageBlend";
+    title += " - OpenMix";
     setWindowTitle(title);
 }
 
@@ -498,11 +474,9 @@ void MainWindow::updateActions() {
 }
 
 void MainWindow::updateStatusBar() {
-    // cue count
     int count = m_app->show()->cueList()->count();
     m_cueStatusLabel->setText(tr("%n cue(s)", "", count));
 
-    // standby cue
     int standbyIdx = m_app->playbackEngine()->standbyCueIndex();
     if (standbyIdx >= 0) {
         const Cue* cue = m_app->playbackEngine()->standbyCue();
@@ -635,4 +609,4 @@ void MainWindow::onLockoutStateChanged(bool locked) {
     }
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

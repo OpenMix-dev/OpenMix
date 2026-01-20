@@ -6,7 +6,7 @@
 #include <QVBoxLayout>
 #include <cmath>
 
-namespace StageBlend {
+namespace OpenMix {
 
 DCAWidget::DCAWidget(int dcaNumber, QWidget* parent) : QWidget(parent), m_dcaNumber(dcaNumber) {
     setupUi();
@@ -131,4 +131,4 @@ void DCAWidget::paintEvent(QPaintEvent* event) {
     }
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

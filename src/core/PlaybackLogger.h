@@ -8,7 +8,7 @@
 #include <QString>
 #include <QVector>
 
-namespace StageBlend {
+namespace OpenMix {
 
 struct PlaybackLogEntry {
     QDateTime timestamp;
@@ -104,4 +104,4 @@ class PlaybackLogger : public QObject {
     QFile m_logFile;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

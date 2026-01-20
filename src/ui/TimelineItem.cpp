@@ -5,7 +5,7 @@
 #include <QPainter>
 #include <QToolTip>
 
-namespace StageBlend {
+namespace OpenMix {
 
 TimelineCueItem::TimelineCueItem(const Cue& cue, int index, QGraphicsItem* parent)
     : QGraphicsRectItem(parent), m_index(index), m_cueId(cue.id()), m_name(cue.name()),
@@ -180,4 +180,4 @@ void TimelineCueItem::mousePressEvent(QGraphicsSceneMouseEvent* event) {
     QGraphicsRectItem::mousePressEvent(event);
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

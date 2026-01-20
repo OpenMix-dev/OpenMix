@@ -9,7 +9,7 @@
 #include <QStandardPaths>
 #include <algorithm>
 
-namespace StageBlend {
+namespace OpenMix {
 
 AutosaveManager::AutosaveManager(Application* app, QObject* parent) : QObject(parent), m_app(app) {
     // main autosave timer
@@ -70,7 +70,7 @@ QString AutosaveManager::autosavePath() const {
         filename = "untitled";
     }
 
-    return autosaveDir() + "/" + filename + "_autosave.sbproj";
+    return autosaveDir() + "/" + filename + "_autosave.omproj";
 }
 
 QString AutosaveManager::generateBackupFilename() const {
@@ -88,7 +88,7 @@ QString AutosaveManager::generateBackupFilename() const {
     }
 
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
-    return QString("%1_%2.sbproj.bak").arg(baseName, timestamp);
+    return QString("%1_%2.omproj.bak").arg(baseName, timestamp);
 }
 
 QString AutosaveManager::generateAutosaveFilename() const {
@@ -106,7 +106,7 @@ QString AutosaveManager::generateAutosaveFilename() const {
     }
 
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
-    return QString("%1_autosave_%2.sbproj").arg(baseName, timestamp);
+    return QString("%1_autosave_%2.omproj").arg(baseName, timestamp);
 }
 
 void AutosaveManager::onShowModified() {
@@ -204,9 +204,9 @@ QStringList AutosaveManager::availableBackups(const QString& projectPath) const 
 
     QStringList filters;
     if (baseName.isEmpty()) {
-        filters << "*.sbproj.bak";
+        filters << "*.omproj.bak";
     } else {
-        filters << QString("%1_*.sbproj.bak").arg(baseName);
+        filters << QString("%1_*.omproj.bak").arg(baseName);
     }
 
     QFileInfoList files = dir.entryInfoList(filters, QDir::Files, QDir::Time);
@@ -251,7 +251,7 @@ void AutosaveManager::cleanupOldBackups() {
 
     // get all backup files sorted by modification time (newest first)
     QFileInfoList files =
-        dir.entryInfoList(QStringList() << "*.sbproj.bak", QDir::Files, QDir::Time);
+        dir.entryInfoList(QStringList() << "*.omproj.bak", QDir::Files, QDir::Time);
 
     // remove files beyond max count
     for (int i = m_maxBackups; i < files.size(); ++i) {
@@ -266,7 +266,7 @@ void AutosaveManager::cleanupOldAutosaves() {
 
     // get all autosave files sorted by modification time (newest first)
     QFileInfoList files =
-        dir.entryInfoList(QStringList() << "*_autosave*.sbproj", QDir::Files, QDir::Time);
+        dir.entryInfoList(QStringList() << "*_autosave*.omproj", QDir::Files, QDir::Time);
 
     // remove files beyond max count
     for (int i = m_maxAutosaves; i < files.size(); ++i) {
@@ -274,4 +274,4 @@ void AutosaveManager::cleanupOldAutosaves() {
     }
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

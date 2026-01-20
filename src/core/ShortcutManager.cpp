@@ -2,7 +2,7 @@
 #include <QKeyEvent>
 #include <QSettings>
 
-namespace StageBlend {
+namespace OpenMix {
 
 ShortcutManager::ShortcutManager(QObject* parent) : QObject(parent) {
     m_keypadTimer.setSingleShot(true);
@@ -179,7 +179,7 @@ void ShortcutManager::clearKeypadBuffer() {
 }
 
 void ShortcutManager::saveToSettings() {
-    QSettings settings("StageBlend", "StageBlend");
+    QSettings settings("OpenMix", "OpenMix");
     settings.beginGroup("Shortcuts");
 
     for (auto it = m_shortcuts.begin(); it != m_shortcuts.end(); ++it) {
@@ -191,7 +191,7 @@ void ShortcutManager::saveToSettings() {
 }
 
 void ShortcutManager::loadFromSettings() {
-    QSettings settings("StageBlend", "StageBlend");
+    QSettings settings("OpenMix", "OpenMix");
     settings.beginGroup("Shortcuts");
 
     for (auto it = m_shortcuts.begin(); it != m_shortcuts.end(); ++it) {
@@ -225,4 +225,4 @@ int ShortcutManager::numpadKeyToDigit(int key) const {
     return -1;
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

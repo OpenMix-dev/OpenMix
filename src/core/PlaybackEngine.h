@@ -8,7 +8,7 @@
 #include <QTimer>
 #include <QVector>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class MixerProtocol;
 class PlaybackGuard;
@@ -17,7 +17,6 @@ class FadeConflictResolver;
 
 enum class PlaybackState { Stopped, Running, Fading, Paused };
 
-// individual fade instance for overlapping fades
 class FadeInstance {
   public:
     FadeInstance() = default;
@@ -31,21 +30,19 @@ class FadeInstance {
     qint64 startTime() const { return m_startTime; }
     double duration() const { return m_duration; }
 
-    // update progress & return interpolated values for this fade
     QJsonObject update(qint64 currentTime);
-
-    // get current interpolated value for a specific parameter
     QVariant interpolatedValue(const QString& path) const;
+    void adjustStartTime(qint64 offset);
 
   private:
     QString m_cueId;
     QJsonObject m_startParams;
     QJsonObject m_endParams;
-    double m_duration = 0.0; // seconds
+    double m_duration = 0.0;
     qint64 m_startTime = 0;
     double m_progress = 0.0;
     FadeCurve m_curve = FadeCurve::Linear;
-    QJsonObject m_currentValues; // last computed interpolated values
+    QJsonObject m_currentValues;
 };
 
 class PlaybackEngine : public QObject {
@@ -54,11 +51,9 @@ class PlaybackEngine : public QObject {
   public:
     explicit PlaybackEngine(QObject* parent = nullptr);
 
-    // setup
     void setCueList(CueList* cueList);
     void setMixer(MixerProtocol* mixer);
 
-    // safety components
     void setValidator(CueValidator* validator);
     CueValidator* validator() const { return m_validator; }
 
@@ -71,51 +66,41 @@ class PlaybackEngine : public QObject {
     void setConflictResolver(FadeConflictResolver* resolver);
     FadeConflictResolver* conflictResolver() const { return m_conflictResolver; }
 
-    // dry run mode (no mixer sends)
     void setDryRunMode(bool enabled) { m_dryRunMode = enabled; }
     bool isDryRunMode() const { return m_dryRunMode; }
 
-    // playback state
     PlaybackState state() const { return m_state; }
 
-    // current/standby cue indices (-1 if none)
     int currentCueIndex() const { return m_currentIndex; }
     int standbyCueIndex() const { return m_standbyIndex; }
 
-    // get cue pointers
     const Cue* currentCue() const;
     const Cue* standbyCue() const;
 
-    // fade progress (0.0 - 1.0) - returns max progress of all active fades
     double fadeProgress() const;
-
-    // active fade count
     int activeFadeCount() const { return m_activeFades.size(); }
-
-    // check if auto-follow is armed (waiting for button press)
     bool isAutoFollowArmed() const { return m_autoFollowArmed; }
 
-    // fade curve interpolation (used by FadeInstance)
     static double interpolate(double progress, FadeCurve curve);
 
   public slots:
-    // main playback control
-    void go();     // execute standby cue
-    void stop();   // stop playback
-    void pause();  // pause all fades
-    void resume(); // resume all fades
+    void go();
+    void stop();
+    void pause();
+    void resume();
 
-    // navigation
-    void goToFirst();            // set standby to first cue
-    void goToLast();             // set standby to last cue
-    void goToIndex(int index);   // set standby to specific index
-    void goToNumber(double num); // set standby to cue number
-    void previous();             // move standby to previous cue
-    void next();                 // move standby to next cue
+    void goToFirst();
+    void goToLast();
+    void goToIndex(int index);
+    void goToNumber(double num);
+    void previous();
+    void next();
 
-    // direct execution
-    void executeCue(int index);             // execute specific cue immediately
-    void executeCueById(const QString& id); // execute by cue ID
+    void executeCue(int index);
+    void executeCueById(const QString& id);
+
+    void executePanicFade(const QJsonObject& targetValues, double durationSec, FadeCurve curve);
+    void cancelPanicFade();
 
   signals:
     void stateChanged(PlaybackState state);
@@ -129,10 +114,10 @@ class PlaybackEngine : public QObject {
     void autoFollowArmed(bool armed);
     void macroChildExecuted(const QString& parentId, const QString& childId);
 
-    // safety signals
     void cueValidationFailed(int index, const ValidationResult& result);
     void goLockout(const QString& reason);
     void emergencyStopped();
+    void panicFadeCompleted();
 
   private slots:
     void onFadeTimerTick();
@@ -146,6 +131,9 @@ class PlaybackEngine : public QObject {
     void executeCueInternal(const Cue& cue);
     void startFade(const Cue& cue);
     void executeMacroCue(const Cue& cue);
+    void executeGoToCue(const Cue& cue);
+    void executeStopCue(const Cue& cue);
+    void executeNextMacroChild();
     void handleAutoFollow(const Cue& cue);
     void checkFadeCompletion();
 
@@ -155,26 +143,25 @@ class PlaybackEngine : public QObject {
     int m_currentIndex = -1;
     int m_standbyIndex = -1;
 
-    // multiple active fades for overlapping support
     QTimer m_fadeTimer;
     QVector<FadeInstance> m_activeFades;
 
-    // auto-follow
     QTimer m_autoFollowTimer;
-    bool m_autoFollowArmed = false; // for OnButtonPress condition
+    bool m_autoFollowArmed = false;
 
-    // track current macro execution
     QString m_currentMacroId;
     int m_macroChildIndex = 0;
+    QStringList m_macroPendingChildren;
 
-    // safety components
     CueValidator* m_validator = nullptr;
     PlaybackGuard* m_guard = nullptr;
     PlaybackLogger* m_logger = nullptr;
     FadeConflictResolver* m_conflictResolver = nullptr;
 
-    // dry run mode
     bool m_dryRunMode = false;
+    qint64 m_pauseStartTime = 0;
+    bool m_panicFadeActive = false;
+    QString m_panicFadeId;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

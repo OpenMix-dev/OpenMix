@@ -3,7 +3,7 @@
 #include "CueList.h"
 #include <QJsonObject>
 
-namespace StageBlend {
+namespace OpenMix {
 
 CueValidator::CueValidator(QObject* parent) : QObject(parent) {}
 
@@ -11,26 +11,21 @@ ValidationResult CueValidator::validate(const Cue& cue, const CueList* cueList) 
     ValidationResult result;
     result.valid = true;
 
-    // validate macro child IDs exist
     if (cue.type() == CueType::Macro) {
         if (!validateMacroIds(cue, cueList, result.issues)) {
             result.valid = false;
         }
 
-        // check for circular macro references
         if (!detectCircularMacroReferences(cue, cueList, result.issues)) {
             result.valid = false;
         }
 
-        // check for conflicting fade targets in parallel macros
         if (cue.macroExecutionMode() == MacroExecutionMode::Parallel) {
             if (!detectConflictingFadeTargets(cue, cueList, result.issues)) {
-                // warning, not error
             }
         }
     }
 
-    // validate parameters
     if (!validateParameters(cue, result.issues)) {
         result.valid = false;
     }
@@ -53,7 +48,6 @@ ValidationResult CueValidator::validateAll(const CueList* cueList) const {
         const Cue& cue = cueList->at(i);
         ValidationResult cueResult = validate(cue, cueList);
 
-        // prefix issues with cue info
         for (ValidationIssue issue : cueResult.issues) {
             issue.message = tr("Cue %1 (%2): %3")
                                 .arg(cue.number(), 0, 'f', 1)
@@ -82,7 +76,6 @@ bool CueValidator::validateMacroIds(const Cue& cue, const CueList* cueList,
 
     if (childIds.isEmpty()) {
         issues.append({ValidationIssue::Warning, tr("Macro cue has no child cues"), QString()});
-        // warning, not error
     }
 
     for (const QString& childId : childIds) {
@@ -99,7 +92,6 @@ bool CueValidator::validateMacroIds(const Cue& cue, const CueList* cueList,
 bool CueValidator::validateParameters(const Cue& cue, QList<ValidationIssue>& issues) const {
     bool valid = true;
 
-    // fade & snapshot cues should have parameters
     if (cue.type() == CueType::Fade || cue.type() == CueType::Snapshot) {
         QJsonObject params = cue.parameters();
         if (params.isEmpty()) {
@@ -107,17 +99,15 @@ bool CueValidator::validateParameters(const Cue& cue, QList<ValidationIssue>& is
                            tr("%1 cue has no parameters defined")
                                .arg(cue.type() == CueType::Fade ? tr("Fade") : tr("Snapshot")),
                            QString()});
-            // warning, not error
         }
     }
 
-    // fade cues should have positive fade time
     if (cue.type() == CueType::Fade && cue.fadeTime() <= 0) {
         issues.append(
             {ValidationIssue::Warning, tr("Fade cue has zero or negative fade time"), QString()});
     }
 
-    // validate parameter paths (basic check for OSC-like format)
+    // basic check for OSC-like format
     QJsonObject params = cue.parameters();
     for (auto it = params.begin(); it != params.end(); ++it) {
         QString path = it.key();
@@ -176,7 +166,6 @@ bool CueValidator::hasCircularReference(const QString& cueId, const CueList* cue
     visited.insert(cueId);
     recursionStack.insert(cueId);
 
-    // check all children
     for (const QString& childId : cue->childCueIds()) {
         if (hasCircularReference(childId, cueList, visited, recursionStack)) {
             return true;
@@ -197,15 +186,13 @@ bool CueValidator::detectConflictingFadeTargets(const Cue& cue, const CueList* c
         return true;
     }
 
-    // collect all parameters from parallel child cues
-    QMap<QString, QStringList> parameterToCues; // parameter path -> list of cue names/ids
+    QMap<QString, QStringList> parameterToCues;
 
     for (const QString& childId : cue.childCueIds()) {
         const Cue* childCue = cueList->findById(childId);
         if (!childCue)
             continue;
 
-        // get parameters from this child (including any nested macro children)
         QSet<QString> childParams = collectMacroParameters(*childCue, cueList);
 
         QString cueName = childCue->name().isEmpty()
@@ -217,7 +204,6 @@ bool CueValidator::detectConflictingFadeTargets(const Cue& cue, const CueList* c
         }
     }
 
-    // check for conflicts (same parameter in multiple cues)
     bool hasConflicts = false;
     for (auto it = parameterToCues.begin(); it != parameterToCues.end(); ++it) {
         if (it.value().size() > 1) {
@@ -237,7 +223,6 @@ QSet<QString> CueValidator::collectMacroParameters(const Cue& cue, const CueList
     QSet<QString> params;
 
     if (cue.type() == CueType::Macro && cueList) {
-        // recursively collect from children
         for (const QString& childId : cue.childCueIds()) {
             const Cue* childCue = cueList->findById(childId);
             if (childCue) {
@@ -245,7 +230,6 @@ QSet<QString> CueValidator::collectMacroParameters(const Cue& cue, const CueList
             }
         }
     } else {
-        // collect direct parameters
         QJsonObject cueParams = cue.parameters();
         for (auto it = cueParams.begin(); it != cueParams.end(); ++it) {
             params.insert(it.key());
@@ -255,4 +239,4 @@ QSet<QString> CueValidator::collectMacroParameters(const Cue& cue, const CueList
     return params;
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

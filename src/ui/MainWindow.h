@@ -10,7 +10,7 @@ class QLabel;
 class QSplitter;
 class QDockWidget;
 
-namespace StageBlend {
+namespace OpenMix {
 
 class Application;
 class CueListView;
@@ -146,4 +146,4 @@ class MainWindow : public QMainWindow {
     QLabel* m_playbackStatusLabel;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

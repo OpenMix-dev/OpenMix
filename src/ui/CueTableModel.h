@@ -3,7 +3,7 @@
 #include <QAbstractTableModel>
 #include <QMimeData>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class CueList;
 class Cue;
@@ -65,4 +65,4 @@ class CueTableModel : public QAbstractTableModel {
     static const QString s_mimeType;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

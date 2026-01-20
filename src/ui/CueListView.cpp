@@ -12,7 +12,7 @@
 #include <QHeaderView>
 #include <QVBoxLayout>
 
-namespace StageBlend {
+namespace OpenMix {
 
 CueListView::CueListView(Application* app, QWidget* parent) : QWidget(parent), m_app(app) {
     setupUi();
@@ -171,7 +171,7 @@ void CueListView::duplicateSelectedCue() {
     CueList* cueList = m_app->show()->cueList();
     Cue original = cueList->at(idx);
 
-    // create duplicate with next available number
+    // create duplicate w/ next available number
     Cue duplicate = original;
     duplicate.setNumber(cueList->nextCueNumber());
 
@@ -220,4 +220,4 @@ void CueListView::onFiltersChanged() {
     // could emit a signal or update status
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

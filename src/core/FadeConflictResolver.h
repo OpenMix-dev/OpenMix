@@ -6,7 +6,7 @@
 #include <QString>
 #include <QVector>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class CueList;
 class FadeInstance;
@@ -70,4 +70,4 @@ class FadeConflictResolver : public QObject {
     QList<FadeConflict> m_lastConflicts;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

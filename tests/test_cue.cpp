@@ -1,7 +1,7 @@
 #include "core/Cue.h"
 #include <QtTest/QtTest>
 
-using namespace StageBlend;
+using namespace OpenMix;
 
 class TestCue : public QObject {
     Q_OBJECT
@@ -91,6 +91,130 @@ class TestCue : public QObject {
         Cue cue2(2.0);
         QVERIFY(cue1 < cue2);
         QVERIFY(!(cue2 < cue1));
+    }
+
+    void testGotoTarget() {
+        Cue cue;
+        cue.setType(CueType::GoTo);
+        cue.setGotoTarget("5.0");
+        cue.setGotoAutoExecute(true);
+
+        QCOMPARE(cue.type(), CueType::GoTo);
+        QCOMPARE(cue.gotoTarget(), QString("5.0"));
+        QCOMPARE(cue.gotoAutoExecute(), true);
+    }
+
+    void testGotoTargetSerialization() {
+        Cue original;
+        original.setType(CueType::GoTo);
+        original.setGotoTarget("10.5");
+        original.setGotoAutoExecute(true);
+
+        QJsonObject json = original.toJson();
+        Cue loaded = Cue::fromJson(json);
+
+        QCOMPARE(loaded.type(), CueType::GoTo);
+        QCOMPARE(loaded.gotoTarget(), QString("10.5"));
+        QCOMPARE(loaded.gotoAutoExecute(), true);
+    }
+
+    void testGotoTargetById() {
+        Cue cue;
+        cue.setType(CueType::GoTo);
+        cue.setGotoTarget("abc-123-def"); // cue ID instead of number
+        cue.setGotoAutoExecute(false);
+
+        QJsonObject json = cue.toJson();
+        Cue loaded = Cue::fromJson(json);
+
+        QCOMPARE(loaded.gotoTarget(), QString("abc-123-def"));
+        QCOMPARE(loaded.gotoAutoExecute(), false);
+    }
+
+    void testMacroCue() {
+        Cue cue;
+        cue.setType(CueType::Macro);
+        cue.setMacroExecutionMode(MacroExecutionMode::Sequential);
+        cue.addChildCueId("child-1");
+        cue.addChildCueId("child-2");
+
+        QCOMPARE(cue.childCueIds().size(), 2);
+        QCOMPARE(cue.macroExecutionMode(), MacroExecutionMode::Sequential);
+
+        QJsonObject json = cue.toJson();
+        Cue loaded = Cue::fromJson(json);
+
+        QCOMPARE(loaded.childCueIds().size(), 2);
+        QCOMPARE(loaded.childCueIds().at(0), QString("child-1"));
+        QCOMPARE(loaded.macroExecutionMode(), MacroExecutionMode::Sequential);
+    }
+
+    void testMacroParallelMode() {
+        Cue cue;
+        cue.setType(CueType::Macro);
+        cue.setMacroExecutionMode(MacroExecutionMode::Parallel);
+
+        QJsonObject json = cue.toJson();
+        Cue loaded = Cue::fromJson(json);
+
+        QCOMPARE(loaded.macroExecutionMode(), MacroExecutionMode::Parallel);
+    }
+
+    void testFadeCurve() {
+        Cue cue;
+        cue.setFadeCurve(FadeCurve::SCurve);
+
+        QCOMPARE(cue.fadeCurve(), FadeCurve::SCurve);
+
+        QJsonObject json = cue.toJson();
+        Cue loaded = Cue::fromJson(json);
+
+        QCOMPARE(loaded.fadeCurve(), FadeCurve::SCurve);
+    }
+
+    void testFadeCurveConversion() {
+        QCOMPARE(fadeCurveToString(FadeCurve::Linear), QString("linear"));
+        QCOMPARE(fadeCurveToString(FadeCurve::EaseIn), QString("easein"));
+        QCOMPARE(fadeCurveToString(FadeCurve::EaseOut), QString("easeout"));
+        QCOMPARE(fadeCurveToString(FadeCurve::SCurve), QString("scurve"));
+        QCOMPARE(fadeCurveToString(FadeCurve::Exponential), QString("exponential"));
+
+        QCOMPARE(stringToFadeCurve("linear"), FadeCurve::Linear);
+        QCOMPARE(stringToFadeCurve("scurve"), FadeCurve::SCurve);
+        QCOMPARE(stringToFadeCurve("invalid"), FadeCurve::Linear); // default
+    }
+
+    void testStopCue() {
+        Cue cue;
+        cue.setType(CueType::Stop);
+        cue.setStopBehavior(StopBehavior::StopAndFadeOut);
+        cue.setFadeTime(2.0);
+        cue.setParameter("/dca/1/fader", 0.0);
+
+        QCOMPARE(cue.type(), CueType::Stop);
+        QCOMPARE(cue.stopBehavior(), StopBehavior::StopAndFadeOut);
+        QCOMPARE(cue.fadeTime(), 2.0);
+    }
+
+    void testStopBehaviorSerialization() {
+        Cue original;
+        original.setType(CueType::Stop);
+        original.setStopBehavior(StopBehavior::StopFadesOnly);
+
+        QJsonObject json = original.toJson();
+        Cue loaded = Cue::fromJson(json);
+
+        QCOMPARE(loaded.stopBehavior(), StopBehavior::StopFadesOnly);
+    }
+
+    void testStopBehaviorConversion() {
+        QCOMPARE(stopBehaviorToString(StopBehavior::StopFadesOnly), QString("stopfadesonly"));
+        QCOMPARE(stopBehaviorToString(StopBehavior::StopAndApply), QString("stopandapply"));
+        QCOMPARE(stopBehaviorToString(StopBehavior::StopAndFadeOut), QString("stopandfadeout"));
+
+        QCOMPARE(stringToStopBehavior("stopfadesonly"), StopBehavior::StopFadesOnly);
+        QCOMPARE(stringToStopBehavior("stopandfadeout"), StopBehavior::StopAndFadeOut);
+        QCOMPARE(stringToStopBehavior("invalid"), StopBehavior::StopAndApply); // default
     }
 };
 

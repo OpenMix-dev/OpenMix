@@ -4,7 +4,7 @@
 #include <QGraphicsRectItem>
 #include <QGraphicsTextItem>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class TimelineCueItem : public QGraphicsRectItem {
   public:
@@ -54,4 +54,4 @@ class TimelineCueItem : public QGraphicsRectItem {
     static constexpr double MIN_WIDTH = 30.0;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

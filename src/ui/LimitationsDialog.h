@@ -4,7 +4,7 @@
 #include <QDialog>
 #include <QPushButton>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class LimitationsDialog : public QDialog {
     Q_OBJECT
@@ -33,4 +33,4 @@ class LimitationsDialog : public QDialog {
     QPushButton* m_acknowledgeButton;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

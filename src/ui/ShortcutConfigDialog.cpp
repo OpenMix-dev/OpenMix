@@ -8,7 +8,7 @@
 #include <QMessageBox>
 #include <QVBoxLayout>
 
-namespace StageBlend {
+namespace OpenMix {
 
 ShortcutConfigDialog::ShortcutConfigDialog(ShortcutManager* manager, QWidget* parent)
     : QDialog(parent), m_manager(manager) {
@@ -211,4 +211,4 @@ bool ShortcutConfigDialog::checkConflicts() {
     return true;
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

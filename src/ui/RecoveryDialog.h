@@ -4,7 +4,7 @@
 #include <QLabel>
 #include <QPushButton>
 
-namespace StageBlend {
+namespace OpenMix {
 
 struct CrashState;
 
@@ -36,4 +36,4 @@ class RecoveryDialog : public QDialog {
     QPushButton* m_openBackupButton;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

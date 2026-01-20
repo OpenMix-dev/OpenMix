@@ -3,7 +3,7 @@
 #include "CueList.h"
 #include "PlaybackEngine.h"
 
-namespace StageBlend {
+namespace OpenMix {
 
 FadeConflictResolver::FadeConflictResolver(QObject* parent) : QObject(parent) {}
 
@@ -167,7 +167,7 @@ QString FadeConflictResolver::selectWinningFade(const QStringList& cueIds,
 
     case ConflictResolution::HigherPriority:
     case ConflictResolution::CueOrder: {
-        // find cue with lowest number (highest priority)
+        // find cue w/ lowest number (highest priority)
         QString winner = cueIds.first();
         double lowestNumber = getCueNumber(winner);
 
@@ -185,4 +185,4 @@ QString FadeConflictResolver::selectWinningFade(const QStringList& cueIds,
     return cueIds.last(); // default fallback
 }
 
-} // namespace StageBlend
+} // namespace OpenMix

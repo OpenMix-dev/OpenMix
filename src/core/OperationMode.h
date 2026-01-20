@@ -4,11 +4,11 @@
 #include <QObject>
 #include <QString>
 
-namespace StageBlend {
+namespace OpenMix {
 
 enum class AppMode {
-    Programmer, // full access to all editing features
-    ShowMode    // limited access - playback only
+    Programmer, // full access to editing features
+    ShowMode    // playback only
 };
 
 class OperationModeManager : public QObject {
@@ -17,15 +17,12 @@ class OperationModeManager : public QObject {
   public:
     explicit OperationModeManager(QObject* parent = nullptr);
 
-    // current mode
     AppMode currentMode() const { return m_mode; }
     void setMode(AppMode mode);
 
-    // string representation
     QString modeString() const;
     static QString modeString(AppMode mode);
 
-    // permission checks
     bool canEditCues() const;          // programmer only
     bool canDeleteCues() const;        // programmer only
     bool canModifyShow() const;        // programmer only
@@ -41,21 +38,19 @@ class OperationModeManager : public QObject {
     bool canViewTimeline() const;      // always
     bool canViewMixerFeedback() const; // always
 
-    // password protection
     void setShowModePassword(const QString& password);
     void clearPassword();
     bool hasPassword() const { return !m_passwordHash.isEmpty(); }
     bool validatePassword(const QString& password) const;
 
-    // try to switch to programmer mode (may require password)
     bool switchToProgrammerMode(const QString& password = QString());
-
-    // switch to show mode (no password required)
     void switchToShowMode();
 
-    // persistence
     void saveToSettings();
     void loadFromSettings();
+
+    void setSaveMode(bool enabled) { m_saveMode = enabled; }
+    bool saveMode() const { return m_saveMode; }
 
   signals:
     void modeChanged(AppMode mode);
@@ -67,6 +62,7 @@ class OperationModeManager : public QObject {
 
     AppMode m_mode = AppMode::Programmer;
     QString m_passwordHash;
+    bool m_saveMode = false;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix

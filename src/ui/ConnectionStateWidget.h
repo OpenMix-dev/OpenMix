@@ -4,7 +4,7 @@
 #include <QTimer>
 #include <QWidget>
 
-namespace StageBlend {
+namespace OpenMix {
 
 class ConnectionStateWidget : public QWidget {
     Q_OBJECT
@@ -37,4 +37,4 @@ class ConnectionStateWidget : public QWidget {
     bool m_blinkState = false;
 };
 
-} // namespace StageBlend
+} // namespace OpenMix
