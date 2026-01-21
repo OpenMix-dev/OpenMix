@@ -31,27 +31,25 @@ void ConnectionPanel::setupUi() {
 
     m_protocolCombo = new QComboBox(this);
 
-    m_protocolCombo->addItem(tr("Behringer X32"), "x32");
-    m_protocolCombo->addItem(tr("Midas M32"), "m32");
-    m_protocolCombo->addItem(tr("Behringer WING"), "wing");
-
+    m_protocolCombo->addItem(tr("Allen & Heath Avantis"), "avantis");
+    m_protocolCombo->addItem(tr("Allen & Heath dLive"), "dlive");
+    m_protocolCombo->addItem(tr("Allen & Heath GLD-80"), "gld80");
+    m_protocolCombo->addItem(tr("Allen & Heath GLD-112"), "gld112");
     m_protocolCombo->addItem(tr("Allen & Heath SQ-5"), "sq5");
     m_protocolCombo->addItem(tr("Allen & Heath SQ-6"), "sq6");
     m_protocolCombo->addItem(tr("Allen & Heath SQ-7"), "sq7");
-    m_protocolCombo->addItem(tr("Allen & Heath GLD-80"), "gld80");
-    m_protocolCombo->addItem(tr("Allen & Heath GLD-112"), "gld112");
-    m_protocolCombo->addItem(tr("Allen & Heath Avantis"), "avantis");
-    m_protocolCombo->addItem(tr("Allen & Heath dLive"), "dlive");
-
-    m_protocolCombo->addItem(tr("Yamaha TF1"), "tf1");
-    m_protocolCombo->addItem(tr("Yamaha TF3"), "tf3");
-    m_protocolCombo->addItem(tr("Yamaha TF5"), "tf5");
-    m_protocolCombo->addItem(tr("Yamaha QL1"), "ql1");
-    m_protocolCombo->addItem(tr("Yamaha QL5"), "ql5");
+    m_protocolCombo->addItem(tr("Behringer WING"), "wing");
+    m_protocolCombo->addItem(tr("Behringer X32"), "x32");
+    m_protocolCombo->addItem(tr("Midas M32"), "m32");
     m_protocolCombo->addItem(tr("Yamaha CL1"), "cl1");
     m_protocolCombo->addItem(tr("Yamaha CL3"), "cl3");
     m_protocolCombo->addItem(tr("Yamaha CL5"), "cl5");
     m_protocolCombo->addItem(tr("Yamaha DM7"), "dm7");
+    m_protocolCombo->addItem(tr("Yamaha QL1"), "ql1");
+    m_protocolCombo->addItem(tr("Yamaha QL5"), "ql5");
+    m_protocolCombo->addItem(tr("Yamaha TF1"), "tf1");
+    m_protocolCombo->addItem(tr("Yamaha TF3"), "tf3");
+    m_protocolCombo->addItem(tr("Yamaha TF5"), "tf5");
 
     formLayout->addRow(tr("Protocol:"), m_protocolCombo);
 
