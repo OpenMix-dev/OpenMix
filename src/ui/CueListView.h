@@ -26,6 +26,9 @@ class CueListView : public QWidget {
     // access to filter bar for external updates
     CueFilterBar* filterBar() const { return m_filterBar; }
 
+    // access to model for live edit highlighting
+    CueTableModel* model() const { return m_model; }
+
   public slots:
     void addNewCue();
     void deleteSelectedCue();

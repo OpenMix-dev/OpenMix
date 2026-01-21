@@ -2,6 +2,8 @@
 #include "app/Application.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
+#include "core/LiveEditSession.h"
+#include "core/PlaybackEngine.h"
 #include "core/Show.h"
 #include "protocol/MixerProtocol.h"
 
@@ -10,6 +12,7 @@
 #include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QGroupBox>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -89,6 +92,34 @@ void CueEditor::setupUi() {
 
     mainLayout->addWidget(captureGroup);
 
+    // live edit group
+    QGroupBox* liveEditGroup = new QGroupBox(tr("Live Edit"), this);
+    QVBoxLayout* liveEditLayout = new QVBoxLayout(liveEditGroup);
+
+    m_liveEditStatusLabel = new QLabel(tr("Not active"), this);
+    m_liveEditStatusLabel->setStyleSheet("color: gray; font-style: italic;");
+    liveEditLayout->addWidget(m_liveEditStatusLabel);
+
+    QHBoxLayout* liveEditButtonLayout = new QHBoxLayout();
+
+    m_startLiveEditButton = new QPushButton(tr("Edit Live"), this);
+    m_startLiveEditButton->setToolTip(tr("Start editing this cue with live mixer feedback"));
+    liveEditButtonLayout->addWidget(m_startLiveEditButton);
+
+    m_commitLiveEditButton = new QPushButton(tr("Commit"), this);
+    m_commitLiveEditButton->setToolTip(tr("Save live edits to this cue"));
+    m_commitLiveEditButton->setVisible(false);
+    liveEditButtonLayout->addWidget(m_commitLiveEditButton);
+
+    m_cancelLiveEditButton = new QPushButton(tr("Revert"), this);
+    m_cancelLiveEditButton->setToolTip(tr("Cancel live edits and restore original values"));
+    m_cancelLiveEditButton->setVisible(false);
+    liveEditButtonLayout->addWidget(m_cancelLiveEditButton);
+
+    liveEditLayout->addLayout(liveEditButtonLayout);
+
+    mainLayout->addWidget(liveEditGroup);
+
     // notes group
     QGroupBox* notesGroup = new QGroupBox(tr("Notes"), this);
     QVBoxLayout* notesLayout = new QVBoxLayout(notesGroup);
@@ -115,6 +146,17 @@ void CueEditor::setupUi() {
             &CueEditor::onAutoFollowDelayChanged);
     connect(m_notesEdit, &QTextEdit::textChanged, this, &CueEditor::onNotesChanged);
     connect(m_captureButton, &QPushButton::clicked, this, &CueEditor::onCaptureSnapshot);
+    connect(m_startLiveEditButton, &QPushButton::clicked, this, &CueEditor::onStartLiveEdit);
+    connect(m_commitLiveEditButton, &QPushButton::clicked, this, &CueEditor::onCommitLiveEdit);
+    connect(m_cancelLiveEditButton, &QPushButton::clicked, this, &CueEditor::onCancelLiveEdit);
+
+    // connect to live edit session signals if available
+    if (m_app && m_app->playbackEngine() && m_app->playbackEngine()->liveEditSession()) {
+        LiveEditSession* session = m_app->playbackEngine()->liveEditSession();
+        connect(session, &LiveEditSession::modeChanged, this, &CueEditor::updateLiveEditState);
+        connect(session, &LiveEditSession::sessionStarted, this, &CueEditor::updateLiveEditState);
+        connect(session, &LiveEditSession::sessionEnded, this, &CueEditor::updateLiveEditState);
+    }
 }
 
 bool CueEditor::hasFocus() const { return m_nameEdit->hasFocus() || m_notesEdit->hasFocus(); }
@@ -257,6 +299,86 @@ void CueEditor::onCaptureSnapshot() {
         m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
         emit cueModified();
     }
+}
+
+void CueEditor::onStartLiveEdit() {
+    if (!m_app || !m_app->playbackEngine()) {
+        return;
+    }
+
+    LiveEditSession* session = m_app->playbackEngine()->liveEditSession();
+    if (!session) {
+        return;
+    }
+
+    Cue* cue = currentCue();
+    if (cue) {
+        session->startLiveEdit(cue->id());
+    }
+}
+
+void CueEditor::onCommitLiveEdit() {
+    if (!m_app || !m_app->playbackEngine()) {
+        return;
+    }
+
+    LiveEditSession* session = m_app->playbackEngine()->liveEditSession();
+    if (session && session->isActive()) {
+        session->commitToCurrentCue();
+        emit cueModified();
+    }
+}
+
+void CueEditor::onCancelLiveEdit() {
+    if (!m_app || !m_app->playbackEngine()) {
+        return;
+    }
+
+    LiveEditSession* session = m_app->playbackEngine()->liveEditSession();
+    if (session && session->isActive()) {
+        session->cancel();
+    }
+}
+
+void CueEditor::updateLiveEditState() {
+    if (!m_app || !m_app->playbackEngine()) {
+        return;
+    }
+
+    LiveEditSession* session = m_app->playbackEngine()->liveEditSession();
+    bool isActive = session && session->isActive();
+    bool isThisCue = isActive && currentCue() && session->activeCueId() == currentCue()->id();
+
+    // update visibility
+    m_startLiveEditButton->setVisible(!isActive);
+    m_commitLiveEditButton->setVisible(isActive && isThisCue);
+    m_cancelLiveEditButton->setVisible(isActive && isThisCue);
+
+    // update status label
+    if (!isActive) {
+        m_liveEditStatusLabel->setText(tr("Not active"));
+        m_liveEditStatusLabel->setStyleSheet("color: gray; font-style: italic;");
+    } else if (isThisCue) {
+        if (session->isPreview()) {
+            m_liveEditStatusLabel->setText(tr("Preview mode - %1 edits").arg(session->editCount()));
+            m_liveEditStatusLabel->setStyleSheet("color: #6699ff; font-weight: bold;");
+        } else {
+            m_liveEditStatusLabel->setText(tr("Live editing - %1 edits").arg(session->editCount()));
+            m_liveEditStatusLabel->setStyleSheet("color: #44cc44; font-weight: bold;");
+        }
+    } else {
+        m_liveEditStatusLabel->setText(tr("Editing another cue"));
+        m_liveEditStatusLabel->setStyleSheet("color: orange; font-style: italic;");
+    }
+
+    // enable/disable start button
+    bool canStart =
+        m_currentIndex >= 0 && !isActive && m_app->mixer() && m_app->mixer()->isConnected();
+    m_startLiveEditButton->setEnabled(canStart);
+
+    // enable/disable commit/cancel
+    m_commitLiveEditButton->setEnabled(isThisCue && session->hasEdits());
+    m_cancelLiveEditButton->setEnabled(isThisCue);
 }
 
 } // namespace OpenMix

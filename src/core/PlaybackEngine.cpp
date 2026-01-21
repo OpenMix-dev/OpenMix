@@ -1,4 +1,6 @@
 #include "PlaybackEngine.h"
+#include "FadeConflictResolver.h"
+#include "LiveEditSession.h"
 #include "PlaybackGuard.h"
 #include "protocol/MixerProtocol.h"
 #include <QDateTime>
@@ -84,6 +86,38 @@ void PlaybackEngine::setLogger(PlaybackLogger* logger) { m_logger = logger; }
 
 void PlaybackEngine::setConflictResolver(FadeConflictResolver* resolver) {
     m_conflictResolver = resolver;
+}
+
+void PlaybackEngine::setLiveEditSession(LiveEditSession* session) {
+    m_liveEditSession = session;
+
+    if (m_liveEditSession && m_conflictResolver) {
+        // connect live edit session to conflict resolver for automatic override updates
+        connect(m_liveEditSession, &LiveEditSession::parameterEdited, this,
+                [this](const QString& path, const QVariant&, const QVariant&) {
+                    // when a parameter is live-edited, add it to conflict resolver overrides
+                    QStringList overrides = m_conflictResolver->liveEditOverrides();
+                    if (!overrides.contains(path)) {
+                        overrides.append(path);
+                        m_conflictResolver->setLiveEditOverrides(overrides);
+                    }
+                });
+
+        connect(m_liveEditSession, &LiveEditSession::parameterReverted, this,
+                [this](const QString& path) {
+                    // when a parameter is reverted, remove it from conflict resolver overrides
+                    QStringList overrides = m_conflictResolver->liveEditOverrides();
+                    overrides.removeAll(path);
+                    m_conflictResolver->setLiveEditOverrides(overrides);
+                });
+
+        connect(m_liveEditSession, &LiveEditSession::sessionEnded, this, [this]() {
+            // when session ends, clear all overrides
+            if (m_conflictResolver) {
+                m_conflictResolver->clearLiveEditOverrides();
+            }
+        });
+    }
 }
 
 const Cue* PlaybackEngine::currentCue() const {
@@ -601,10 +635,21 @@ void PlaybackEngine::onFadeTimerTick() {
 
     QJsonObject mergedValues;
 
-    for (FadeInstance& fade : m_activeFades) {
-        QJsonObject values = fade.update(now);
-        for (auto it = values.begin(); it != values.end(); ++it) {
-            mergedValues[it.key()] = it.value();
+    // use conflict resolver if available
+    if (m_conflictResolver) {
+        mergedValues = m_conflictResolver->resolveConflicts(m_activeFades);
+    } else {
+        // fallback to simple merge w/ last-wins behavior
+        for (FadeInstance& fade : m_activeFades) {
+            QJsonObject values = fade.update(now);
+            for (auto it = values.begin(); it != values.end(); ++it) {
+                // skip params that are being live-edited
+                if (m_liveEditSession && m_liveEditSession->isActive() &&
+                    m_liveEditSession->editedPaths().contains(it.key())) {
+                    continue;
+                }
+                mergedValues[it.key()] = it.value();
+            }
         }
     }
 
@@ -646,7 +691,7 @@ double PlaybackEngine::interpolate(double progress, FadeCurve curve) {
         }
 
     case FadeCurve::Exponential:
-        // exponential curve for audio-like response
+        // exponential curve
         // (exp(progress * 3) - 1) / (exp(3) - 1)
         return (std::exp(progress * 3.0) - 1.0) / (std::exp(3.0) - 1.0);
 

@@ -4,10 +4,12 @@
 #include "core/CueValidator.h"
 #include "core/DryRunEngine.h"
 #include "core/FadeConflictResolver.h"
+#include "core/LiveEditSession.h"
 #include "core/OperationMode.h"
 #include "core/PlaybackEngine.h"
 #include "core/PlaybackGuard.h"
-#include "core/PlaybackLogger.h"
+#include "core/PlaybackLogger.h" // includes PlaybackLogEntry
+#include "core/PreviewLayer.h"
 #include "core/ShortcutManager.h"
 #include "core/Show.h"
 #include "io/AutosaveManager.h"
@@ -37,6 +39,10 @@ Application::Application(QObject* parent) : QObject(parent) {
     m_operationModeManager = new OperationModeManager(this);
 
     m_crashRecovery = new CrashRecovery(this);
+
+    // live edit components
+    m_liveEditSession = new LiveEditSession(this);
+    m_previewLayer = new PreviewLayer(this);
 }
 
 Application::~Application() {
@@ -113,6 +119,32 @@ void Application::initialize() {
 
     m_shortcutManager->loadFromSettings();
     m_operationModeManager->loadFromSettings();
+
+    m_liveEditSession->setCueList(m_show->cueList());
+    m_liveEditSession->setPreviewLayer(m_previewLayer);
+
+    m_playbackEngine->setLiveEditSession(m_liveEditSession);
+
+    connect(m_liveEditSession, &LiveEditSession::sessionStarted, [this](const QString& cueId) {
+        if (m_playbackLogger) {
+            m_playbackLogger->log(PlaybackLogEntry::Custom, cueId,
+                                  QString("Live edit session started"));
+        }
+    });
+
+    connect(m_liveEditSession, &LiveEditSession::editsCommitted, [this](const QString& cueId) {
+        if (m_playbackLogger) {
+            m_playbackLogger->log(PlaybackLogEntry::Custom, cueId, QString("Live edits committed"));
+        }
+        m_show->setModified(true);
+    });
+
+    connect(m_liveEditSession, &LiveEditSession::editsCancelled, [this]() {
+        if (m_playbackLogger) {
+            m_playbackLogger->log(PlaybackLogEntry::Custom, QString(),
+                                  QString("Live edit session cancelled"));
+        }
+    });
 }
 
 void Application::connectToMixer(const QString& type, const QString& host, int port) {
@@ -125,6 +157,9 @@ void Application::connectToMixer(const QString& type, const QString& host, int p
 
     m_playbackEngine->setMixer(m_mixer);
 
+    m_liveEditSession->setMixer(m_mixer);
+    m_previewLayer->setMixer(m_mixer);
+
     connect(m_mixer, &MixerProtocol::connected, this, [this]() { emit mixerConnected(); });
     connect(m_mixer, &MixerProtocol::disconnected, this, [this]() { emit mixerDisconnected(); });
 
@@ -133,8 +168,14 @@ void Application::connectToMixer(const QString& type, const QString& host, int p
 
 void Application::disconnectFromMixer() {
     if (m_mixer) {
+        if (m_liveEditSession && m_liveEditSession->isActive()) {
+            m_liveEditSession->cancel();
+        }
+
         m_mixer->disconnect();
         m_playbackEngine->setMixer(nullptr);
+        m_liveEditSession->setMixer(nullptr);
+        m_previewLayer->setMixer(nullptr);
         delete m_mixer;
         m_mixer = nullptr;
     }

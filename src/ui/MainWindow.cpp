@@ -2,11 +2,14 @@
 #include "ConnectionPanel.h"
 #include "CueEditor.h"
 #include "CueListView.h"
+#include "CueTableModel.h"
+#include "LiveEditPanel.h"
 #include "MixerFeedbackPanel.h"
 #include "TimelineView.h"
 #include "app/Application.h"
 #include "core/CueList.h"
 #include "core/CueValidator.h"
+#include "core/LiveEditSession.h"
 #include "core/PlaybackEngine.h"
 #include "core/PlaybackGuard.h"
 #include "core/Show.h"
@@ -58,7 +61,6 @@ void MainWindow::setupUi() {
     m_mainSplitter->setStretchFactor(0, 2);
     m_mainSplitter->setStretchFactor(1, 1);
 
-    // prevent panes from collapsing when dragging splitter
     m_mainSplitter->setChildrenCollapsible(false);
     m_cueListView->setMinimumWidth(200);
     m_cueEditor->setMinimumWidth(150);
@@ -147,6 +149,12 @@ void MainWindow::createActions() {
     m_showMixerFeedbackAction->setChecked(false);
     connect(m_showMixerFeedbackAction, &QAction::triggered, this,
             &MainWindow::showMixerFeedbackPanel);
+
+    m_showLiveEditAction = new QAction(tr("&Live Edit"), this);
+    m_showLiveEditAction->setCheckable(true);
+    m_showLiveEditAction->setChecked(false);
+    m_showLiveEditAction->setShortcut(Qt::CTRL | Qt::Key_L);
+    connect(m_showLiveEditAction, &QAction::triggered, this, &MainWindow::showLiveEditPanel);
 }
 
 void MainWindow::createMenus() {
@@ -184,6 +192,7 @@ void MainWindow::createMenus() {
     m_viewMenu->addAction(m_showConnectionAction);
     m_viewMenu->addAction(m_showTimelineAction);
     m_viewMenu->addAction(m_showMixerFeedbackAction);
+    m_viewMenu->addAction(m_showLiveEditAction);
 
     m_helpMenu = menuBar()->addMenu(tr("&Help"));
     QAction* aboutAction = m_helpMenu->addAction(tr("&About OpenMix"));
@@ -257,12 +266,29 @@ void MainWindow::createDockWidgets() {
     m_mixerFeedbackDock->setWidget(m_mixerFeedbackPanel);
     m_mixerFeedbackDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea |
                                          Qt::BottomDockWidgetArea);
+
     addDockWidget(Qt::RightDockWidgetArea, m_mixerFeedbackDock);
     m_mixerFeedbackDock->setVisible(false); // hidden by default
 
     m_showMixerFeedbackAction->setChecked(m_mixerFeedbackDock->isVisible());
     connect(m_mixerFeedbackDock, &QDockWidget::visibilityChanged, m_showMixerFeedbackAction,
             &QAction::setChecked);
+
+    // live edit panel
+    m_liveEditPanel = new LiveEditPanel(m_app, this);
+    m_liveEditDock = new QDockWidget(tr("Live Edit"), this);
+    m_liveEditDock->setObjectName("LiveEditDock");
+    m_liveEditDock->setWidget(m_liveEditPanel);
+    m_liveEditDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    addDockWidget(Qt::RightDockWidgetArea, m_liveEditDock);
+    m_liveEditDock->setVisible(false); // hidden by default
+
+    m_showLiveEditAction->setChecked(m_liveEditDock->isVisible());
+    connect(m_liveEditDock, &QDockWidget::visibilityChanged, m_showLiveEditAction,
+            &QAction::setChecked);
+
+    // tabify live edit dock w/ mixer feedback dock
+    tabifyDockWidget(m_mixerFeedbackDock, m_liveEditDock);
 }
 
 void MainWindow::connectSignals() {
@@ -299,6 +325,26 @@ void MainWindow::connectSignals() {
 
     connect(m_timelineView, &TimelineView::cueClicked,
             [this](int index) { m_app->playbackEngine()->goToIndex(index); });
+
+    // live edit session signals
+    LiveEditSession* liveEditSession = m_app->playbackEngine()->liveEditSession();
+    if (liveEditSession) {
+        connect(liveEditSession, &LiveEditSession::sessionStarted, [this](const QString& cueId) {
+            int index = m_app->show()->cueList()->indexOf(cueId);
+            m_cueListView->model()->setLiveEditCueIndex(index);
+
+            // show live edit panel when session starts
+            m_liveEditDock->setVisible(true);
+            m_liveEditDock->raise();
+        });
+
+        connect(liveEditSession, &LiveEditSession::sessionEnded,
+                [this]() { m_cueListView->model()->setLiveEditCueIndex(-1); });
+
+        connect(liveEditSession, &LiveEditSession::modeChanged, [this](LiveEditMode mode) {
+            m_mixerFeedbackPanel->onLiveEditModeChanged(static_cast<int>(mode));
+        });
+    }
 }
 
 void MainWindow::loadSettings() {
@@ -323,7 +369,7 @@ void MainWindow::closeEvent(QCloseEvent* event) {
 }
 
 void MainWindow::keyPressEvent(QKeyEvent* event) {
-    // spacebar for GO (only when not editing text)
+    // spacebar for GO (when not editing text)
     if (event->key() == Qt::Key_Space && !m_cueEditor->hasFocus()) {
         go();
         event->accept();
@@ -454,6 +500,12 @@ void MainWindow::showTimelineView(bool show) {
 void MainWindow::showMixerFeedbackPanel(bool show) {
     if (m_mixerFeedbackDock) {
         m_mixerFeedbackDock->setVisible(show);
+    }
+}
+
+void MainWindow::showLiveEditPanel(bool show) {
+    if (m_liveEditDock) {
+        m_liveEditDock->setVisible(show);
     }
 }
 

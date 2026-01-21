@@ -17,7 +17,7 @@ void EditCueCommand::undo() {
 
 void EditCueCommand::redo() {
     if (m_firstRedo) {
-        // skip first redo since the edit was already applied
+        // edit already applied
         m_firstRedo = false;
         return;
     }
@@ -158,6 +158,125 @@ void BatchEditCommand::redo() {
         if (idx >= 0 && idx < m_cueList->count()) {
             m_cueList->updateCue(idx, m_newCues[i]);
         }
+    }
+}
+
+LiveEditCommand::LiveEditCommand(CueList* cueList, const QString& cueId, const QString& paramPath,
+                                 const QVariant& oldValue, const QVariant& newValue,
+                                 QUndoCommand* parent)
+    : QUndoCommand(parent), m_cueList(cueList), m_cueId(cueId), m_paramPath(paramPath),
+      m_oldValue(oldValue), m_newValue(newValue) {
+    setText(QObject::tr("Live Edit %1").arg(paramPath));
+}
+
+void LiveEditCommand::undo() {
+    if (!m_cueList) {
+        return;
+    }
+
+    Cue* cue = m_cueList->findById(m_cueId);
+    if (!cue) {
+        return;
+    }
+
+    QJsonObject params = cue->parameters();
+    params[m_paramPath] = QJsonValue::fromVariant(m_oldValue);
+    cue->setParameters(params);
+
+    int index = m_cueList->indexOf(m_cueId);
+    if (index >= 0) {
+        m_cueList->updateCue(index, *cue);
+    }
+}
+
+void LiveEditCommand::redo() {
+    if (m_firstRedo) {
+        m_firstRedo = false;
+        return;
+    }
+
+    if (!m_cueList) {
+        return;
+    }
+
+    Cue* cue = m_cueList->findById(m_cueId);
+    if (!cue) {
+        return;
+    }
+
+    QJsonObject params = cue->parameters();
+    params[m_paramPath] = QJsonValue::fromVariant(m_newValue);
+    cue->setParameters(params);
+
+    int index = m_cueList->indexOf(m_cueId);
+    if (index >= 0) {
+        m_cueList->updateCue(index, *cue);
+    }
+}
+
+bool LiveEditCommand::mergeWith(const QUndoCommand* other) {
+    if (other->id() != id()) {
+        return false;
+    }
+
+    const LiveEditCommand* cmd = static_cast<const LiveEditCommand*>(other);
+
+    // only merge if editing same parameter in same cue
+    if (cmd->m_cueId != m_cueId || cmd->m_paramPath != m_paramPath || cmd->m_cueList != m_cueList) {
+        return false;
+    }
+
+    // keep original old value, use new command's new value
+    m_newValue = cmd->m_newValue;
+    return true;
+}
+
+CommitLiveEditsCommand::CommitLiveEditsCommand(CueList* cueList, const QString& cueId,
+                                               const QJsonObject& oldParams,
+                                               const QJsonObject& newParams, QUndoCommand* parent)
+    : QUndoCommand(parent), m_cueList(cueList), m_cueId(cueId), m_oldParams(oldParams),
+      m_newParams(newParams) {
+    setText(QObject::tr("Commit Live Edits"));
+}
+
+void CommitLiveEditsCommand::undo() {
+    if (!m_cueList) {
+        return;
+    }
+
+    Cue* cue = m_cueList->findById(m_cueId);
+    if (!cue) {
+        return;
+    }
+
+    cue->setParameters(m_oldParams);
+
+    int index = m_cueList->indexOf(m_cueId);
+    if (index >= 0) {
+        m_cueList->updateCue(index, *cue);
+    }
+}
+
+void CommitLiveEditsCommand::redo() {
+    if (m_firstRedo) {
+        m_firstRedo = false;
+        return;
+    }
+
+    if (!m_cueList) {
+        return;
+    }
+
+    Cue* cue = m_cueList->findById(m_cueId);
+    if (!cue) {
+        return;
+    }
+
+    cue->setParameters(m_newParams);
+
+    int index = m_cueList->indexOf(m_cueId);
+    if (index >= 0) {
+        m_cueList->updateCue(index, *cue);
     }
 }
 

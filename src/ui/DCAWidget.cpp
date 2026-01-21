@@ -82,6 +82,28 @@ void DCAWidget::setActive(bool active) {
     }
 }
 
+void DCAWidget::setEditMode(bool editMode) {
+    if (m_editMode != editMode) {
+        m_editMode = editMode;
+        if (editMode) {
+            m_originalLevel = m_level;
+        }
+        update();
+    }
+}
+
+void DCAWidget::setPreviewMode(bool preview) {
+    if (m_previewMode != preview) {
+        m_previewMode = preview;
+        update();
+    }
+}
+
+void DCAWidget::setOriginalLevel(float level) {
+    m_originalLevel = qBound(0.0f, level, 1.0f);
+    update();
+}
+
 QSize DCAWidget::sizeHint() const { return QSize(50, 180); }
 
 QSize DCAWidget::minimumSizeHint() const { return QSize(40, 120); }
@@ -124,8 +146,32 @@ void DCAWidget::updateDisplay() {
 void DCAWidget::paintEvent(QPaintEvent* event) {
     QWidget::paintEvent(event);
 
-    if (m_active) {
-        QPainter painter(this);
+    QPainter painter(this);
+
+    if (m_editMode) {
+        // draw edit mode border
+        if (m_previewMode) {
+            painter.setPen(QPen(QColor(100, 150, 255), 2, Qt::DashLine));
+        } else {
+            painter.setPen(QPen(QColor(200, 150, 255), 2));
+        }
+        painter.drawRect(rect().adjusted(1, 1, -1, -1));
+
+        // draw original level indicator if level differs
+        if (qAbs(m_level - m_originalLevel) > 0.01f && m_faderSlider) {
+            int sliderY = m_faderSlider->y();
+            int sliderHeight = m_faderSlider->height();
+            int sliderX = m_faderSlider->x();
+            int sliderWidth = m_faderSlider->width();
+
+            // calculate pos for original level marker
+            int originalY =
+                sliderY + sliderHeight - static_cast<int>(m_originalLevel * sliderHeight);
+
+            painter.setPen(QPen(QColor(255, 100, 100), 2));
+            painter.drawLine(sliderX - 4, originalY, sliderX + sliderWidth + 4, originalY);
+        }
+    } else if (m_active) {
         painter.setPen(QPen(QColor(100, 200, 100), 2));
         painter.drawRect(rect().adjusted(1, 1, -1, -1));
     }

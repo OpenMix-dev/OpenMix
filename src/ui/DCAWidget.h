@@ -28,6 +28,16 @@ class DCAWidget : public QWidget {
     void setActive(bool active);
     bool isActive() const { return m_active; }
 
+    // edit mode visualization
+    void setEditMode(bool editMode);
+    bool isEditMode() const { return m_editMode; }
+
+    void setPreviewMode(bool preview);
+    bool isPreviewMode() const { return m_previewMode; }
+
+    void setOriginalLevel(float level);
+    float originalLevel() const { return m_originalLevel; }
+
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override;
 
@@ -48,6 +58,9 @@ class DCAWidget : public QWidget {
     bool m_muted = false;
     QString m_name;
     bool m_active = false;
+    bool m_editMode = false;
+    bool m_previewMode = false;
+    float m_originalLevel = 0.0f;
 
     QSlider* m_faderSlider;
     QPushButton* m_muteButton;

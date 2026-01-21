@@ -41,6 +41,10 @@ class CueTableModel : public QAbstractTableModel {
     int currentCueIndex() const { return m_currentIndex; }
     int standbyCueIndex() const { return m_standbyIndex; }
 
+    // highlighting for live edit
+    void setLiveEditCueIndex(int index);
+    int liveEditCueIndex() const { return m_liveEditIndex; }
+
     // access to underlying data
     CueList* cueList() const { return m_cueList; }
     const Cue* cueAt(int row) const;
@@ -61,6 +65,7 @@ class CueTableModel : public QAbstractTableModel {
     CueList* m_cueList;
     int m_currentIndex = -1;
     int m_standbyIndex = -1;
+    int m_liveEditIndex = -1;
 
     static const QString s_mimeType;
 };

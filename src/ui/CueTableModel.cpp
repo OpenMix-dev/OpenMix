@@ -68,7 +68,9 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
     }
 
     if (role == Qt::BackgroundRole) {
-        if (row == m_currentIndex) {
+        if (row == m_liveEditIndex) {
+            return QBrush(QColor(200, 150, 255)); // purple for live edit
+        } else if (row == m_currentIndex) {
             return QBrush(QColor(100, 200, 100)); // green for active
         } else if (row == m_standbyIndex) {
             return QBrush(QColor(255, 200, 100)); // yellow for standby
@@ -295,6 +297,19 @@ void CueTableModel::setCurrentCueIndex(int index) {
 void CueTableModel::setStandbyCueIndex(int index) {
     int oldIndex = m_standbyIndex;
     m_standbyIndex = index;
+
+    // refresh old & new rows
+    if (oldIndex >= 0 && oldIndex < rowCount()) {
+        emit dataChanged(this->index(oldIndex, 0), this->index(oldIndex, ColCount - 1));
+    }
+    if (index >= 0 && index < rowCount()) {
+        emit dataChanged(this->index(index, 0), this->index(index, ColCount - 1));
+    }
+}
+
+void CueTableModel::setLiveEditCueIndex(int index) {
+    int oldIndex = m_liveEditIndex;
+    m_liveEditIndex = index;
 
     // refresh old & new rows
     if (oldIndex >= 0 && oldIndex < rowCount()) {

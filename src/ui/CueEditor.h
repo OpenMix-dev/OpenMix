@@ -9,6 +9,7 @@ class QTextEdit;
 class QCheckBox;
 class QPushButton;
 class QFormLayout;
+class QLabel;
 
 namespace OpenMix {
 
@@ -25,6 +26,7 @@ class CueEditor : public QWidget {
 
   public slots:
     void setCue(int index);
+    void updateLiveEditState();
 
   signals:
     void cueModified();
@@ -38,6 +40,9 @@ class CueEditor : public QWidget {
     void onAutoFollowDelayChanged(double value);
     void onNotesChanged();
     void onCaptureSnapshot();
+    void onStartLiveEdit();
+    void onCommitLiveEdit();
+    void onCancelLiveEdit();
 
   private:
     void setupUi();
@@ -58,6 +63,12 @@ class CueEditor : public QWidget {
     QDoubleSpinBox* m_autoFollowDelaySpin;
     QTextEdit* m_notesEdit;
     QPushButton* m_captureButton;
+
+    // live edit widgets
+    QPushButton* m_startLiveEditButton;
+    QPushButton* m_commitLiveEditButton;
+    QPushButton* m_cancelLiveEditButton;
+    QLabel* m_liveEditStatusLabel;
 };
 
 } // namespace OpenMix

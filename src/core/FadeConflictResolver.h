@@ -12,10 +12,11 @@ class CueList;
 class FadeInstance;
 
 enum class ConflictResolution {
-    LastWins,       // most recent fade takes precedence (current)
-    FirstWins,      // first fade locks the parameter
-    HigherPriority, // use cue priority field (lower number = higher priority)
-    CueOrder        // lower cue number wins
+    LastWins,        // most recent fade takes precedence (current)
+    FirstWins,       // first fade locks the parameter
+    HigherPriority,  // use cue priority field (lower number = higher priority)
+    CueOrder,        // lower cue number wins
+    LiveEditOverride // live edits take precedence over fades
 };
 
 struct FadeConflict {
@@ -51,6 +52,12 @@ class FadeConflictResolver : public QObject {
     // get the last resolved conflicts (for debugging/logging)
     QList<FadeConflict> lastResolvedConflicts() const { return m_lastConflicts; }
 
+    // live edit override
+    void setLiveEditOverrides(const QStringList& paths);
+    void clearLiveEditOverrides();
+    QStringList liveEditOverrides() const { return m_liveEditOverrides; }
+    bool isLiveEditOverride(const QString& path) const;
+
   signals:
     void conflictDetected(const FadeConflict& conflict);
     void conflictResolved(const FadeConflict& conflict);
@@ -68,6 +75,7 @@ class FadeConflictResolver : public QObject {
     ConflictResolution m_policy = ConflictResolution::LastWins;
     CueList* m_cueList = nullptr;
     QList<FadeConflict> m_lastConflicts;
+    QStringList m_liveEditOverrides;
 };
 
 } // namespace OpenMix

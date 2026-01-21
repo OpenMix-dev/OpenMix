@@ -14,6 +14,7 @@ class MixerProtocol;
 class PlaybackGuard;
 class PlaybackLogger;
 class FadeConflictResolver;
+class LiveEditSession;
 
 enum class PlaybackState { Stopped, Running, Fading, Paused };
 
@@ -65,6 +66,9 @@ class PlaybackEngine : public QObject {
 
     void setConflictResolver(FadeConflictResolver* resolver);
     FadeConflictResolver* conflictResolver() const { return m_conflictResolver; }
+
+    void setLiveEditSession(LiveEditSession* session);
+    LiveEditSession* liveEditSession() const { return m_liveEditSession; }
 
     void setDryRunMode(bool enabled) { m_dryRunMode = enabled; }
     bool isDryRunMode() const { return m_dryRunMode; }
@@ -157,6 +161,7 @@ class PlaybackEngine : public QObject {
     PlaybackGuard* m_guard = nullptr;
     PlaybackLogger* m_logger = nullptr;
     FadeConflictResolver* m_conflictResolver = nullptr;
+    LiveEditSession* m_liveEditSession = nullptr;
 
     bool m_dryRunMode = false;
     qint64 m_pauseStartTime = 0;

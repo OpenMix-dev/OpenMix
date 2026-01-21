@@ -29,6 +29,12 @@ QJsonObject FadeConflictResolver::resolveConflicts(const QVector<FadeInstance>& 
 
         for (auto it = values.begin(); it != values.end(); ++it) {
             QString path = it.key();
+
+            // skip params that are being live-edited (controlled manually)
+            if (isLiveEditOverride(path)) {
+                continue;
+            }
+
             QVariant value = it.value().toVariant();
             parameterSources[path].append(qMakePair(cueId, value));
         }
@@ -183,6 +189,16 @@ QString FadeConflictResolver::selectWinningFade(const QStringList& cueIds,
     }
 
     return cueIds.last(); // default fallback
+}
+
+void FadeConflictResolver::setLiveEditOverrides(const QStringList& paths) {
+    m_liveEditOverrides = paths;
+}
+
+void FadeConflictResolver::clearLiveEditOverrides() { m_liveEditOverrides.clear(); }
+
+bool FadeConflictResolver::isLiveEditOverride(const QString& path) const {
+    return m_liveEditOverrides.contains(path);
 }
 
 } // namespace OpenMix

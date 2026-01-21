@@ -18,6 +18,7 @@ class CueEditor;
 class ConnectionPanel;
 class TimelineView;
 class MixerFeedbackPanel;
+class LiveEditPanel;
 class PlaybackGuard;
 struct ValidationResult;
 
@@ -52,6 +53,7 @@ class MainWindow : public QMainWindow {
     void showConnectionPanel(bool show);
     void showTimelineView(bool show);
     void showMixerFeedbackPanel(bool show);
+    void showLiveEditPanel(bool show);
 
     // update UI state
     void updateTitle();
@@ -93,11 +95,13 @@ class MainWindow : public QMainWindow {
     ConnectionPanel* m_connectionPanel;
     TimelineView* m_timelineView;
     MixerFeedbackPanel* m_mixerFeedbackPanel;
+    LiveEditPanel* m_liveEditPanel;
 
     // dock widgets
     QDockWidget* m_connectionDock;
     QDockWidget* m_timelineDock;
     QDockWidget* m_mixerFeedbackDock;
+    QDockWidget* m_liveEditDock;
 
     // menus
     QMenu* m_fileMenu;
@@ -139,6 +143,7 @@ class MainWindow : public QMainWindow {
     QAction* m_showConnectionAction;
     QAction* m_showTimelineAction;
     QAction* m_showMixerFeedbackAction;
+    QAction* m_showLiveEditAction;
 
     // status bar
     QLabel* m_connectionStatusLabel;

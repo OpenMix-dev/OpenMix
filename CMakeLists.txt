@@ -45,6 +45,8 @@ set(SOURCES
     src/core/DryRunEngine.cpp
     src/core/ShortcutManager.cpp
     src/core/OperationMode.cpp
+    src/core/LiveEditSession.cpp
+    src/core/PreviewLayer.cpp
     src/ui/MainWindow.cpp
     src/ui/CueListView.cpp
     src/ui/CueEditor.cpp
@@ -62,6 +64,8 @@ set(SOURCES
     src/ui/ShortcutConfigDialog.cpp
     src/ui/RecoveryDialog.cpp
     src/ui/LimitationsDialog.cpp
+    src/ui/LiveEditPanel.cpp
+    src/ui/ParameterEditWidget.cpp
 
     src/protocol/MixerProtocol.cpp
     src/protocol/MixerCapabilities.cpp
@@ -106,6 +110,8 @@ set(HEADERS
     src/core/DryRunEngine.h
     src/core/ShortcutManager.h
     src/core/OperationMode.h
+    src/core/LiveEditSession.h
+    src/core/PreviewLayer.h
     src/ui/MainWindow.h
     src/ui/CueListView.h
     src/ui/CueEditor.h
@@ -123,6 +129,8 @@ set(HEADERS
     src/ui/ShortcutConfigDialog.h
     src/ui/RecoveryDialog.h
     src/ui/LimitationsDialog.h
+    src/ui/LiveEditPanel.h
+    src/ui/ParameterEditWidget.h
 
     src/protocol/MixerProtocol.h
     src/protocol/MixerCapabilities.h

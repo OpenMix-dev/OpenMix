@@ -26,6 +26,10 @@ class MixerFeedbackPanel : public QWidget {
     void onMixerConnected();
     void onMixerDisconnected();
 
+    void onLiveEditModeChanged(int mode);
+    void onLiveEditSessionStarted(const QString& cueId);
+    void onLiveEditSessionEnded();
+
   private:
     void setupUi();
     bool parseParameterPath(const QString& path, QString& type, int& number, QString& param);

@@ -1,6 +1,8 @@
 #include "MixerFeedbackPanel.h"
 #include "DCAWidget.h"
 #include "app/Application.h"
+#include "core/LiveEditSession.h"
+#include "core/PlaybackEngine.h"
 #include "protocol/MixerProtocol.h"
 #include <QHBoxLayout>
 #include <QLabel>
@@ -144,6 +146,34 @@ bool MixerFeedbackPanel::parseParameterPath(const QString& path, QString& type, 
     }
 
     return false;
+}
+
+void MixerFeedbackPanel::onLiveEditModeChanged(int mode) {
+    // 0 = inactive, 1 = live, 2 = preview
+    bool editMode = mode != 0;
+    bool previewMode = mode == 2;
+
+    for (DCAWidget* dca : m_dcaWidgets) {
+        dca->setEditMode(editMode);
+        dca->setPreviewMode(previewMode);
+    }
+}
+
+void MixerFeedbackPanel::onLiveEditSessionStarted(const QString& cueId) {
+    Q_UNUSED(cueId);
+
+    // capture current levels as original values
+    for (DCAWidget* dca : m_dcaWidgets) {
+        dca->setOriginalLevel(dca->level());
+        dca->setEditMode(true);
+    }
+}
+
+void MixerFeedbackPanel::onLiveEditSessionEnded() {
+    for (DCAWidget* dca : m_dcaWidgets) {
+        dca->setEditMode(false);
+        dca->setPreviewMode(false);
+    }
 }
 
 } // namespace OpenMix

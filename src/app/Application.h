@@ -19,6 +19,8 @@ class DryRunEngine;
 class ShortcutManager;
 class OperationModeManager;
 class CrashRecovery;
+class LiveEditSession;
+class PreviewLayer;
 
 class Application : public QObject {
     Q_OBJECT
@@ -50,6 +52,10 @@ class Application : public QObject {
 
     // recovery
     CrashRecovery* crashRecovery() { return m_crashRecovery; }
+
+    // live edit
+    LiveEditSession* liveEditSession() { return m_liveEditSession; }
+    PreviewLayer* previewLayer() { return m_previewLayer; }
 
     // mixer connection
     void connectToMixer(const QString& type, const QString& host, int port);
@@ -89,6 +95,10 @@ class Application : public QObject {
 
     // recovery
     CrashRecovery* m_crashRecovery;
+
+    // live edit
+    LiveEditSession* m_liveEditSession;
+    PreviewLayer* m_previewLayer;
 };
 
 } // namespace OpenMix
