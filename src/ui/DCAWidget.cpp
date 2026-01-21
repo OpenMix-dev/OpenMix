@@ -1,5 +1,9 @@
 #include "DCAWidget.h"
+#include <QEvent>
+#include <QKeyEvent>
 #include <QLabel>
+#include <QLineEdit>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPushButton>
 #include <QSlider>
@@ -24,6 +28,15 @@ void DCAWidget::setupUi() {
     nameFont.setPointSize(8);
     nameFont.setBold(true);
     m_nameLabel->setFont(nameFont);
+    m_nameLabel->installEventFilter(this);
+
+    // name edit
+    m_nameEdit = new QLineEdit(this);
+    m_nameEdit->setAlignment(Qt::AlignCenter);
+    m_nameEdit->setFont(nameFont);
+    m_nameEdit->setVisible(false);
+    m_nameEdit->installEventFilter(this);
+    connect(m_nameEdit, &QLineEdit::editingFinished, this, &DCAWidget::finishLabelEdit);
 
     // level display
     m_levelLabel = new QLabel("-inf", this);
@@ -47,6 +60,7 @@ void DCAWidget::setupUi() {
 
     // layout
     layout->addWidget(m_nameLabel);
+    layout->addWidget(m_nameEdit);
     layout->addWidget(m_levelLabel);
     layout->addWidget(m_faderSlider, 1, Qt::AlignHCenter);
     layout->addWidget(m_muteButton, 0, Qt::AlignHCenter);
@@ -66,13 +80,82 @@ void DCAWidget::setMuted(bool muted) {
     updateDisplay();
 }
 
-void DCAWidget::setName(const QString& name) {
-    m_name = name;
-    if (name.isEmpty()) {
-        m_nameLabel->setText(QString("DCA %1").arg(m_dcaNumber));
-    } else {
-        m_nameLabel->setText(name);
+void DCAWidget::setMixerName(const QString& name) {
+    m_mixerName = name;
+    updateNameDisplay();
+}
+
+void DCAWidget::setCueLabel(const QString& label) {
+    m_cueLabel = label;
+    updateNameDisplay();
+}
+
+QString DCAWidget::displayName() const {
+    if (!m_cueLabel.isEmpty()) {
+        return m_cueLabel;
     }
+    if (!m_mixerName.isEmpty()) {
+        return m_mixerName;
+    }
+    return QString("DCA %1").arg(m_dcaNumber);
+}
+
+void DCAWidget::setLabelEditEnabled(bool enabled) {
+    m_labelEditEnabled = enabled;
+    if (!enabled && m_nameEdit->isVisible()) {
+        cancelLabelEdit();
+    }
+    m_nameLabel->setCursor(enabled ? Qt::IBeamCursor : Qt::ArrowCursor);
+}
+
+void DCAWidget::updateNameDisplay() { m_nameLabel->setText(displayName()); }
+
+void DCAWidget::startLabelEdit() {
+    if (!m_labelEditEnabled) {
+        return;
+    }
+
+    m_nameEdit->setText(m_cueLabel.isEmpty() ? m_mixerName : m_cueLabel);
+    m_nameLabel->setVisible(false);
+    m_nameEdit->setVisible(true);
+    m_nameEdit->setFocus();
+    m_nameEdit->selectAll();
+}
+
+void DCAWidget::finishLabelEdit() {
+    if (!m_nameEdit->isVisible()) {
+        return;
+    }
+
+    QString newLabel = m_nameEdit->text().trimmed();
+    m_nameEdit->setVisible(false);
+    m_nameLabel->setVisible(true);
+
+    // emit signal if label changed
+    if (newLabel != m_cueLabel) {
+        emit labelEdited(m_dcaNumber, newLabel);
+    }
+}
+
+void DCAWidget::cancelLabelEdit() {
+    m_nameEdit->setVisible(false);
+    m_nameLabel->setVisible(true);
+}
+
+bool DCAWidget::eventFilter(QObject* obj, QEvent* event) {
+    if (obj == m_nameLabel && event->type() == QEvent::MouseButtonDblClick) {
+        if (m_labelEditEnabled) {
+            startLabelEdit();
+            return true;
+        }
+    } else if (obj == m_nameEdit && event->type() == QEvent::KeyPress) {
+        QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
+        if (keyEvent->key() == Qt::Key_Escape) {
+            cancelLabelEdit();
+            return true;
+        }
+    }
+    return QWidget::eventFilter(obj, event);
 }
 
 void DCAWidget::setActive(bool active) {

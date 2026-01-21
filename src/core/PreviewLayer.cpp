@@ -36,14 +36,11 @@ QStringList PreviewLayer::cachedPaths() const { return m_cachedValues.keys(); }
 int PreviewLayer::cachedCount() const { return m_cachedValues.size(); }
 
 void PreviewLayer::flush() {
-    if (!m_mixer || m_cachedValues.isEmpty()) {
-        emit cacheFlushed();
-        return;
-    }
-
-    // send all cached values to mixer
-    for (auto it = m_cachedValues.begin(); it != m_cachedValues.end(); ++it) {
-        m_mixer->sendParameter(it.key(), it.value());
+    // send all cached values to mixer if available
+    if (m_mixer && !m_cachedValues.isEmpty()) {
+        for (auto it = m_cachedValues.begin(); it != m_cachedValues.end(); ++it) {
+            m_mixer->sendParameter(it.key(), it.value());
+        }
     }
 
     m_cachedValues.clear();

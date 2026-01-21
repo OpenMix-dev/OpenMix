@@ -1,4 +1,5 @@
 #include "ProtocolFactory.h"
+#include "LoopbackProtocol.h"
 #include "MixerProtocol.h"
 
 #include "allenheath/AvantisProtocol.h"
@@ -65,6 +66,9 @@ MixerProtocol* ProtocolFactory::create(const MixerCapabilities& caps, QObject* p
     case ConsoleType::DM7:
         return new YamahaDM7Protocol(caps, parent);
 
+    case ConsoleType::Loopback:
+        return new LoopbackProtocol(caps, parent);
+
     default:
         return nullptr;
     }
@@ -96,6 +100,7 @@ bool ProtocolFactory::isImplemented(ConsoleType type) {
     case ConsoleType::CL3:
     case ConsoleType::CL5:
     case ConsoleType::DM7:
+    case ConsoleType::Loopback:
         return true;
     default:
         return false;

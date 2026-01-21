@@ -2,6 +2,7 @@
 #include "FadeConflictResolver.h"
 #include "LiveEditSession.h"
 #include "PlaybackGuard.h"
+#include "protocol/MixerCapabilities.h"
 #include "protocol/MixerProtocol.h"
 #include <QDateTime>
 #include <cmath>
@@ -30,17 +31,15 @@ QJsonObject FadeInstance::update(qint64 currentTime) {
         QString path = it.key();
         QVariant endVal = it.value().toVariant();
 
-        if (endVal.typeId() == QMetaType::Double || endVal.typeId() == QMetaType::Float) {
+        int typeId = endVal.typeId();
+        bool isNumeric = (typeId == QMetaType::Double || typeId == QMetaType::Float ||
+                          typeId == QMetaType::Int || typeId == QMetaType::LongLong);
+
+        if (isNumeric) {
             double startVal = m_startParams.value(path).toDouble();
             double targetVal = endVal.toDouble();
             double currentVal = startVal + (targetVal - startVal) * curvedProgress;
             m_currentValues[path] = currentVal;
-        } else if (endVal.typeId() == QMetaType::Int) {
-            if (m_progress >= 0.5) {
-                m_currentValues[path] = endVal.toInt();
-            } else {
-                m_currentValues[path] = m_startParams.value(path).toInt();
-            }
         } else {
             if (m_progress >= 1.0) {
                 m_currentValues[path] = it.value();
@@ -363,6 +362,9 @@ void PlaybackEngine::executeCueInternal(const Cue& cue) {
     if (!m_mixer)
         return;
 
+    // sync DCA labels to mixer
+    syncDCALabels(cue);
+
     switch (cue.type()) {
     case CueType::Snapshot:
         m_mixer->recallSnapshot(cue);
@@ -391,6 +393,35 @@ void PlaybackEngine::executeCueInternal(const Cue& cue) {
     case CueType::Macro:
         executeMacroCue(cue);
         break;
+    }
+}
+
+void PlaybackEngine::syncDCALabels(const Cue& cue) {
+    if (!m_mixer || !m_mixer->isConnected()) {
+        return;
+    }
+
+    const MixerCapabilities& caps = m_mixer->capabilities();
+    int maxLen = caps.maxDCANameLength;
+
+    for (int i = 1; i <= caps.dcaCount; ++i) {
+        QString path = QString("/dca/%1/label").arg(i);
+        QVariant labelValue = cue.parameter(path);
+        QString label = labelValue.toString();
+
+        // if no label set, use default
+        if (label.isEmpty()) {
+            label = QString("DCA %1").arg(i);
+        }
+
+        // truncate to console's max character limit
+        if (label.length() > maxLen) {
+            label = label.left(maxLen);
+        }
+
+        // send to mixer
+        QString mixerPath = QString("/dca/%1/config/name").arg(i);
+        m_mixer->sendParameter(mixerPath, label);
     }
 }
 

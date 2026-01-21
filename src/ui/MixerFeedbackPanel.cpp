@@ -1,8 +1,11 @@
 #include "MixerFeedbackPanel.h"
 #include "DCAWidget.h"
 #include "app/Application.h"
+#include "core/Cue.h"
+#include "core/CueList.h"
 #include "core/LiveEditSession.h"
 #include "core/PlaybackEngine.h"
+#include "core/Show.h"
 #include "protocol/MixerProtocol.h"
 #include <QHBoxLayout>
 #include <QLabel>
@@ -34,11 +37,16 @@ void MixerFeedbackPanel::setupUi() {
     // create default 8 DCA widgets (will be adjusted by setDCACount)
     for (int i = 1; i <= 8; ++i) {
         DCAWidget* dca = new DCAWidget(i, this);
+        connectDCASignals(dca);
         m_dcaWidgets.append(dca);
         layout->addWidget(dca);
     }
 
     layout->addStretch();
+}
+
+void MixerFeedbackPanel::connectDCASignals(DCAWidget* dca) {
+    connect(dca, &DCAWidget::labelEdited, this, &MixerFeedbackPanel::onDCALabelEdited);
 }
 
 void MixerFeedbackPanel::setDCACount(int count) {
@@ -57,6 +65,7 @@ void MixerFeedbackPanel::setDCACount(int count) {
     while (m_dcaWidgets.size() < count) {
         int dcaNum = m_dcaWidgets.size() + 1;
         DCAWidget* dca = new DCAWidget(dcaNum, this);
+        connectDCASignals(dca);
         m_dcaWidgets.append(dca);
         // insert before stretch
         layout->insertWidget(layout->count() - 1, dca);
@@ -94,7 +103,9 @@ void MixerFeedbackPanel::onParameterChanged(const QString& path, const QVariant&
                 dca->setMuted(value.toBool());
             }
         } else if (param == "config/name") {
-            dca->setName(value.toString());
+            dca->setMixerName(value.toString());
+        } else if (param == "label") {
+            dca->setCueLabel(value.toString());
         }
     }
 }
@@ -127,7 +138,8 @@ void MixerFeedbackPanel::onMixerDisconnected() {
     for (DCAWidget* dca : m_dcaWidgets) {
         dca->setLevel(0.0f);
         dca->setMuted(false);
-        dca->setName(QString());
+        dca->setMixerName(QString());
+        dca->setCueLabel(QString());
         dca->setActive(false);
     }
 }
@@ -160,12 +172,16 @@ void MixerFeedbackPanel::onLiveEditModeChanged(int mode) {
 }
 
 void MixerFeedbackPanel::onLiveEditSessionStarted(const QString& cueId) {
-    Q_UNUSED(cueId);
-
     // capture current levels as original values
     for (DCAWidget* dca : m_dcaWidgets) {
         dca->setOriginalLevel(dca->level());
         dca->setEditMode(true);
+    }
+
+    // load cue-specific labels (also sets m_activeCueId)
+    if (!cueId.isEmpty()) {
+        m_activeCueId = cueId;
+        loadCueSettings(cueId);
     }
 }
 
@@ -173,6 +189,92 @@ void MixerFeedbackPanel::onLiveEditSessionEnded() {
     for (DCAWidget* dca : m_dcaWidgets) {
         dca->setEditMode(false);
         dca->setPreviewMode(false);
+    }
+}
+
+void MixerFeedbackPanel::onActiveCueChanged(int cueIndex) {
+    if (!m_app || !m_app->show() || !m_app->show()->cueList()) {
+        return;
+    }
+
+    CueList* cueList = m_app->show()->cueList();
+    if (cueIndex < 0 || cueIndex >= cueList->count()) {
+        clearCueSettings();
+        m_activeCueId.clear();
+        // disable label editing when no cue is active
+        for (DCAWidget* dca : m_dcaWidgets) {
+            dca->setLabelEditEnabled(false);
+        }
+        return;
+    }
+
+    const Cue& cue = cueList->at(cueIndex);
+    m_activeCueId = cue.id();
+    loadCueSettings(cue.id());
+
+    // enable label editing when a cue is active
+    for (DCAWidget* dca : m_dcaWidgets) {
+        dca->setLabelEditEnabled(true);
+    }
+}
+
+void MixerFeedbackPanel::onDCALabelEdited(int dcaNumber, const QString& newLabel) {
+    if (!m_app || m_activeCueId.isEmpty()) {
+        return;
+    }
+
+    CueList* cueList = m_app->show()->cueList();
+    if (!cueList) {
+        return;
+    }
+
+    Cue* cue = cueList->findById(m_activeCueId);
+    if (!cue) {
+        return;
+    }
+
+    // save label directly to cue parameters
+    QString path = QString("/dca/%1/label").arg(dcaNumber);
+    cue->setParameter(path, newLabel);
+
+    // update cue in list
+    int cueIndex = cueList->indexOf(m_activeCueId);
+    if (cueIndex >= 0) {
+        cueList->updateCue(cueIndex, *cue);
+    }
+
+    // update widget immediately
+    if (dcaNumber >= 1 && dcaNumber <= m_dcaWidgets.size()) {
+        m_dcaWidgets[dcaNumber - 1]->setCueLabel(newLabel);
+    }
+}
+
+void MixerFeedbackPanel::loadCueSettings(const QString& cueId) {
+    if (!m_app || !m_app->show() || !m_app->show()->cueList()) {
+        return;
+    }
+
+    CueList* cueList = m_app->show()->cueList();
+    int index = cueList->indexOf(cueId);
+    if (index < 0) {
+        clearCueSettings();
+        return;
+    }
+
+    const Cue& cue = cueList->at(index);
+
+    // load /dca/N/label values from cue
+    for (int i = 1; i <= m_dcaWidgets.size(); ++i) {
+        QString path = QString("/dca/%1/label").arg(i);
+        QVariant labelValue = cue.parameter(path);
+        QString label = labelValue.toString();
+        m_dcaWidgets[i - 1]->setCueLabel(label);
+    }
+}
+
+void MixerFeedbackPanel::clearCueSettings() {
+    for (DCAWidget* dca : m_dcaWidgets) {
+        dca->setCueLabel(QString());
     }
 }
 

@@ -29,6 +29,8 @@ enum class ConsoleType {
     CL5, // CL5
     DM7, // DM7 / DM7 Compact
 
+    Loopback, // loopback for testing
+
     Unknown
 };
 
@@ -37,7 +39,8 @@ enum class ProtocolType {
     OscUdp,    // OSC over UDP (X32, WING)
     MidiTcp,   // MIDI over TCP (SQ, GLD)
     BinaryTcp, // custom binary TCP (Avantis, dLive)
-    TextTcp    // text-based TCP (Yamaha TF/QL/CL/DM7)
+    TextTcp,   // text-based TCP (Yamaha TF/QL/CL/DM7)
+    Internal   // internal loopback (no network)
 };
 
 // manufacturer categories
@@ -52,12 +55,13 @@ struct MixerCapabilities {
     QString displayName; // human-readable name
     QString protocolId;  // ID for factory lookup ("x32", "wing", "sq", etc.)
 
-    int defaultPort = 10023; // default port
-    int dcaCount = 8;        // # of DCAs
-    int inputChannels = 32;  // # of input channels
-    int mixBuses = 16;       // # of mix buses
-    int matrixOutputs = 0;   // # of matrix outputs
-    int scenes = 100;        // # of scene/snapshot slots
+    int defaultPort = 10023;  // default port
+    int dcaCount = 8;         // # of DCAs
+    int inputChannels = 32;   // # of input channels
+    int mixBuses = 16;        // # of mix buses
+    int matrixOutputs = 0;    // # of matrix outputs
+    int scenes = 100;         // # of scene/snapshot slots
+    int maxDCANameLength = 6; // default to safe minimum
 
     bool supportsSceneRecall = true;
     bool supportsDCAMute = true;

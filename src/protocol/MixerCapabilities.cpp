@@ -18,6 +18,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 16;
         caps.matrixOutputs = 6;
         caps.scenes = 100;
+        caps.maxDCANameLength = 12;
         break;
 
     case ConsoleType::M32:
@@ -31,6 +32,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 16;
         caps.matrixOutputs = 6;
         caps.scenes = 100;
+        caps.maxDCANameLength = 12;
         break;
 
     case ConsoleType::Wing:
@@ -44,6 +46,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 16;
         caps.matrixOutputs = 8;
         caps.scenes = 100;
+        caps.maxDCANameLength = 8;
         break;
 
     case ConsoleType::SQ5:
@@ -57,6 +60,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 12;
         caps.matrixOutputs = 3;
         caps.scenes = 300;
+        caps.maxDCANameLength = 6;
         break;
 
     case ConsoleType::SQ6:
@@ -70,6 +74,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 12;
         caps.matrixOutputs = 3;
         caps.scenes = 300;
+        caps.maxDCANameLength = 6;
         break;
 
     case ConsoleType::SQ7:
@@ -83,6 +88,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 12;
         caps.matrixOutputs = 3;
         caps.scenes = 300;
+        caps.maxDCANameLength = 6;
         break;
 
     case ConsoleType::GLD80:
@@ -96,6 +102,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 20;
         caps.matrixOutputs = 4;
         caps.scenes = 250;
+        caps.maxDCANameLength = 8;
         break;
 
     case ConsoleType::GLD112:
@@ -109,6 +116,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 30;
         caps.matrixOutputs = 4;
         caps.scenes = 250;
+        caps.maxDCANameLength = 8;
         break;
 
     case ConsoleType::Avantis:
@@ -122,6 +130,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 36;
         caps.matrixOutputs = 6;
         caps.scenes = 500;
+        caps.maxDCANameLength = 8;
         break;
 
     case ConsoleType::DLive:
@@ -135,6 +144,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 64;
         caps.matrixOutputs = 16;
         caps.scenes = 500;
+        caps.maxDCANameLength = 8;
         break;
 
     case ConsoleType::TF1:
@@ -187,6 +197,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 16;
         caps.matrixOutputs = 8;
         caps.scenes = 300;
+        caps.maxDCANameLength = 8;
         break;
 
     case ConsoleType::QL5:
@@ -200,6 +211,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 16;
         caps.matrixOutputs = 8;
         caps.scenes = 300;
+        caps.maxDCANameLength = 8;
         break;
 
     case ConsoleType::CL1:
@@ -252,6 +264,20 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 48;
         caps.matrixOutputs = 24;
         caps.scenes = 300;
+        break;
+
+    case ConsoleType::Loopback:
+        caps.manufacturer = Manufacturer::Unknown;
+        caps.protocol = ProtocolType::Internal;
+        caps.displayName = "Loopback (Test)";
+        caps.protocolId = "loopback";
+        caps.defaultPort = 0;
+        caps.dcaCount = 8;
+        caps.inputChannels = 32;
+        caps.mixBuses = 16;
+        caps.matrixOutputs = 6;
+        caps.scenes = 100;
+        caps.maxDCANameLength = 12;
         break;
 
     default:
@@ -313,6 +339,9 @@ MixerCapabilities MixerCapabilities::forProtocolId(const QString& protocolId) {
     if (id == "dm7")
         return forConsole(ConsoleType::DM7);
 
+    if (id == "loopback" || id == "test")
+        return forConsole(ConsoleType::Loopback);
+
     return forConsole(ConsoleType::Unknown);
 }
 
@@ -357,12 +386,15 @@ QVector<MixerCapabilities> MixerCapabilities::forManufacturer(Manufacturer manuf
 
 bool MixerCapabilities::isSupported() const {
     switch (type) {
-    // Behringer / Midas - fully implemented
+    case ConsoleType::Loopback:
+        return true;
+
+    // Behringer / Midas
     case ConsoleType::X32:
     case ConsoleType::M32:
         return true;
 
-    // Allen & Heath SQ/GLD - MIDI/TCP protocol implemented
+    // Allen & Heath SQ/GLD
     case ConsoleType::SQ5:
     case ConsoleType::SQ6:
     case ConsoleType::SQ7:
@@ -370,29 +402,29 @@ bool MixerCapabilities::isSupported() const {
     case ConsoleType::GLD112:
         return true;
 
-    // Yamaha TF series - text/TCP protocol implemented
+    // Yamaha TF series
     case ConsoleType::TF1:
     case ConsoleType::TF3:
     case ConsoleType::TF5:
         return true;
 
-    // Allen & Heath Avantis/dLive - binary/TCP protocol implemented
+    // Allen & Heath Avantis/dLive
     case ConsoleType::Avantis:
     case ConsoleType::DLive:
         return true;
 
-    // Yamaha QL/CL/DM7 - text/TCP, same protocol as TF but not yet tested
+    // Yamaha QL/CL/DM7 (not tested)
     case ConsoleType::QL1:
     case ConsoleType::QL5:
     case ConsoleType::CL1:
     case ConsoleType::CL3:
     case ConsoleType::CL5:
     case ConsoleType::DM7:
-        return false;
+        return true;
 
-    // Behringer Wing - OSC/UDP, similar to X32 but not yet tested
+    // Behringer Wing (not tested)
     case ConsoleType::Wing:
-        return false;
+        return true;
 
     default:
         return false;
@@ -432,6 +464,8 @@ QString protocolTypeToString(ProtocolType type) {
         return "Binary/TCP";
     case ProtocolType::TextTcp:
         return "Text/TCP";
+    case ProtocolType::Internal:
+        return "Internal";
     default:
         return "Unknown";
     }

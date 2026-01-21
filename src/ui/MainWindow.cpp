@@ -302,11 +302,15 @@ void MainWindow::connectSignals() {
             &MainWindow::onPlaybackStateChanged);
     connect(m_app->playbackEngine(), &PlaybackEngine::currentCueChanged, this,
             &MainWindow::onCurrentCueChanged);
+    connect(m_app->playbackEngine(), &PlaybackEngine::currentCueChanged, m_mixerFeedbackPanel,
+            &MixerFeedbackPanel::onActiveCueChanged);
     connect(m_app->playbackEngine(), &PlaybackEngine::standbyCueChanged, this,
             &MainWindow::updateStatusBar);
 
     connect(m_cueListView, &CueListView::cueSelected, this, &MainWindow::onCueSelectionChanged);
     connect(m_cueListView, &CueListView::cueSelected, m_cueEditor, &CueEditor::setCue);
+    connect(m_cueListView, &CueListView::cueSelected, m_mixerFeedbackPanel,
+            &MixerFeedbackPanel::onActiveCueChanged);
     connect(m_cueListView, &CueListView::cueDoubleClicked,
             [this](int index) { m_app->playbackEngine()->executeCue(index); });
 
@@ -336,10 +340,15 @@ void MainWindow::connectSignals() {
             // show live edit panel when session starts
             m_liveEditDock->setVisible(true);
             m_liveEditDock->raise();
+
+            // notify mixer feedback panel
+            m_mixerFeedbackPanel->onLiveEditSessionStarted(cueId);
         });
 
-        connect(liveEditSession, &LiveEditSession::sessionEnded,
-                [this]() { m_cueListView->model()->setLiveEditCueIndex(-1); });
+        connect(liveEditSession, &LiveEditSession::sessionEnded, [this]() {
+            m_cueListView->model()->setLiveEditCueIndex(-1);
+            m_mixerFeedbackPanel->onLiveEditSessionEnded();
+        });
 
         connect(liveEditSession, &LiveEditSession::modeChanged, [this](LiveEditMode mode) {
             m_mixerFeedbackPanel->onLiveEditModeChanged(static_cast<int>(mode));

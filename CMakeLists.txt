@@ -70,6 +70,7 @@ set(SOURCES
     src/protocol/MixerProtocol.cpp
     src/protocol/MixerCapabilities.cpp
     src/protocol/ProtocolFactory.cpp
+    src/protocol/LoopbackProtocol.cpp
     src/protocol/transport/OscTransport.cpp
     src/protocol/transport/TcpTransport.cpp
     # Behringer / Midas protocols

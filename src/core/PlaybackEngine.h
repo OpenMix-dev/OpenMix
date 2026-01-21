@@ -133,6 +133,7 @@ class PlaybackEngine : public QObject {
     void setStandbyIndex(int index);
     void advanceStandby();
     void executeCueInternal(const Cue& cue);
+    void syncDCALabels(const Cue& cue);
     void startFade(const Cue& cue);
     void executeMacroCue(const Cue& cue);
     void executeGoToCue(const Cue& cue);

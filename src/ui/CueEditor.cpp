@@ -24,6 +24,7 @@ namespace OpenMix {
 CueEditor::CueEditor(Application* app, QWidget* parent) : QWidget(parent), m_app(app) {
     setupUi();
     setEnabled(false);
+    updateLiveEditState();
 }
 
 void CueEditor::setupUi() {
@@ -157,6 +158,11 @@ void CueEditor::setupUi() {
         connect(session, &LiveEditSession::sessionStarted, this, &CueEditor::updateLiveEditState);
         connect(session, &LiveEditSession::sessionEnded, this, &CueEditor::updateLiveEditState);
     }
+
+    if (m_app) {
+        connect(m_app, &Application::mixerConnected, this, &CueEditor::updateLiveEditState);
+        connect(m_app, &Application::mixerDisconnected, this, &CueEditor::updateLiveEditState);
+    }
 }
 
 bool CueEditor::hasFocus() const { return m_nameEdit->hasFocus() || m_notesEdit->hasFocus(); }
@@ -165,6 +171,7 @@ void CueEditor::setCue(int index) {
     m_currentIndex = index;
     updateFromCue();
     setEnabled(index >= 0);
+    updateLiveEditState();
 }
 
 Cue* CueEditor::currentCue() {

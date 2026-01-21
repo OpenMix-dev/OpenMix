@@ -30,12 +30,21 @@ class MixerFeedbackPanel : public QWidget {
     void onLiveEditSessionStarted(const QString& cueId);
     void onLiveEditSessionEnded();
 
+    void onActiveCueChanged(int cueIndex);
+
+  private slots:
+    void onDCALabelEdited(int dcaNumber, const QString& newLabel);
+
   private:
     void setupUi();
+    void connectDCASignals(DCAWidget* dca);
     bool parseParameterPath(const QString& path, QString& type, int& number, QString& param);
+    void loadCueSettings(const QString& cueId);
+    void clearCueSettings();
 
     Application* m_app;
     QVector<DCAWidget*> m_dcaWidgets;
+    QString m_activeCueId;
 };
 
 } // namespace OpenMix

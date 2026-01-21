@@ -44,6 +44,9 @@ class ConnectionPanel : public QWidget {
     QComboBox* m_protocolCombo;
     QLineEdit* m_hostEdit;
     QSpinBox* m_portSpin;
+    QLabel* m_hostLabel;
+    QLabel* m_portLabel;
+    QLabel* m_loopbackLabel;
     QPushButton* m_connectButton;
     QPushButton* m_disconnectButton;
     QPushButton* m_refreshButton;

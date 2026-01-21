@@ -20,6 +20,7 @@ namespace OpenMix {
 ConnectionPanel::ConnectionPanel(Application* app, QWidget* parent) : QWidget(parent), m_app(app) {
     setupUi();
     loadFromConfig();
+    onProtocolTypeChanged(m_protocolCombo->currentIndex());
     updateUiState();
 }
 
@@ -31,6 +32,7 @@ void ConnectionPanel::setupUi() {
 
     m_protocolCombo = new QComboBox(this);
 
+    m_protocolCombo->addItem(tr("Loopback (Test)"), "loopback");
     m_protocolCombo->addItem(tr("Allen & Heath Avantis"), "avantis");
     m_protocolCombo->addItem(tr("Allen & Heath dLive"), "dlive");
     m_protocolCombo->addItem(tr("Allen & Heath GLD-80"), "gld80");
@@ -53,14 +55,21 @@ void ConnectionPanel::setupUi() {
 
     formLayout->addRow(tr("Protocol:"), m_protocolCombo);
 
+    m_hostLabel = new QLabel(tr("IP Address:"), this);
     m_hostEdit = new QLineEdit(this);
     m_hostEdit->setPlaceholderText(tr("192.168.1.1"));
-    formLayout->addRow(tr("IP Address:"), m_hostEdit);
+    formLayout->addRow(m_hostLabel, m_hostEdit);
 
+    m_portLabel = new QLabel(tr("Port:"), this);
     m_portSpin = new QSpinBox(this);
     m_portSpin->setRange(1, 65535);
     m_portSpin->setValue(10023); // default X32 port
-    formLayout->addRow(tr("Port:"), m_portSpin);
+    formLayout->addRow(m_portLabel, m_portSpin);
+
+    m_loopbackLabel = new QLabel(tr("No hardware connection required."), this);
+    m_loopbackLabel->setStyleSheet("color: gray; font-style: italic;");
+    m_loopbackLabel->setVisible(false);
+    formLayout->addRow(QString(), m_loopbackLabel);
 
     mainLayout->addWidget(connectionGroup);
 
@@ -109,7 +118,10 @@ void ConnectionPanel::onConnectClicked() {
     QString host = m_hostEdit->text().trimmed();
     int port = m_portSpin->value();
 
-    if (host.isEmpty()) {
+    MixerCapabilities caps = MixerCapabilities::forProtocolId(type);
+    bool isLoopback = (caps.protocol == ProtocolType::Internal);
+
+    if (!isLoopback && host.isEmpty()) {
         m_statusLabel->setText(tr("Please enter an IP address"));
         return;
     }
@@ -223,10 +235,24 @@ void ConnectionPanel::onRequestTimeout(const QString& path) {
 }
 
 void ConnectionPanel::onConnected() {
-    m_statusLabel->setText(
-        tr("Connected to %1:%2").arg(m_hostEdit->text()).arg(m_portSpin->value()));
+    MixerProtocol* mixer = m_app->mixer();
+
+    // use mixer's status message if available
+    if (mixer && !mixer->connectionStatus().isEmpty()) {
+        m_statusLabel->setText(mixer->connectionStatus());
+    } else {
+        m_statusLabel->setText(
+            tr("Connected to %1:%2").arg(m_hostEdit->text()).arg(m_portSpin->value()));
+    }
+
     m_stateWidget->setState(ConnectionState::Connected);
-    m_latencyLabel->setVisible(true);
+
+    // hide latency for loopback (not meaningful)
+    QString type = m_protocolCombo->currentData().toString();
+    MixerCapabilities caps = MixerCapabilities::forProtocolId(type);
+    bool isLoopback = (caps.protocol == ProtocolType::Internal);
+    m_latencyLabel->setVisible(!isLoopback);
+
     m_timeoutCount = 0;
     updateUiState();
 }
@@ -241,16 +267,32 @@ void ConnectionPanel::onDisconnected() {
 void ConnectionPanel::onProtocolTypeChanged(int index) {
     QString type = m_protocolCombo->itemData(index).toString();
     MixerCapabilities caps = MixerCapabilities::forProtocolId(type);
-    m_portSpin->setValue(caps.defaultPort);
+
+    bool isLoopback = (caps.protocol == ProtocolType::Internal);
+
+    // show/hide network fields based on protocol type
+    m_hostLabel->setVisible(!isLoopback);
+    m_hostEdit->setVisible(!isLoopback);
+    m_portLabel->setVisible(!isLoopback);
+    m_portSpin->setVisible(!isLoopback);
+    m_loopbackLabel->setVisible(isLoopback);
+
+    if (!isLoopback) {
+        m_portSpin->setValue(caps.defaultPort);
+    }
 }
 
 void ConnectionPanel::updateUiState() {
     MixerProtocol* mixer = m_app->mixer();
     bool connected = mixer && mixer->isConnected();
 
+    QString type = m_protocolCombo->currentData().toString();
+    MixerCapabilities caps = MixerCapabilities::forProtocolId(type);
+    bool isLoopback = (caps.protocol == ProtocolType::Internal);
+
     m_protocolCombo->setEnabled(!connected);
-    m_hostEdit->setEnabled(!connected);
-    m_portSpin->setEnabled(!connected);
+    m_hostEdit->setEnabled(!connected && !isLoopback);
+    m_portSpin->setEnabled(!connected && !isLoopback);
     m_connectButton->setEnabled(!connected);
     m_disconnectButton->setEnabled(connected);
     m_refreshButton->setEnabled(connected);
