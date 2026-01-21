@@ -86,13 +86,13 @@ jobs:
           /opt/homebrew/opt/qt@6/bin/macdeployqt build/OpenMix.app
           xattr -cr build/OpenMix.app
           codesign --force --deep -s - build/OpenMix.app
-          cd build && ditto -c -k --keepParent OpenMix.app OpenMix-macos.zip
+          cd build && ditto -c -k --keepParent OpenMix.app OpenMix.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: OpenMix-macos
-          path: build/OpenMix-macos.zip
+          path: build/OpenMix.zip
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -108,7 +108,7 @@ jobs:
         run: |
           cd OpenMix-linux && tar czf ../OpenMix-linux.tar.gz OpenMix && cd ..
           cd OpenMix-windows && zip -r ../OpenMix-windows.zip . && cd ..
-          mv OpenMix-macos/OpenMix-macos.zip .
+          mv OpenMix-macos/OpenMix.zip OpenMix-macos.zip
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
