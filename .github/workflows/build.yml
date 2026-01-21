@@ -86,7 +86,11 @@ jobs:
           /opt/homebrew/opt/qt@6/bin/macdeployqt build/OpenMix.app
           xattr -cr build/OpenMix.app
           codesign --force --deep -s - build/OpenMix.app
-          cd build && ditto -c -k OpenMix.app OpenMix.zip
+          cd build
+          mkdir OpenMix-temp
+          mv OpenMix.app OpenMix-temp/
+          ditto -c -k --keepParent OpenMix-temp OpenMix.zip
+          rm -rf OpenMix-temp
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
