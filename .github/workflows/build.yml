@@ -87,10 +87,7 @@ jobs:
           xattr -cr build/OpenMix.app
           codesign --force --deep -s - build/OpenMix.app
           cd build
-          mkdir OpenMix-temp
-          mv OpenMix.app OpenMix-temp/
-          ditto -c -k --keepParent OpenMix-temp OpenMix.zip
-          rm -rf OpenMix-temp
+          ditto -c -k --sequesterRsrc --keepParent OpenMix.app OpenMix.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
