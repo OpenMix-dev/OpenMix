@@ -29,7 +29,7 @@ else()
     pkg_check_modules(LIBLO REQUIRED IMPORTED_TARGET liblo)
 endif()
 
-# RtMidi (bundled in libs/RtMidi)
+# RtMidi
 set(RTMIDI_SOURCES libs/RtMidi/RtMidi.cpp)
 set(RTMIDI_HEADERS libs/RtMidi/RtMidi.h)
 
@@ -77,7 +77,7 @@ set(SOURCES
     src/protocol/LoopbackProtocol.cpp
     src/protocol/transport/OscTransport.cpp
     src/protocol/transport/TcpTransport.cpp
-    # Behringer / Midas protocols
+
     src/protocol/behringer/X32Protocol.cpp
     src/protocol/behringer/WingProtocol.cpp
 
@@ -146,7 +146,7 @@ set(HEADERS
     src/protocol/ProtocolFactory.h
     src/protocol/transport/OscTransport.h
     src/protocol/transport/TcpTransport.h
-    # Behringer / Midas protocols
+
     src/protocol/behringer/X32Protocol.h
     src/protocol/behringer/WingProtocol.h
 
@@ -195,7 +195,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Network
 )
 
-# add liblo for OSC support
+# liblo
 if(WIN32)
     target_include_directories(${PROJECT_NAME} PRIVATE ${LIBLO_INCLUDE_DIRS})
     target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBLO_LIBRARIES})
@@ -207,6 +207,9 @@ endif()
 if(WIN32)
     target_compile_definitions(${PROJECT_NAME} PRIVATE __WINDOWS_MM__)
     target_link_libraries(${PROJECT_NAME} PRIVATE winmm)
+    set_source_files_properties(libs/RtMidi/RtMidi.cpp PROPERTIES
+        COMPILE_FLAGS "/FIwindows.h"
+    )
 elseif(APPLE)
     target_compile_definitions(${PROJECT_NAME} PRIVATE __MACOSX_CORE__)
     find_library(COREMIDI_LIBRARY CoreMIDI)
@@ -218,7 +221,6 @@ elseif(APPLE)
         ${COREFOUNDATION_LIBRARY}
     )
 else()
-    # Linux - use ALSA
     target_compile_definitions(${PROJECT_NAME} PRIVATE __LINUX_ALSA__)
     find_package(ALSA REQUIRED)
     target_link_libraries(${PROJECT_NAME} PRIVATE ALSA::ALSA)

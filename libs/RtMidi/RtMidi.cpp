@@ -2624,7 +2624,7 @@ struct WinMidiData {
     MidiInApi::MidiMessage message;
     std::vector<LPMIDIHDR> sysexBuffer;
     CRITICAL_SECTION
-        _mutex; // [Patrice] see https://groups.google.com/forum/#!topic/mididev/6OUjHutMpEo
+    _mutex; // [Patrice] see https://groups.google.com/forum/#!topic/mididev/6OUjHutMpEo
 };
 
 //*********************************************************************//
