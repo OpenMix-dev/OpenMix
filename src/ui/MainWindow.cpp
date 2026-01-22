@@ -14,7 +14,9 @@
 #include "core/PlaybackGuard.h"
 #include "core/Show.h"
 #include "io/ProjectFile.h"
+#include "midi/MidiInputManager.h"
 #include "protocol/MixerProtocol.h"
+#include "ui/MidiConfigDialog.h"
 
 #include <QAction>
 #include <QCloseEvent>
@@ -193,6 +195,10 @@ void MainWindow::createMenus() {
     m_viewMenu->addAction(m_showTimelineAction);
     m_viewMenu->addAction(m_showMixerFeedbackAction);
     m_viewMenu->addAction(m_showLiveEditAction);
+
+    m_settingsMenu = menuBar()->addMenu(tr("&Settings"));
+    QAction* midiControllerAction = m_settingsMenu->addAction(tr("MIDI Controller..."));
+    connect(midiControllerAction, &QAction::triggered, this, &MainWindow::showMidiConfigDialog);
 
     m_helpMenu = menuBar()->addMenu(tr("&Help"));
     QAction* aboutAction = m_helpMenu->addAction(tr("&About OpenMix"));
@@ -668,6 +674,11 @@ void MainWindow::onLockoutStateChanged(bool locked) {
     } else {
         m_goAction->setEnabled(true);
     }
+}
+
+void MainWindow::showMidiConfigDialog() {
+    MidiConfigDialog dialog(m_app->midiInputManager(), this);
+    dialog.exec();
 }
 
 } // namespace OpenMix

@@ -29,6 +29,10 @@ else()
     pkg_check_modules(LIBLO REQUIRED IMPORTED_TARGET liblo)
 endif()
 
+# RtMidi (bundled in libs/RtMidi)
+set(RTMIDI_SOURCES libs/RtMidi/RtMidi.cpp)
+set(RTMIDI_HEADERS libs/RtMidi/RtMidi.h)
+
 # source files
 set(SOURCES
     src/main.cpp
@@ -94,6 +98,10 @@ set(SOURCES
     src/io/AutosaveManager.cpp
     src/io/CrashRecovery.cpp
     src/io/ProjectMigration.cpp
+
+    src/midi/MidiControlMapping.cpp
+    src/midi/MidiInputManager.cpp
+    src/ui/MidiConfigDialog.cpp
 )
 
 # header files
@@ -159,18 +167,25 @@ set(HEADERS
     src/io/AutosaveManager.h
     src/io/CrashRecovery.h
     src/io/ProjectMigration.h
+
+    src/midi/MidiControlMapping.h
+    src/midi/MidiInputManager.h
+    src/ui/MidiConfigDialog.h
 )
 
 # create executable
 add_executable(${PROJECT_NAME}
     ${SOURCES}
     ${HEADERS}
+    ${RTMIDI_SOURCES}
+    ${RTMIDI_HEADERS}
 )
 
 # include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/RtMidi
 )
 
 # link libraries
@@ -186,6 +201,27 @@ if(WIN32)
     target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBLO_LIBRARIES})
 else()
     target_link_libraries(${PROJECT_NAME} PRIVATE PkgConfig::LIBLO)
+endif()
+
+# RtMidi platform configuration
+if(WIN32)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE __WINDOWS_MM__)
+    target_link_libraries(${PROJECT_NAME} PRIVATE winmm)
+elseif(APPLE)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE __MACOSX_CORE__)
+    find_library(COREMIDI_LIBRARY CoreMIDI)
+    find_library(COREAUDIO_LIBRARY CoreAudio)
+    find_library(COREFOUNDATION_LIBRARY CoreFoundation)
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        ${COREMIDI_LIBRARY}
+        ${COREAUDIO_LIBRARY}
+        ${COREFOUNDATION_LIBRARY}
+    )
+else()
+    # Linux - use ALSA
+    target_compile_definitions(${PROJECT_NAME} PRIVATE __LINUX_ALSA__)
+    find_package(ALSA REQUIRED)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ALSA::ALSA)
 endif()
 
 # platform-specific settings

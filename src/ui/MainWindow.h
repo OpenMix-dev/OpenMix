@@ -71,6 +71,9 @@ class MainWindow : public QMainWindow {
     void onPanicTriggered();
     void onLockoutStateChanged(bool locked);
 
+    // settings dialogs
+    void showMidiConfigDialog();
+
   private:
     void setupUi();
     void createActions();
@@ -109,6 +112,7 @@ class MainWindow : public QMainWindow {
     QMenu* m_editMenu;
     QMenu* m_playbackMenu;
     QMenu* m_viewMenu;
+    QMenu* m_settingsMenu;
     QMenu* m_helpMenu;
 
     // toolbars

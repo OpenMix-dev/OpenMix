@@ -1,0 +1,359 @@
+#include "MidiInputManager.h"
+#include "core/PlaybackEngine.h"
+#include "core/PlaybackGuard.h"
+
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QSettings>
+#include <RtMidi.h>
+
+namespace OpenMix {
+
+MidiInputManager::MidiInputManager(QObject* parent) : QObject(parent) {
+    try {
+        m_midiIn = new RtMidiIn();
+    } catch (RtMidiError& error) {
+        qWarning() << "RtMidi initialization error:" << QString::fromStdString(error.getMessage());
+    }
+
+    // device polling timer for hot-plug detection
+    m_devicePollTimer.setInterval(2000);
+    connect(&m_devicePollTimer, &QTimer::timeout, this, &MidiInputManager::onDevicePollTimer);
+    m_devicePollTimer.start();
+}
+
+MidiInputManager::~MidiInputManager() {
+    closeDevice();
+    delete m_midiIn;
+}
+
+QVector<MidiDeviceInfo> MidiInputManager::availableDevices() const {
+    QVector<MidiDeviceInfo> devices;
+    if (!m_midiIn)
+        return devices;
+
+    try {
+        unsigned int portCount = m_midiIn->getPortCount();
+        for (unsigned int i = 0; i < portCount; ++i) {
+            MidiDeviceInfo info;
+            info.index = static_cast<int>(i);
+            info.name = QString::fromStdString(m_midiIn->getPortName(i));
+            devices.append(info);
+        }
+    } catch (RtMidiError& error) {
+        qWarning() << "Error enumerating MIDI devices:"
+                   << QString::fromStdString(error.getMessage());
+    }
+
+    return devices;
+}
+
+bool MidiInputManager::openDevice(int deviceIndex) {
+    if (!m_midiIn)
+        return false;
+
+    closeDevice();
+
+    try {
+        m_midiIn->openPort(deviceIndex);
+        m_midiIn->setCallback(&MidiInputManager::midiCallback, this);
+        m_midiIn->ignoreTypes(true, true, true); // ignore sysex, timing, active sensing
+
+        m_currentDeviceName = QString::fromStdString(m_midiIn->getPortName(deviceIndex));
+        m_savedDeviceName = m_currentDeviceName;
+        m_deviceOpen = true;
+
+        emit deviceOpened(m_currentDeviceName);
+        return true;
+    } catch (RtMidiError& error) {
+        QString errorMsg = QString::fromStdString(error.getMessage());
+        qWarning() << "Error opening MIDI device:" << errorMsg;
+        emit deviceError(errorMsg);
+        return false;
+    }
+}
+
+bool MidiInputManager::openDevice(const QString& deviceName) {
+    QVector<MidiDeviceInfo> devices = availableDevices();
+    for (const MidiDeviceInfo& dev : devices) {
+        if (dev.name == deviceName) {
+            return openDevice(dev.index);
+        }
+    }
+    return false;
+}
+
+void MidiInputManager::closeDevice() {
+    if (!m_midiIn || !m_deviceOpen)
+        return;
+
+    try {
+        m_midiIn->cancelCallback();
+        m_midiIn->closePort();
+    } catch (RtMidiError& error) {
+        qWarning() << "Error closing MIDI device:" << QString::fromStdString(error.getMessage());
+    }
+
+    m_deviceOpen = false;
+    m_currentDeviceName.clear();
+    emit deviceClosed();
+}
+
+void MidiInputManager::setAutoReconnect(bool enabled) { m_autoReconnect = enabled; }
+
+void MidiInputManager::setEnabled(bool enabled) { m_enabled = enabled; }
+
+void MidiInputManager::setMappings(const QVector<MidiMapping>& mappings) {
+    m_mappings = mappings;
+    emit mappingsChanged();
+}
+
+void MidiInputManager::addMapping(const MidiMapping& mapping) {
+    m_mappings.append(mapping);
+    emit mappingsChanged();
+}
+
+void MidiInputManager::removeMapping(int index) {
+    if (index >= 0 && index < m_mappings.size()) {
+        m_mappings.removeAt(index);
+        emit mappingsChanged();
+    }
+}
+
+void MidiInputManager::clearMappings() {
+    m_mappings.clear();
+    emit mappingsChanged();
+}
+
+bool MidiInputManager::hasConflict(const MidiTrigger& trigger, int excludeIndex) const {
+    for (int i = 0; i < m_mappings.size(); ++i) {
+        if (i == excludeIndex)
+            continue;
+        if (m_mappings[i].trigger == trigger)
+            return true;
+    }
+    return false;
+}
+
+void MidiInputManager::startMidiLearn() { m_midiLearnActive = true; }
+
+void MidiInputManager::stopMidiLearn() { m_midiLearnActive = false; }
+
+void MidiInputManager::saveToSettings() {
+    QSettings settings("OpenMix", "OpenMix");
+    settings.beginGroup("MidiController");
+
+    settings.setValue("enabled", m_enabled);
+    settings.setValue("autoReconnect", m_autoReconnect);
+    settings.setValue("deviceName", m_savedDeviceName);
+
+    QJsonArray mappingsArray;
+    for (const MidiMapping& mapping : m_mappings) {
+        mappingsArray.append(mapping.toJson());
+    }
+    QJsonDocument doc(mappingsArray);
+    settings.setValue("mappings", doc.toJson(QJsonDocument::Compact));
+
+    settings.endGroup();
+}
+
+void MidiInputManager::loadFromSettings() {
+    QSettings settings("OpenMix", "OpenMix");
+    settings.beginGroup("MidiController");
+
+    m_enabled = settings.value("enabled", true).toBool();
+    m_autoReconnect = settings.value("autoReconnect", true).toBool();
+    m_savedDeviceName = settings.value("deviceName").toString();
+
+    QString mappingsJson = settings.value("mappings").toString();
+    if (!mappingsJson.isEmpty()) {
+        QJsonDocument doc = QJsonDocument::fromJson(mappingsJson.toUtf8());
+        QJsonArray mappingsArray = doc.array();
+        m_mappings.clear();
+        for (const QJsonValue& val : mappingsArray) {
+            m_mappings.append(MidiMapping::fromJson(val.toObject()));
+        }
+    }
+
+    settings.endGroup();
+
+    // try to open saved device
+    if (!m_savedDeviceName.isEmpty() && m_enabled) {
+        openDevice(m_savedDeviceName);
+    }
+
+    emit mappingsChanged();
+}
+
+void MidiInputManager::onDevicePollTimer() {
+    if (!m_midiIn)
+        return;
+
+    // build current device list
+    QStringList currentList;
+    QVector<MidiDeviceInfo> devices = availableDevices();
+    for (const MidiDeviceInfo& dev : devices) {
+        currentList.append(dev.name);
+    }
+
+    // check if list changed
+    if (currentList != m_lastDeviceList) {
+        m_lastDeviceList = currentList;
+        emit deviceListChanged();
+
+        // try auto-reconnect if device was disconnected & is now available
+        if (m_autoReconnect && !m_deviceOpen && !m_savedDeviceName.isEmpty()) {
+            tryReconnect();
+        }
+    }
+}
+
+bool MidiInputManager::tryReconnect() {
+    if (m_savedDeviceName.isEmpty())
+        return false;
+
+    QVector<MidiDeviceInfo> devices = availableDevices();
+    for (const MidiDeviceInfo& dev : devices) {
+        if (dev.name == m_savedDeviceName) {
+            return openDevice(dev.index);
+        }
+    }
+    return false;
+}
+
+void MidiInputManager::midiCallback(double /*timeStamp*/, std::vector<unsigned char>* message,
+                                    void* userData) {
+    if (!message || message->empty())
+        return;
+
+    MidiInputManager* self = static_cast<MidiInputManager*>(userData);
+
+    // copy message for thread-safe delivery
+    std::vector<unsigned char> msgCopy = *message;
+
+    // route to main thread
+    QMetaObject::invokeMethod(
+        self, [self, msgCopy]() { self->processMidiMessage(msgCopy); }, Qt::QueuedConnection);
+}
+
+void MidiInputManager::processMidiMessage(const std::vector<unsigned char>& message) {
+    if (message.size() < 2)
+        return;
+
+    unsigned char status = message[0];
+    int channel = status & 0x0F;
+    int statusType = status & 0xF0;
+
+    MidiMessageType type;
+    int noteOrCC = message[1];
+    int value = (message.size() > 2) ? message[2] : 0;
+
+    switch (statusType) {
+    case 0x90: // note on
+        // note on with velocity 0 is treated as note off
+        if (value == 0) {
+            type = MidiMessageType::NoteOff;
+        } else {
+            type = MidiMessageType::NoteOn;
+        }
+        break;
+    case 0x80:
+        type = MidiMessageType::NoteOff;
+        break;
+    case 0xB0:
+        type = MidiMessageType::ControlChange;
+        break;
+    default:
+        return; // ignore other message types
+    }
+
+    emit midiMessageReceived(type, channel, noteOrCC, value);
+
+    // MIDI Learn mode
+    if (m_midiLearnActive) {
+        if ((type == MidiMessageType::NoteOn && value > 0) ||
+            (type == MidiMessageType::ControlChange && value > 0)) {
+            MidiTrigger trigger;
+            trigger.type = type;
+            trigger.channel = channel;
+            trigger.noteOrCC = noteOrCC;
+            trigger.minValue = 1;
+            emit midiLearnReceived(trigger);
+            m_midiLearnActive = false;
+        }
+        return;
+    }
+
+    // check mappings & execute actions
+    if (!m_enabled)
+        return;
+
+    for (const MidiMapping& mapping : m_mappings) {
+        if (mapping.trigger.matches(type, channel, noteOrCC, value)) {
+            executeAction(mapping.action);
+            break; // only execute first matching mapping
+        }
+    }
+}
+
+void MidiInputManager::executeAction(MidiAction action) {
+    if (action == MidiAction::None)
+        return;
+
+    emit actionExecuted(action);
+
+    switch (action) {
+    case MidiAction::Go:
+        if (m_engine)
+            m_engine->go();
+        break;
+    case MidiAction::Stop:
+        if (m_engine)
+            m_engine->stop();
+        break;
+    case MidiAction::Pause:
+        if (m_engine)
+            m_engine->pause();
+        break;
+    case MidiAction::Resume:
+        if (m_engine)
+            m_engine->resume();
+        break;
+    case MidiAction::Previous:
+        if (m_engine)
+            m_engine->previous();
+        break;
+    case MidiAction::Next:
+        if (m_engine)
+            m_engine->next();
+        break;
+    case MidiAction::GoToFirst:
+        if (m_engine)
+            m_engine->goToFirst();
+        break;
+    case MidiAction::GoToLast:
+        if (m_engine)
+            m_engine->goToLast();
+        break;
+    case MidiAction::Panic:
+        if (m_guard)
+            m_guard->panic(0.5);
+        break;
+    case MidiAction::PanicImmediate:
+        if (m_guard)
+            m_guard->panicImmediate();
+        break;
+    case MidiAction::PanicAndRestore:
+        if (m_guard)
+            m_guard->panicAndRestore(0.5);
+        break;
+    case MidiAction::RestoreFromPanic:
+        if (m_guard)
+            m_guard->restoreFromPanic(1.0);
+        break;
+    case MidiAction::None:
+        break;
+    }
+}
+
+} // namespace OpenMix

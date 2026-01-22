@@ -21,6 +21,7 @@ class OperationModeManager;
 class CrashRecovery;
 class LiveEditSession;
 class PreviewLayer;
+class MidiInputManager;
 
 class Application : public QObject {
     Q_OBJECT
@@ -56,6 +57,9 @@ class Application : public QObject {
     // live edit
     LiveEditSession* liveEditSession() { return m_liveEditSession; }
     PreviewLayer* previewLayer() { return m_previewLayer; }
+
+    // MIDI input
+    MidiInputManager* midiInputManager() { return m_midiInputManager; }
 
     // mixer connection
     void connectToMixer(const QString& type, const QString& host, int port);
@@ -99,6 +103,9 @@ class Application : public QObject {
     // live edit
     LiveEditSession* m_liveEditSession;
     PreviewLayer* m_previewLayer;
+
+    // MIDI input
+    MidiInputManager* m_midiInputManager;
 };
 
 } // namespace OpenMix

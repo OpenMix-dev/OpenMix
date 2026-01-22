@@ -14,6 +14,7 @@
 #include "core/Show.h"
 #include "io/AutosaveManager.h"
 #include "io/CrashRecovery.h"
+#include "midi/MidiInputManager.h"
 #include "protocol/MixerProtocol.h"
 #include "protocol/ProtocolFactory.h"
 
@@ -43,6 +44,9 @@ Application::Application(QObject* parent) : QObject(parent) {
     // live edit components
     m_liveEditSession = new LiveEditSession(this);
     m_previewLayer = new PreviewLayer(this);
+
+    // MIDI input
+    m_midiInputManager = new MidiInputManager(this);
 }
 
 Application::~Application() {
@@ -119,6 +123,11 @@ void Application::initialize() {
 
     m_shortcutManager->loadFromSettings();
     m_operationModeManager->loadFromSettings();
+
+    // MIDI input setup
+    m_midiInputManager->setPlaybackEngine(m_playbackEngine);
+    m_midiInputManager->setPlaybackGuard(m_playbackGuard);
+    m_midiInputManager->loadFromSettings();
 
     m_liveEditSession->setCueList(m_show->cueList());
     m_liveEditSession->setPreviewLayer(m_previewLayer);
