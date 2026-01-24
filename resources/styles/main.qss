@@ -245,15 +245,9 @@ QComboBox::drop-down {
 }
 
 QComboBox::down-arrow {
-    image: none;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 5px solid #9ca3af;
-    margin-right: 8px;
-}
-
-QComboBox::down-arrow:hover {
-    border-top-color: #f0f1f3;
+    image: url(:/icons/chevron-down.svg);
+    width: 12px;
+    height: 12px;
 }
 
 QComboBox QAbstractItemView {
@@ -299,32 +293,16 @@ QDoubleSpinBox::down-button:hover {
 
 QSpinBox::up-arrow,
 QDoubleSpinBox::up-arrow {
-    image: none;
-    border-left: 3px solid transparent;
-    border-right: 3px solid transparent;
-    border-bottom: 4px solid #9ca3af;
-    width: 0;
-    height: 0;
-}
-
-QSpinBox::up-arrow:hover,
-QDoubleSpinBox::up-arrow:hover {
-    border-bottom-color: #f0f1f3;
+    image: url(:/icons/chevron-up.svg);
+    width: 10px;
+    height: 10px;
 }
 
 QSpinBox::down-arrow,
 QDoubleSpinBox::down-arrow {
-    image: none;
-    border-left: 3px solid transparent;
-    border-right: 3px solid transparent;
-    border-top: 4px solid #9ca3af;
-    width: 0;
-    height: 0;
-}
-
-QSpinBox::down-arrow:hover,
-QDoubleSpinBox::down-arrow:hover {
-    border-top-color: #f0f1f3;
+    image: url(:/icons/chevron-down.svg);
+    width: 10px;
+    height: 10px;
 }
 
 QCheckBox {
