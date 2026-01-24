@@ -119,6 +119,7 @@ void CueList::fromJson(const QJsonArray& json) {
     for (const auto& val : json) {
         m_cues.append(Cue::fromJson(val.toObject()));
     }
+    emit listLoaded();
 }
 
 } // namespace OpenMix

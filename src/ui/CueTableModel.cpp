@@ -19,6 +19,7 @@ CueTableModel::CueTableModel(CueList* cueList, QObject* parent)
         connect(m_cueList, &CueList::cueUpdated, this, &CueTableModel::onCueUpdated);
         connect(m_cueList, &CueList::cueMoved, this, &CueTableModel::onCueMoved);
         connect(m_cueList, &CueList::listCleared, this, &CueTableModel::onListCleared);
+        connect(m_cueList, &CueList::listLoaded, this, &CueTableModel::onListLoaded);
     }
 }
 
@@ -373,6 +374,11 @@ void CueTableModel::onListCleared() {
     beginResetModel();
     m_currentIndex = -1;
     m_standbyIndex = -1;
+    endResetModel();
+}
+
+void CueTableModel::onListLoaded() {
+    beginResetModel();
     endResetModel();
 }
 

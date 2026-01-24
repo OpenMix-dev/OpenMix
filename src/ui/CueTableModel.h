@@ -56,6 +56,7 @@ class CueTableModel : public QAbstractTableModel {
     void onCueUpdated(int index);
     void onCueMoved(int from, int to);
     void onListCleared();
+    void onListLoaded();
 
   private:
     CueList* m_cueList;

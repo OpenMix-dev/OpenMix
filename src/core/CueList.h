@@ -52,6 +52,7 @@ class CueList : public QObject {
     void cueUpdated(int index);
     void cueMoved(int fromIndex, int toIndex);
     void listCleared();
+    void listLoaded();
 
   private:
     QVector<Cue> m_cues;
