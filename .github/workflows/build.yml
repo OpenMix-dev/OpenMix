@@ -16,7 +16,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y qt6-base-dev liblo-dev libasound2-dev build-essential cmake
+          sudo apt-get install -y qt6-base-dev qt6-svg-dev libxkbcommon-dev liblo-dev libasound2-dev build-essential cmake
 
       - name: Configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
