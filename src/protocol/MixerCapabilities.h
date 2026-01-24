@@ -67,6 +67,15 @@ struct MixerCapabilities {
     bool supportsDCAMute = true;
     bool supportsDCAFader = true;
 
+    // EQ capabilities
+    int eqBandsPerChannel = 0; // 0 = no EQ, 4 or 6 typical
+    bool supportsChannelEQ = false;
+    QVector<QString> eqBandTypes; // supported band types per console
+
+    // FX capabilities
+    int effectSendBuses = 0; // # of effect send buses
+    bool supportsEffectSends = false;
+
     static MixerCapabilities forConsole(ConsoleType type);
     static MixerCapabilities forProtocolId(const QString& protocolId);
     static QVector<MixerCapabilities> allSupported();

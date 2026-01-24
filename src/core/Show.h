@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CueList.h"
+#include "DCAMapping.h"
 #include <QJsonObject>
 #include <QObject>
 #include <QString>
@@ -41,6 +42,9 @@ class Show : public QObject {
     CueList* cueList() { return &m_cueList; }
     const CueList* cueList() const { return &m_cueList; }
 
+    DCAMapping* dcaMapping() { return &m_dcaMapping; }
+    const DCAMapping* dcaMapping() const { return &m_dcaMapping; }
+
     MixerConfig mixerConfig() const { return m_mixerConfig; }
     void setMixerConfig(const MixerConfig& config) { m_mixerConfig = config; }
 
@@ -63,6 +67,7 @@ class Show : public QObject {
     bool m_modified = false;
     CueList m_cueList;
     MixerConfig m_mixerConfig;
+    DCAMapping m_dcaMapping;
 };
 
 } // namespace OpenMix

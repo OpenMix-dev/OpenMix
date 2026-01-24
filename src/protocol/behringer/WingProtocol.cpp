@@ -46,19 +46,67 @@ void WingProtocol::initializeSnapshotParams() {
 
     // WING has up to 48 input channels
     for (int i = 1; i <= m_capabilities.inputChannels && i <= 48; ++i) {
-        m_snapshotParams.append(QString("/ch/%1/fader").arg(i));
-        m_snapshotParams.append(QString("/ch/%1/mute").arg(i));
+        QString chPrefix = QString("/ch/%1").arg(i);
+        m_snapshotParams.append(chPrefix + "/fader");
+        m_snapshotParams.append(chPrefix + "/mute");
+
+        // EQ params
+        if (m_capabilities.supportsChannelEQ) {
+            m_snapshotParams.append(chPrefix + "/eq/on");
+            for (int band = 1; band <= m_capabilities.eqBandsPerChannel; ++band) {
+                QString bandPrefix = QString("%1/eq/%2").arg(chPrefix).arg(band);
+                m_snapshotParams.append(bandPrefix + "/type");
+                m_snapshotParams.append(bandPrefix + "/f");
+                m_snapshotParams.append(bandPrefix + "/g");
+                m_snapshotParams.append(bandPrefix + "/q");
+            }
+        }
+
+        // effect send params
+        if (m_capabilities.supportsEffectSends) {
+            int sends = qMin(m_capabilities.effectSendBuses, 16);
+            for (int send = 1; send <= sends; ++send) {
+                QString sendPrefix = QString("%1/send/%2").arg(chPrefix).arg(send);
+                m_snapshotParams.append(sendPrefix + "/level");
+                m_snapshotParams.append(sendPrefix + "/on");
+            }
+        }
     }
 
     // WING has up to 16 buses
     for (int i = 1; i <= m_capabilities.mixBuses && i <= 16; ++i) {
-        m_snapshotParams.append(QString("/bus/%1/fader").arg(i));
-        m_snapshotParams.append(QString("/bus/%1/mute").arg(i));
+        QString busPrefix = QString("/bus/%1").arg(i);
+        m_snapshotParams.append(busPrefix + "/fader");
+        m_snapshotParams.append(busPrefix + "/mute");
+
+        // bus EQ params
+        if (m_capabilities.supportsChannelEQ) {
+            m_snapshotParams.append(busPrefix + "/eq/on");
+            for (int band = 1; band <= m_capabilities.eqBandsPerChannel; ++band) {
+                QString bandPrefix = QString("%1/eq/%2").arg(busPrefix).arg(band);
+                m_snapshotParams.append(bandPrefix + "/type");
+                m_snapshotParams.append(bandPrefix + "/f");
+                m_snapshotParams.append(bandPrefix + "/g");
+                m_snapshotParams.append(bandPrefix + "/q");
+            }
+        }
     }
 
     // main outputs
     m_snapshotParams.append("/main/lr/fader");
     m_snapshotParams.append("/main/lr/mute");
+
+    // main EQ
+    if (m_capabilities.supportsChannelEQ) {
+        m_snapshotParams.append("/main/lr/eq/on");
+        for (int band = 1; band <= m_capabilities.eqBandsPerChannel; ++band) {
+            QString bandPrefix = QString("/main/lr/eq/%1").arg(band);
+            m_snapshotParams.append(bandPrefix + "/type");
+            m_snapshotParams.append(bandPrefix + "/f");
+            m_snapshotParams.append(bandPrefix + "/g");
+            m_snapshotParams.append(bandPrefix + "/q");
+        }
+    }
 
     // WING has up to 24 DCAs
     for (int i = 1; i <= m_capabilities.dcaCount && i <= 24; ++i) {
@@ -158,24 +206,6 @@ void WingProtocol::requestParameterAsync(const QString& path, ParameterCallback 
     m_transport.send(path);
 }
 
-void WingProtocol::captureSnapshot(Cue& cue) {
-    if (m_connectionState != ConnectionState::Connected)
-        return;
-
-    for (const QString& param : m_snapshotParams) {
-        requestParameter(param);
-    }
-
-    QJsonObject params;
-    for (const QString& param : m_snapshotParams) {
-        if (m_parameterCache.contains(param)) {
-            params[param] = QJsonValue::fromVariant(m_parameterCache[param]);
-        }
-    }
-    cue.setParameters(params);
-    emit snapshotCaptured();
-}
-
 void WingProtocol::recallSnapshot(const Cue& cue) {
     if (m_connectionState != ConnectionState::Connected)
         return;
@@ -184,16 +214,6 @@ void WingProtocol::recallSnapshot(const Cue& cue) {
     for (auto it = params.begin(); it != params.end(); ++it) {
         sendParameter(it.key(), it.value().toVariant());
     }
-}
-
-QJsonObject WingProtocol::captureCurrentState() {
-    QJsonObject state;
-    for (const QString& param : m_snapshotParams) {
-        if (m_parameterCache.contains(param)) {
-            state[param] = QJsonValue::fromVariant(m_parameterCache[param]);
-        }
-    }
-    return state;
 }
 
 void WingProtocol::recallScene(int sceneNumber) {

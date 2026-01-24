@@ -112,20 +112,6 @@ void AllenHeathMidiProtocol::requestParameterAsync(const QString& path,
     }
 }
 
-void AllenHeathMidiProtocol::captureSnapshot(Cue& cue) {
-    if (m_connectionState != ConnectionState::Connected)
-        return;
-
-    QJsonObject params;
-    for (const QString& param : m_snapshotParams) {
-        if (m_parameterCache.contains(param)) {
-            params[param] = QJsonValue::fromVariant(m_parameterCache[param]);
-        }
-    }
-    cue.setParameters(params);
-    emit snapshotCaptured();
-}
-
 void AllenHeathMidiProtocol::recallSnapshot(const Cue& cue) {
     if (m_connectionState != ConnectionState::Connected)
         return;
@@ -134,16 +120,6 @@ void AllenHeathMidiProtocol::recallSnapshot(const Cue& cue) {
     for (auto it = params.begin(); it != params.end(); ++it) {
         sendParameter(it.key(), it.value().toVariant());
     }
-}
-
-QJsonObject AllenHeathMidiProtocol::captureCurrentState() {
-    QJsonObject state;
-    for (const QString& param : m_snapshotParams) {
-        if (m_parameterCache.contains(param)) {
-            state[param] = QJsonValue::fromVariant(m_parameterCache[param]);
-        }
-    }
-    return state;
 }
 
 void AllenHeathMidiProtocol::recallScene(int sceneNumber) {
@@ -223,7 +199,7 @@ void AllenHeathMidiProtocol::parseMidiData(const QByteArray& data) {
         if (status == 0xF0) {
             int endPos = m_receiveBuffer.indexOf(static_cast<char>(0xF7));
             if (endPos < 0)
-                break; // Incomplete
+                break; // incomplete
 
             QByteArray sysex = m_receiveBuffer.left(endPos + 1);
             m_receiveBuffer.remove(0, endPos + 1);
@@ -280,7 +256,6 @@ void AllenHeathMidiProtocol::processControlChange(int channel, int cc, int value
         if (m_nrpnState.channel == channel) {
             m_nrpnState.dataMsb = value;
             m_nrpnState.timestamp = now;
-            // some implementations only send MSB for coarse values
             if (m_nrpnState.isComplete()) {
                 processNRPNComplete();
             }
@@ -318,7 +293,6 @@ void AllenHeathMidiProtocol::processNRPNComplete() {
     // NRPN MSB 0x63 (99), LSB = DCA index (0-7 for DCAs 1-8)
     if (m_nrpnState.nrpnMsb == 0x63 && m_nrpnState.nrpnLsb >= 0 && m_nrpnState.nrpnLsb <= 7) {
         int dca = m_nrpnState.nrpnLsb + 1;
-        // convert 14-bit value (0-16383) to 0.0-1.0 range
         float level = dataValue / 16383.0f;
         QString path = QString("/dca/%1/fader").arg(dca);
         m_parameterCache[path] = level;

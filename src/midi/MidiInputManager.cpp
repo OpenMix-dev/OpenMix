@@ -313,11 +313,11 @@ void MidiInputManager::executeAction(MidiAction action) {
         break;
     case MidiAction::Pause:
         if (m_engine)
-            m_engine->pause();
+            m_engine->stop();
         break;
     case MidiAction::Resume:
         if (m_engine)
-            m_engine->resume();
+            m_engine->go();
         break;
     case MidiAction::Previous:
         if (m_engine)
@@ -337,19 +337,17 @@ void MidiInputManager::executeAction(MidiAction action) {
         break;
     case MidiAction::Panic:
         if (m_guard)
-            m_guard->panic(0.5);
+            m_guard->panic();
         break;
     case MidiAction::PanicImmediate:
         if (m_guard)
-            m_guard->panicImmediate();
+            m_guard->panic();
         break;
     case MidiAction::PanicAndRestore:
         if (m_guard)
-            m_guard->panicAndRestore(0.5);
+            m_guard->panic();
         break;
     case MidiAction::RestoreFromPanic:
-        if (m_guard)
-            m_guard->restoreFromPanic(1.0);
         break;
     case MidiAction::None:
         break;

@@ -1,68 +1,13 @@
 #include "PlaybackEngine.h"
-#include "FadeConflictResolver.h"
-#include "LiveEditSession.h"
 #include "PlaybackGuard.h"
 #include "protocol/MixerCapabilities.h"
 #include "protocol/MixerProtocol.h"
 #include <QDateTime>
-#include <cmath>
+#include <QRegularExpression>
 
 namespace OpenMix {
 
-FadeInstance::FadeInstance(const QString& cueId, const QJsonObject& startParams,
-                           const QJsonObject& endParams, double durationSec, FadeCurve curve)
-    : m_cueId(cueId), m_startParams(startParams), m_endParams(endParams), m_duration(durationSec),
-      m_startTime(QDateTime::currentMSecsSinceEpoch()), m_progress(0.0), m_curve(curve) {}
-
-QJsonObject FadeInstance::update(qint64 currentTime) {
-    if (m_duration <= 0) {
-        m_progress = 1.0;
-        m_currentValues = m_endParams;
-        return m_currentValues;
-    }
-
-    qint64 elapsed = currentTime - m_startTime;
-    m_progress = qMin(1.0, elapsed / (m_duration * 1000.0));
-
-    double curvedProgress = PlaybackEngine::interpolate(m_progress, m_curve);
-
-    m_currentValues = QJsonObject();
-    for (auto it = m_endParams.begin(); it != m_endParams.end(); ++it) {
-        QString path = it.key();
-        QVariant endVal = it.value().toVariant();
-
-        int typeId = endVal.typeId();
-        bool isNumeric = (typeId == QMetaType::Double || typeId == QMetaType::Float ||
-                          typeId == QMetaType::Int || typeId == QMetaType::LongLong);
-
-        if (isNumeric) {
-            double startVal = m_startParams.value(path).toDouble();
-            double targetVal = endVal.toDouble();
-            double currentVal = startVal + (targetVal - startVal) * curvedProgress;
-            m_currentValues[path] = currentVal;
-        } else {
-            if (m_progress >= 1.0) {
-                m_currentValues[path] = it.value();
-            }
-        }
-    }
-
-    return m_currentValues;
-}
-
-QVariant FadeInstance::interpolatedValue(const QString& path) const {
-    if (m_currentValues.contains(path)) {
-        return m_currentValues[path].toVariant();
-    }
-    return QVariant();
-}
-
-void FadeInstance::adjustStartTime(qint64 offset) { m_startTime += offset; }
-
 PlaybackEngine::PlaybackEngine(QObject* parent) : QObject(parent) {
-    m_fadeTimer.setInterval(16);
-    connect(&m_fadeTimer, &QTimer::timeout, this, &PlaybackEngine::onFadeTimerTick);
-
     m_autoFollowTimer.setSingleShot(true);
     connect(&m_autoFollowTimer, &QTimer::timeout, this, &PlaybackEngine::onAutoFollowTimerTimeout);
 }
@@ -77,47 +22,13 @@ void PlaybackEngine::setCueList(CueList* cueList) {
 
 void PlaybackEngine::setMixer(MixerProtocol* mixer) { m_mixer = mixer; }
 
+void PlaybackEngine::setDCAMapping(DCAMapping* mapping) { m_dcaMapping = mapping; }
+
 void PlaybackEngine::setValidator(CueValidator* validator) { m_validator = validator; }
 
 void PlaybackEngine::setGuard(PlaybackGuard* guard) { m_guard = guard; }
 
 void PlaybackEngine::setLogger(PlaybackLogger* logger) { m_logger = logger; }
-
-void PlaybackEngine::setConflictResolver(FadeConflictResolver* resolver) {
-    m_conflictResolver = resolver;
-}
-
-void PlaybackEngine::setLiveEditSession(LiveEditSession* session) {
-    m_liveEditSession = session;
-
-    if (m_liveEditSession && m_conflictResolver) {
-        // connect live edit session to conflict resolver for automatic override updates
-        connect(m_liveEditSession, &LiveEditSession::parameterEdited, this,
-                [this](const QString& path, const QVariant&, const QVariant&) {
-                    // when a parameter is live-edited, add it to conflict resolver overrides
-                    QStringList overrides = m_conflictResolver->liveEditOverrides();
-                    if (!overrides.contains(path)) {
-                        overrides.append(path);
-                        m_conflictResolver->setLiveEditOverrides(overrides);
-                    }
-                });
-
-        connect(m_liveEditSession, &LiveEditSession::parameterReverted, this,
-                [this](const QString& path) {
-                    // when a parameter is reverted, remove it from conflict resolver overrides
-                    QStringList overrides = m_conflictResolver->liveEditOverrides();
-                    overrides.removeAll(path);
-                    m_conflictResolver->setLiveEditOverrides(overrides);
-                });
-
-        connect(m_liveEditSession, &LiveEditSession::sessionEnded, this, [this]() {
-            // when session ends, clear all overrides
-            if (m_conflictResolver) {
-                m_conflictResolver->clearLiveEditOverrides();
-            }
-        });
-    }
-}
 
 const Cue* PlaybackEngine::currentCue() const {
     if (m_cueList && m_currentIndex >= 0 && m_currentIndex < m_cueList->count()) {
@@ -131,17 +42,6 @@ const Cue* PlaybackEngine::standbyCue() const {
         return &m_cueList->at(m_standbyIndex);
     }
     return nullptr;
-}
-
-double PlaybackEngine::fadeProgress() const {
-    if (m_activeFades.isEmpty()) {
-        return 0.0;
-    }
-    double maxProgress = 0.0;
-    for (const FadeInstance& fade : m_activeFades) {
-        maxProgress = qMax(maxProgress, fade.progress());
-    }
-    return maxProgress;
 }
 
 void PlaybackEngine::go() {
@@ -168,11 +68,6 @@ void PlaybackEngine::go() {
         }
     }
 
-    if (m_guard) {
-        QString cueNumber = QString::number(cue.number(), 'f', 1);
-        m_guard->captureSafeState(tr("Before cue %1").arg(cueNumber));
-    }
-
     executeCueInternal(cue);
 
     setCurrentIndex(m_standbyIndex);
@@ -182,9 +77,7 @@ void PlaybackEngine::go() {
 }
 
 void PlaybackEngine::stop() {
-    m_fadeTimer.stop();
     m_autoFollowTimer.stop();
-    m_activeFades.clear();
     m_autoFollowArmed = false;
     m_currentMacroId.clear();
     m_macroChildIndex = 0;
@@ -197,31 +90,7 @@ void PlaybackEngine::stop() {
     } else {
         setStandbyIndex(-1);
     }
-    emit fadeProgressChanged(0.0);
     emit autoFollowArmed(false);
-}
-
-void PlaybackEngine::pause() {
-    if (m_state == PlaybackState::Fading) {
-        m_pauseStartTime = QDateTime::currentMSecsSinceEpoch();
-        m_fadeTimer.stop();
-        setState(PlaybackState::Paused);
-    }
-}
-
-void PlaybackEngine::resume() {
-    if (m_state == PlaybackState::Paused && !m_activeFades.isEmpty()) {
-        qint64 now = QDateTime::currentMSecsSinceEpoch();
-        qint64 pauseDuration = now - m_pauseStartTime;
-
-        for (FadeInstance& fade : m_activeFades) {
-            fade.adjustStartTime(pauseDuration);
-        }
-
-        m_pauseStartTime = 0;
-        m_fadeTimer.start();
-        setState(PlaybackState::Fading);
-    }
 }
 
 void PlaybackEngine::goToFirst() {
@@ -286,47 +155,6 @@ void PlaybackEngine::executeCueById(const QString& id) {
     }
 }
 
-void PlaybackEngine::executePanicFade(const QJsonObject& targetValues, double durationSec,
-                                      FadeCurve curve) {
-    if (!m_mixer || targetValues.isEmpty())
-        return;
-
-    cancelPanicFade();
-
-    QJsonObject startParams = m_mixer->captureCurrentState();
-
-    m_panicFadeId = "panic_" + QString::number(QDateTime::currentMSecsSinceEpoch());
-    m_panicFadeActive = true;
-
-    FadeInstance fade(m_panicFadeId, startParams, targetValues, durationSec, curve);
-    m_activeFades.append(fade);
-
-    setState(PlaybackState::Fading);
-
-    if (!m_fadeTimer.isActive()) {
-        m_fadeTimer.start();
-    }
-}
-
-void PlaybackEngine::cancelPanicFade() {
-    if (!m_panicFadeActive)
-        return;
-
-    for (int i = m_activeFades.size() - 1; i >= 0; --i) {
-        if (m_activeFades[i].cueId() == m_panicFadeId) {
-            m_activeFades.removeAt(i);
-            break;
-        }
-    }
-
-    m_panicFadeActive = false;
-    m_panicFadeId.clear();
-
-    if (m_activeFades.isEmpty() && m_state == PlaybackState::Fading) {
-        setState(PlaybackState::Running);
-    }
-}
-
 void PlaybackEngine::setState(PlaybackState state) {
     if (m_state != state) {
         m_state = state;
@@ -362,20 +190,27 @@ void PlaybackEngine::executeCueInternal(const Cue& cue) {
     if (!m_mixer)
         return;
 
-    // sync DCA labels to mixer
-    syncDCALabels(cue);
+    // resolve which DCAs to target
+    QSet<int> targetDCAs = cue.targetsAllDCAs() ? allDCAs() : cue.targetedDCAs();
 
     switch (cue.type()) {
-    case CueType::Snapshot:
-        m_mixer->recallSnapshot(cue);
-        setState(PlaybackState::Running);
-        handleAutoFollow(cue);
-        emit cueCompleted(m_currentIndex);
-        break;
+    case CueType::Snapshot: {
+        // filter params based on DCA targeting
+        QJsonObject filteredParams = filterParametersForDCAs(cue.parameters(), targetDCAs);
 
-    case CueType::Fade:
-        startFade(cue);
+        // instant recall of filtered params
+        Cue filteredCue = cue;
+        filteredCue.setParameters(filteredParams);
+        m_mixer->recallSnapshot(filteredCue);
+
+        // apply DCA overrides (mute & label only)
+        applyDCAOverrides(cue, targetDCAs);
+
+        setState(PlaybackState::Running);
+        emit cueCompleted(m_currentIndex);
+        handleAutoFollow(cue);
         break;
+    }
 
     case CueType::Stop:
         executeStopCue(cue);
@@ -396,55 +231,115 @@ void PlaybackEngine::executeCueInternal(const Cue& cue) {
     }
 }
 
-void PlaybackEngine::syncDCALabels(const Cue& cue) {
-    if (!m_mixer || !m_mixer->isConnected()) {
+void PlaybackEngine::applyDCAOverrides(const Cue& cue, const QSet<int>& targetDCAs) {
+    if (!m_mixer || !m_mixer->isConnected())
         return;
-    }
 
     const MixerCapabilities& caps = m_mixer->capabilities();
-    int maxLen = caps.maxDCANameLength;
 
-    for (int i = 1; i <= caps.dcaCount; ++i) {
-        QString path = QString("/dca/%1/label").arg(i);
-        QVariant labelValue = cue.parameter(path);
-        QString label = labelValue.toString();
+    for (int dca : targetDCAs) {
+        if (dca < 1 || dca > caps.dcaCount)
+            continue;
 
-        // if no label set, use default
-        if (label.isEmpty()) {
-            label = QString("DCA %1").arg(i);
+        DCAOverride override = cue.dcaOverride(dca);
+
+        if (override.mute.has_value()) {
+            QString path = QString("/dca/%1/mute").arg(dca);
+            m_mixer->sendParameter(path, override.mute.value() ? 1 : 0);
         }
 
-        // truncate to console's max character limit
-        if (label.length() > maxLen) {
-            label = label.left(maxLen);
+        if (override.label.has_value()) {
+            QString label = override.label.value();
+            // truncate to max label length
+            if (label.length() > caps.maxDCANameLength) {
+                label = label.left(caps.maxDCANameLength);
+            }
+            QString path = QString("/dca/%1/config/name").arg(dca);
+            m_mixer->sendParameter(path, label);
         }
-
-        // send to mixer
-        QString mixerPath = QString("/dca/%1/config/name").arg(i);
-        m_mixer->sendParameter(mixerPath, label);
     }
 }
 
-void PlaybackEngine::startFade(const Cue& cue) {
-    if (cue.fadeTime() <= 0) {
-        m_mixer->recallSnapshot(cue);
-        emit cueCompleted(m_currentIndex);
-        handleAutoFollow(cue);
-        return;
+QJsonObject PlaybackEngine::filterParametersForDCAs(const QJsonObject& params,
+                                                    const QSet<int>& targetDCAs) const {
+    if (!m_dcaMapping || targetDCAs.isEmpty()) {
+        QJsonObject filtered;
+        static QRegularExpression dcaFaderRegex("^/dca/\\d+/fader$");
+        for (auto it = params.begin(); it != params.end(); ++it) {
+            if (!dcaFaderRegex.match(it.key()).hasMatch()) {
+                filtered[it.key()] = it.value();
+            }
+        }
+        return filtered;
     }
 
-    QJsonObject startParams = m_mixer->captureCurrentState();
-    QJsonObject endParams = cue.parameters();
-
-    FadeInstance fade(cue.id(), startParams, endParams, cue.fadeTime(), cue.fadeCurve());
-    m_activeFades.append(fade);
-
-    emit fadeStarted(cue.id());
-    setState(PlaybackState::Fading);
-
-    if (!m_fadeTimer.isActive()) {
-        m_fadeTimer.start();
+    // set of channels/buses that belong to targeted DCAs
+    QSet<int> targetChannels;
+    QSet<int> targetBuses;
+    for (int dca : targetDCAs) {
+        QList<int> channels = m_dcaMapping->channelsForDCA(dca);
+        for (int ch : channels) {
+            targetChannels.insert(ch);
+        }
+        QList<int> buses = m_dcaMapping->busesForDCA(dca);
+        for (int bus : buses) {
+            targetBuses.insert(bus);
+        }
     }
+
+    // filter params to only include targeted channels/buses
+    QJsonObject filtered;
+    static QRegularExpression channelRegex("^/ch/(\\d+)/");
+    static QRegularExpression busRegex("^/bus/(\\d+)/");
+    static QRegularExpression dcaFaderRegex("^/dca/\\d+/fader$");
+
+    for (auto it = params.begin(); it != params.end(); ++it) {
+        const QString& path = it.key();
+
+        if (dcaFaderRegex.match(path).hasMatch()) {
+            continue;
+        }
+
+        // check if channel parameter
+        QRegularExpressionMatch channelMatch = channelRegex.match(path);
+        if (channelMatch.hasMatch()) {
+            int ch = channelMatch.captured(1).toInt();
+            if (targetChannels.contains(ch)) {
+                filtered[path] = it.value();
+            }
+            continue;
+        }
+
+        // check if bus parameter
+        QRegularExpressionMatch busMatch = busRegex.match(path);
+        if (busMatch.hasMatch()) {
+            int bus = busMatch.captured(1).toInt();
+            if (targetBuses.contains(bus)) {
+                filtered[path] = it.value();
+            }
+            continue;
+        }
+
+        // include non-channel/bus parameters (master, etc.)
+        filtered[path] = it.value();
+    }
+
+    return filtered;
+}
+
+QSet<int> PlaybackEngine::allDCAs() const {
+    QSet<int> dcas;
+    if (m_mixer && m_mixer->isConnected()) {
+        int count = m_mixer->capabilities().dcaCount;
+        for (int i = 1; i <= count; ++i) {
+            dcas.insert(i);
+        }
+    } else {
+        for (int i = 1; i <= 8; ++i) {
+            dcas.insert(i);
+        }
+    }
+    return dcas;
 }
 
 void PlaybackEngine::executeMacroCue(const Cue& cue) {
@@ -479,6 +374,19 @@ void PlaybackEngine::executeMacroCue(const Cue& cue) {
             executeCueInternal(*firstChild);
             emit macroChildExecuted(cue.id(), childIds.first());
             m_macroChildIndex = 1;
+
+            if (m_macroPendingChildren.isEmpty()) {
+                const Cue* macroCue = m_cueList->findById(m_currentMacroId);
+                m_currentMacroId.clear();
+                m_macroPendingChildren.clear();
+                m_macroChildIndex = 0;
+                emit cueCompleted(m_currentIndex);
+                if (macroCue) {
+                    handleAutoFollow(*macroCue);
+                }
+            } else {
+                executeNextMacroChild();
+            }
         }
     }
 }
@@ -507,6 +415,19 @@ void PlaybackEngine::executeNextMacroChild() {
         executeCueInternal(*childCue);
         emit macroChildExecuted(m_currentMacroId, childId);
         m_macroChildIndex++;
+
+        if (!m_macroPendingChildren.isEmpty()) {
+            executeNextMacroChild();
+        } else {
+            const Cue* macroCue = m_cueList->findById(m_currentMacroId);
+            m_currentMacroId.clear();
+            m_macroPendingChildren.clear();
+            m_macroChildIndex = 0;
+            emit cueCompleted(m_currentIndex);
+            if (macroCue) {
+                handleAutoFollow(*macroCue);
+            }
+        }
     } else {
         executeNextMacroChild();
     }
@@ -549,8 +470,6 @@ void PlaybackEngine::executeGoToCue(const Cue& cue) {
 }
 
 void PlaybackEngine::executeStopCue(const Cue& cue) {
-    m_fadeTimer.stop();
-    m_activeFades.clear();
     m_autoFollowTimer.stop();
     m_autoFollowArmed = false;
 
@@ -559,7 +478,7 @@ void PlaybackEngine::executeStopCue(const Cue& cue) {
     m_macroChildIndex = 0;
 
     switch (cue.stopBehavior()) {
-    case StopBehavior::StopFadesOnly:
+    case StopBehavior::StopOnly:
         setState(PlaybackState::Stopped);
         emit cueCompleted(m_currentIndex);
         break;
@@ -571,19 +490,6 @@ void PlaybackEngine::executeStopCue(const Cue& cue) {
         setState(PlaybackState::Running);
         emit cueCompleted(m_currentIndex);
         handleAutoFollow(cue);
-        break;
-
-    case StopBehavior::StopAndFadeOut:
-        if (m_mixer && !cue.parameters().isEmpty() && cue.fadeTime() > 0) {
-            startFade(cue);
-        } else {
-            if (m_mixer && !cue.parameters().isEmpty()) {
-                m_mixer->recallSnapshot(cue);
-            }
-            setState(PlaybackState::Running);
-            emit cueCompleted(m_currentIndex);
-            handleAutoFollow(cue);
-        }
         break;
     }
 }
@@ -598,12 +504,6 @@ void PlaybackEngine::handleAutoFollow(const Cue& cue) {
         m_autoFollowTimer.start(static_cast<int>(cue.autoFollowDelay() * 1000));
         break;
 
-    case AutoFollowCondition::AfterFadeComplete:
-        if (cue.type() != CueType::Fade) {
-            m_autoFollowTimer.start(static_cast<int>(cue.autoFollowDelay() * 1000));
-        }
-        break;
-
     case AutoFollowCondition::OnButtonPress:
         m_autoFollowArmed = true;
         emit autoFollowArmed(true);
@@ -611,124 +511,6 @@ void PlaybackEngine::handleAutoFollow(const Cue& cue) {
     }
 }
 
-void PlaybackEngine::checkFadeCompletion() {
-    bool panicFadeWasCompleted = false;
-
-    for (int i = m_activeFades.size() - 1; i >= 0; --i) {
-        if (m_activeFades[i].isComplete()) {
-            QString cueId = m_activeFades[i].cueId();
-            m_activeFades.removeAt(i);
-
-            if (cueId == m_panicFadeId) {
-                m_panicFadeActive = false;
-                m_panicFadeId.clear();
-                panicFadeWasCompleted = true;
-                continue;
-            }
-
-            emit fadeCompleted(cueId);
-
-            if (m_cueList) {
-                const Cue* completedCue = m_cueList->findById(cueId);
-                if (completedCue && completedCue->autoFollow() &&
-                    completedCue->autoFollowCondition() == AutoFollowCondition::AfterFadeComplete) {
-                    m_autoFollowTimer.start(
-                        static_cast<int>(completedCue->autoFollowDelay() * 1000));
-                }
-            }
-        }
-    }
-
-    if (panicFadeWasCompleted) {
-        emit panicFadeCompleted();
-    }
-
-    if (m_activeFades.isEmpty()) {
-        if (m_state == PlaybackState::Fading) {
-            setState(PlaybackState::Running);
-
-            if (!m_currentMacroId.isEmpty()) {
-                executeNextMacroChild();
-            } else if (!panicFadeWasCompleted) {
-                emit cueCompleted(m_currentIndex);
-            }
-        }
-    }
-}
-
-void PlaybackEngine::onFadeTimerTick() {
-    if (m_activeFades.isEmpty()) {
-        m_fadeTimer.stop();
-        return;
-    }
-
-    qint64 now = QDateTime::currentMSecsSinceEpoch();
-
-    QJsonObject mergedValues;
-
-    // use conflict resolver if available
-    if (m_conflictResolver) {
-        mergedValues = m_conflictResolver->resolveConflicts(m_activeFades);
-    } else {
-        // fallback to simple merge w/ last-wins behavior
-        for (FadeInstance& fade : m_activeFades) {
-            QJsonObject values = fade.update(now);
-            for (auto it = values.begin(); it != values.end(); ++it) {
-                // skip params that are being live-edited
-                if (m_liveEditSession && m_liveEditSession->isActive() &&
-                    m_liveEditSession->editedPaths().contains(it.key())) {
-                    continue;
-                }
-                mergedValues[it.key()] = it.value();
-            }
-        }
-    }
-
-    if (m_mixer) {
-        for (auto it = mergedValues.begin(); it != mergedValues.end(); ++it) {
-            QVariant val = it.value().toVariant();
-            m_mixer->sendParameter(it.key(), val);
-        }
-    }
-
-    emit fadeProgressChanged(fadeProgress());
-
-    checkFadeCompletion();
-}
-
 void PlaybackEngine::onAutoFollowTimerTimeout() { go(); }
-
-double PlaybackEngine::interpolate(double progress, FadeCurve curve) {
-    progress = qBound(0.0, progress, 1.0);
-
-    switch (curve) {
-    case FadeCurve::Linear:
-        return progress;
-
-    case FadeCurve::EaseIn:
-        // quadratic ease in: progress^2
-        return progress * progress;
-
-    case FadeCurve::EaseOut:
-        // quadratic ease out: 1 - (1 - progress)^2
-        return 1.0 - (1.0 - progress) * (1.0 - progress);
-
-    case FadeCurve::SCurve:
-        // smooth S-curve (ease in-out)
-        if (progress < 0.5) {
-            return 2.0 * progress * progress;
-        } else {
-            return 1.0 - std::pow(-2.0 * progress + 2.0, 2.0) / 2.0;
-        }
-
-    case FadeCurve::Exponential:
-        // exponential curve
-        // (exp(progress * 3) - 1) / (exp(3) - 1)
-        return (std::exp(progress * 3.0) - 1.0) / (std::exp(3.0) - 1.0);
-
-    default:
-        return progress;
-    }
-}
 
 } // namespace OpenMix

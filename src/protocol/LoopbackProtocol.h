@@ -35,9 +35,7 @@ class LoopbackProtocol : public MixerProtocol {
     void requestParameterAsync(const QString& path, ParameterCallback callback) override;
 
     // snapshot operations
-    void captureSnapshot(Cue& cue) override;
     void recallSnapshot(const Cue& cue) override;
-    QJsonObject captureCurrentState() override;
 
     // scene recall
     void recallScene(int sceneNumber) override;

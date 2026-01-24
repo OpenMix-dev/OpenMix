@@ -4,6 +4,7 @@
 #include "core/Show.h"
 #include "protocol/MixerCapabilities.h"
 #include "protocol/MixerProtocol.h"
+#include "theme/Icons.h"
 
 #include <QComboBox>
 #include <QFormLayout>
@@ -25,6 +26,9 @@ ConnectionPanel::ConnectionPanel(Application* app, QWidget* parent) : QWidget(pa
 }
 
 void ConnectionPanel::setupUi() {
+    setMinimumSize(240, 300);
+    setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
     QGroupBox* connectionGroup = new QGroupBox(tr("Mixer Connection"), this);
@@ -74,9 +78,11 @@ void ConnectionPanel::setupUi() {
     mainLayout->addWidget(connectionGroup);
 
     QHBoxLayout* buttonLayout = new QHBoxLayout();
-    m_connectButton = new QPushButton(tr("Connect"), this);
-    m_disconnectButton = new QPushButton(tr("Disconnect"), this);
-    m_refreshButton = new QPushButton(tr("Refresh"), this);
+    m_connectButton = new QPushButton(Icons::network(), tr("Connect"), this);
+    m_connectButton->setToolTip(tr("Connect to the mixer"));
+    m_disconnectButton = new QPushButton(Icons::disconnect(), tr("Disconnect"), this);
+    m_disconnectButton->setToolTip(tr("Disconnect from the mixer"));
+    m_refreshButton = new QPushButton(Icons::refresh(), tr("Refresh"), this);
     m_refreshButton->setToolTip(tr("Request all parameters from mixer"));
 
     buttonLayout->addWidget(m_connectButton);

@@ -7,8 +7,6 @@ QString cueTypeToString(CueType type) {
     switch (type) {
     case CueType::Snapshot:
         return "snapshot";
-    case CueType::Fade:
-        return "fade";
     case CueType::Stop:
         return "stop";
     case CueType::GoTo:
@@ -23,8 +21,8 @@ QString cueTypeToString(CueType type) {
 }
 
 CueType stringToCueType(const QString& str) {
-    if (str == "fade")
-        return CueType::Fade;
+    if (str == "snapshot")
+        return CueType::Snapshot;
     if (str == "stop")
         return CueType::Stop;
     if (str == "goto")
@@ -36,41 +34,10 @@ CueType stringToCueType(const QString& str) {
     return CueType::Snapshot;
 }
 
-QString fadeCurveToString(FadeCurve curve) {
-    switch (curve) {
-    case FadeCurve::Linear:
-        return "linear";
-    case FadeCurve::EaseIn:
-        return "easein";
-    case FadeCurve::EaseOut:
-        return "easeout";
-    case FadeCurve::SCurve:
-        return "scurve";
-    case FadeCurve::Exponential:
-        return "exponential";
-    default:
-        return "linear";
-    }
-}
-
-FadeCurve stringToFadeCurve(const QString& str) {
-    if (str == "easein")
-        return FadeCurve::EaseIn;
-    if (str == "easeout")
-        return FadeCurve::EaseOut;
-    if (str == "scurve")
-        return FadeCurve::SCurve;
-    if (str == "exponential")
-        return FadeCurve::Exponential;
-    return FadeCurve::Linear;
-}
-
 QString autoFollowConditionToString(AutoFollowCondition condition) {
     switch (condition) {
     case AutoFollowCondition::Always:
         return "always";
-    case AutoFollowCondition::AfterFadeComplete:
-        return "afterfade";
     case AutoFollowCondition::OnButtonPress:
         return "onbutton";
     default:
@@ -79,8 +46,8 @@ QString autoFollowConditionToString(AutoFollowCondition condition) {
 }
 
 AutoFollowCondition stringToAutoFollowCondition(const QString& str) {
-    if (str == "afterfade")
-        return AutoFollowCondition::AfterFadeComplete;
+    if (str == "always")
+        return AutoFollowCondition::Always;
     if (str == "onbutton")
         return AutoFollowCondition::OnButtonPress;
     return AutoFollowCondition::Always;
@@ -105,36 +72,55 @@ MacroExecutionMode stringToMacroExecutionMode(const QString& str) {
 
 QString stopBehaviorToString(StopBehavior behavior) {
     switch (behavior) {
-    case StopBehavior::StopFadesOnly:
-        return "stopfadesonly";
+    case StopBehavior::StopOnly:
+        return "stoponly";
     case StopBehavior::StopAndApply:
         return "stopandapply";
-    case StopBehavior::StopAndFadeOut:
-        return "stopandfadeout";
     default:
         return "stopandapply";
     }
 }
 
 StopBehavior stringToStopBehavior(const QString& str) {
-    if (str == "stopfadesonly")
-        return StopBehavior::StopFadesOnly;
-    if (str == "stopandfadeout")
-        return StopBehavior::StopAndFadeOut;
+    if (str == "stoponly")
+        return StopBehavior::StopOnly;
+    if (str == "stopandapply")
+        return StopBehavior::StopAndApply;
     return StopBehavior::StopAndApply;
+}
+
+// DCAOverride serialization
+QJsonObject DCAOverride::toJson() const {
+    QJsonObject json;
+    if (mute.has_value()) {
+        json["mute"] = mute.value();
+    }
+    if (label.has_value()) {
+        json["label"] = label.value();
+    }
+    return json;
+}
+
+DCAOverride DCAOverride::fromJson(const QJsonObject& json) {
+    DCAOverride override;
+    if (json.contains("mute")) {
+        override.mute = json["mute"].toBool();
+    }
+    if (json.contains("label")) {
+        override.label = json["label"].toString();
+    }
+    return override;
 }
 
 Cue::Cue()
     : m_id(QUuid::createUuid().toString(QUuid::WithoutBraces)), m_number(0.0),
-      m_type(CueType::Snapshot), m_fadeTime(0.0), m_fadeCurve(FadeCurve::Linear),
-      m_autoFollow(false), m_autoFollowDelay(0.0),
+      m_type(CueType::Snapshot), m_autoFollow(false), m_autoFollowDelay(0.0),
       m_autoFollowCondition(AutoFollowCondition::Always),
       m_macroExecutionMode(MacroExecutionMode::Sequential), m_gotoAutoExecute(false) {}
 
 Cue::Cue(double number, const QString& name)
     : m_id(QUuid::createUuid().toString(QUuid::WithoutBraces)), m_number(number), m_name(name),
-      m_type(CueType::Snapshot), m_fadeTime(0.0), m_fadeCurve(FadeCurve::Linear),
-      m_autoFollow(false), m_autoFollowDelay(0.0),
+      m_type(CueType::Snapshot), m_autoFollow(false), m_autoFollowDelay(0.0),
       m_autoFollowCondition(AutoFollowCondition::Always),
       m_macroExecutionMode(MacroExecutionMode::Sequential), m_gotoAutoExecute(false) {}
 
@@ -149,6 +135,18 @@ QVariant Cue::parameter(const QString& path) const {
     return QVariant();
 }
 
+void Cue::setDCAOverride(int dca, const DCAOverride& override) {
+    if (override.hasOverrides()) {
+        m_dcaOverrides[dca] = override;
+    } else {
+        m_dcaOverrides.remove(dca);
+    }
+}
+
+DCAOverride Cue::dcaOverride(int dca) const { return m_dcaOverrides.value(dca); }
+
+void Cue::clearDCAOverride(int dca) { m_dcaOverrides.remove(dca); }
+
 QJsonObject Cue::toJson() const {
     QJsonObject json;
     json["id"] = m_id;
@@ -156,12 +154,28 @@ QJsonObject Cue::toJson() const {
     json["name"] = m_name;
     json["notes"] = m_notes;
     json["type"] = cueTypeToString(m_type);
-    json["fadeTime"] = m_fadeTime;
-    json["fadeCurve"] = fadeCurveToString(m_fadeCurve);
     json["autoFollow"] = m_autoFollow;
     json["autoFollowDelay"] = m_autoFollowDelay;
     json["autoFollowCondition"] = autoFollowConditionToString(m_autoFollowCondition);
     json["parameters"] = m_parameters;
+
+    // DCA targeting
+    if (!m_targetedDCAs.isEmpty()) {
+        QJsonArray dcaArray;
+        for (int dca : m_targetedDCAs) {
+            dcaArray.append(dca);
+        }
+        json["targetedDCAs"] = dcaArray;
+    }
+
+    // DCA overrides
+    if (!m_dcaOverrides.isEmpty()) {
+        QJsonObject overridesObj;
+        for (auto it = m_dcaOverrides.constBegin(); it != m_dcaOverrides.constEnd(); ++it) {
+            overridesObj[QString::number(it.key())] = it.value().toJson();
+        }
+        json["dcaOverrides"] = overridesObj;
+    }
 
     if (!m_childCueIds.isEmpty()) {
         QJsonArray childIds;
@@ -203,12 +217,27 @@ Cue Cue::fromJson(const QJsonObject& json) {
     cue.m_name = json["name"].toString();
     cue.m_notes = json["notes"].toString();
     cue.m_type = stringToCueType(json["type"].toString());
-    cue.m_fadeTime = json["fadeTime"].toDouble();
-    cue.m_fadeCurve = stringToFadeCurve(json["fadeCurve"].toString());
     cue.m_autoFollow = json["autoFollow"].toBool();
     cue.m_autoFollowDelay = json["autoFollowDelay"].toDouble();
     cue.m_autoFollowCondition = stringToAutoFollowCondition(json["autoFollowCondition"].toString());
     cue.m_parameters = json["parameters"].toObject();
+
+    // DCA targeting
+    if (json.contains("targetedDCAs")) {
+        QJsonArray dcaArray = json["targetedDCAs"].toArray();
+        for (const QJsonValue& val : dcaArray) {
+            cue.m_targetedDCAs.insert(val.toInt());
+        }
+    }
+
+    // DCA overrides
+    if (json.contains("dcaOverrides")) {
+        QJsonObject overridesObj = json["dcaOverrides"].toObject();
+        for (auto it = overridesObj.constBegin(); it != overridesObj.constEnd(); ++it) {
+            int dca = it.key().toInt();
+            cue.m_dcaOverrides[dca] = DCAOverride::fromJson(it.value().toObject());
+        }
+    }
 
     if (json.contains("childCueIds")) {
         QJsonArray childIds = json["childCueIds"].toArray();

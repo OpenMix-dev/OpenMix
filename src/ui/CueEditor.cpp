@@ -2,20 +2,20 @@
 #include "app/Application.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
-#include "core/LiveEditSession.h"
 #include "core/PlaybackEngine.h"
 #include "core/Show.h"
-#include "protocol/MixerProtocol.h"
 
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QTextEdit>
 #include <QVBoxLayout>
 
@@ -24,11 +24,13 @@ namespace OpenMix {
 CueEditor::CueEditor(Application* app, QWidget* parent) : QWidget(parent), m_app(app) {
     setupUi();
     setEnabled(false);
-    updateLiveEditState();
 }
 
 void CueEditor::setupUi() {
-    QVBoxLayout* mainLayout = new QVBoxLayout(this);
+    setMinimumSize(280, 500);
+    setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
+
+    m_mainLayout = new QVBoxLayout(this);
 
     // basic properties group
     QGroupBox* basicGroup = new QGroupBox(tr("Cue Properties"), this);
@@ -46,27 +48,19 @@ void CueEditor::setupUi() {
 
     m_typeCombo = new QComboBox(this);
     m_typeCombo->addItem(tr("Snapshot"), static_cast<int>(CueType::Snapshot));
-    m_typeCombo->addItem(tr("Fade"), static_cast<int>(CueType::Fade));
     m_typeCombo->addItem(tr("Stop"), static_cast<int>(CueType::Stop));
     m_typeCombo->addItem(tr("Go To"), static_cast<int>(CueType::GoTo));
     m_typeCombo->addItem(tr("Wait"), static_cast<int>(CueType::Wait));
     basicLayout->addRow(tr("Type:"), m_typeCombo);
 
-    mainLayout->addWidget(basicGroup);
+    m_mainLayout->addWidget(basicGroup);
 
     // timing group
-    QGroupBox* timingGroup = new QGroupBox(tr("Timing"), this);
+    QGroupBox* timingGroup = new QGroupBox(tr("Auto-Follow"), this);
     QFormLayout* timingLayout = new QFormLayout(timingGroup);
 
-    m_fadeTimeSpin = new QDoubleSpinBox(this);
-    m_fadeTimeSpin->setRange(0.0, 999.0);
-    m_fadeTimeSpin->setDecimals(1);
-    m_fadeTimeSpin->setSingleStep(0.5);
-    m_fadeTimeSpin->setSuffix(tr(" sec"));
-    timingLayout->addRow(tr("Fade Time:"), m_fadeTimeSpin);
-
-    m_autoFollowCheck = new QCheckBox(tr("Auto-follow"), this);
-    timingLayout->addRow(QString(), m_autoFollowCheck);
+    m_autoFollowCheck = new QCheckBox(tr("Enable"), this);
+    timingLayout->addRow(tr("Auto-follow:"), m_autoFollowCheck);
 
     m_autoFollowDelaySpin = new QDoubleSpinBox(this);
     m_autoFollowDelaySpin->setRange(0.0, 999.0);
@@ -74,52 +68,76 @@ void CueEditor::setupUi() {
     m_autoFollowDelaySpin->setSingleStep(0.5);
     m_autoFollowDelaySpin->setSuffix(tr(" sec"));
     m_autoFollowDelaySpin->setEnabled(false);
-    timingLayout->addRow(tr("Follow Delay:"), m_autoFollowDelaySpin);
+    timingLayout->addRow(tr("Delay:"), m_autoFollowDelaySpin);
 
-    mainLayout->addWidget(timingGroup);
+    m_mainLayout->addWidget(timingGroup);
 
-    // capture group
-    QGroupBox* captureGroup = new QGroupBox(tr("Mixer Snapshot"), this);
-    QVBoxLayout* captureLayout = new QVBoxLayout(captureGroup);
+    // DCA targeting section
+    createDCATargetingSection();
+    m_mainLayout->addWidget(m_dcaTargetingGroup);
 
-    m_captureButton = new QPushButton(tr("Capture Current Mixer State"), this);
-    captureLayout->addWidget(m_captureButton);
+    // DCA overrides section
+    m_dcaOverridesGroup = new QGroupBox(tr("DCA Overrides (Mute/Label)"), this);
+    QVBoxLayout* overridesLayout = new QVBoxLayout(m_dcaOverridesGroup);
 
-    QLabel* captureInfo =
-        new QLabel(tr("Captures faders, mutes, & DCA settings from the connected mixer."), this);
-    captureInfo->setWordWrap(true);
-    captureInfo->setStyleSheet("color: gray; font-size: 10px;");
-    captureLayout->addWidget(captureInfo);
+    m_dcaOverridesScroll = new QScrollArea(this);
+    m_dcaOverridesScroll->setWidgetResizable(true);
+    m_dcaOverridesScroll->setFrameShape(QFrame::NoFrame);
+    m_dcaOverridesScroll->setMaximumHeight(200);
 
-    mainLayout->addWidget(captureGroup);
+    QWidget* overridesContent = new QWidget();
+    QVBoxLayout* overridesContentLayout = new QVBoxLayout(overridesContent);
+    overridesContentLayout->setContentsMargins(0, 0, 0, 0);
+    overridesContentLayout->setSpacing(4);
 
-    // live edit group
-    QGroupBox* liveEditGroup = new QGroupBox(tr("Live Edit"), this);
-    QVBoxLayout* liveEditLayout = new QVBoxLayout(liveEditGroup);
+    // create override widgets for 8 DCAs (updated based on mixer)
+    for (int i = 1; i <= 8; ++i) {
+        QGroupBox* dcaBox = new QGroupBox(tr("DCA %1").arg(i), overridesContent);
+        QGridLayout* dcaLayout = new QGridLayout(dcaBox);
+        dcaLayout->setContentsMargins(4, 4, 4, 4);
+        dcaLayout->setSpacing(4);
 
-    m_liveEditStatusLabel = new QLabel(tr("Not active"), this);
-    m_liveEditStatusLabel->setStyleSheet("color: gray; font-style: italic;");
-    liveEditLayout->addWidget(m_liveEditStatusLabel);
+        DCAOverrideWidgets widgets;
 
-    QHBoxLayout* liveEditButtonLayout = new QHBoxLayout();
+        widgets.enableMute = new QCheckBox(tr("Set Mute:"), dcaBox);
+        widgets.muteValue = new QCheckBox(tr("Muted"), dcaBox);
+        widgets.muteValue->setEnabled(false);
+        dcaLayout->addWidget(widgets.enableMute, 0, 0);
+        dcaLayout->addWidget(widgets.muteValue, 0, 1);
 
-    m_startLiveEditButton = new QPushButton(tr("Edit Live"), this);
-    m_startLiveEditButton->setToolTip(tr("Start editing this cue with live mixer feedback"));
-    liveEditButtonLayout->addWidget(m_startLiveEditButton);
+        widgets.enableLabel = new QCheckBox(tr("Set Label:"), dcaBox);
+        widgets.labelValue = new QLineEdit(dcaBox);
+        widgets.labelValue->setPlaceholderText(tr("DCA label"));
+        widgets.labelValue->setEnabled(false);
+        widgets.labelValue->setMaxLength(12);
+        dcaLayout->addWidget(widgets.enableLabel, 1, 0);
+        dcaLayout->addWidget(widgets.labelValue, 1, 1);
 
-    m_commitLiveEditButton = new QPushButton(tr("Commit"), this);
-    m_commitLiveEditButton->setToolTip(tr("Save live edits to this cue"));
-    m_commitLiveEditButton->setVisible(false);
-    liveEditButtonLayout->addWidget(m_commitLiveEditButton);
+        // connect enable checkboxes to enable/disable value widgets
+        connect(widgets.enableMute, &QCheckBox::toggled, widgets.muteValue, &QCheckBox::setEnabled);
+        connect(widgets.enableLabel, &QCheckBox::toggled, widgets.labelValue,
+                &QLineEdit::setEnabled);
 
-    m_cancelLiveEditButton = new QPushButton(tr("Revert"), this);
-    m_cancelLiveEditButton->setToolTip(tr("Cancel live edits and restore original values"));
-    m_cancelLiveEditButton->setVisible(false);
-    liveEditButtonLayout->addWidget(m_cancelLiveEditButton);
+        // connect changes to save
+        int dca = i;
+        connect(widgets.enableMute, &QCheckBox::toggled,
+                [this, dca]() { onDCAOverrideChanged(dca); });
+        connect(widgets.muteValue, &QCheckBox::toggled,
+                [this, dca]() { onDCAOverrideChanged(dca); });
+        connect(widgets.enableLabel, &QCheckBox::toggled,
+                [this, dca]() { onDCAOverrideChanged(dca); });
+        connect(widgets.labelValue, &QLineEdit::textChanged,
+                [this, dca]() { onDCAOverrideChanged(dca); });
 
-    liveEditLayout->addLayout(liveEditButtonLayout);
+        m_dcaOverrideWidgets.append(widgets);
+        overridesContentLayout->addWidget(dcaBox);
+    }
 
-    mainLayout->addWidget(liveEditGroup);
+    overridesContentLayout->addStretch();
+    m_dcaOverridesScroll->setWidget(overridesContent);
+    overridesLayout->addWidget(m_dcaOverridesScroll);
+
+    m_mainLayout->addWidget(m_dcaOverridesGroup);
 
     // notes group
     QGroupBox* notesGroup = new QGroupBox(tr("Notes"), this);
@@ -127,12 +145,12 @@ void CueEditor::setupUi() {
 
     m_notesEdit = new QTextEdit(this);
     m_notesEdit->setPlaceholderText(tr("Enter cue notes..."));
-    m_notesEdit->setMaximumHeight(100);
+    m_notesEdit->setMaximumHeight(80);
     notesLayout->addWidget(m_notesEdit);
 
-    mainLayout->addWidget(notesGroup);
+    m_mainLayout->addWidget(notesGroup);
 
-    mainLayout->addStretch();
+    m_mainLayout->addStretch();
 
     // connect signals
     connect(m_numberSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
@@ -140,29 +158,68 @@ void CueEditor::setupUi() {
     connect(m_nameEdit, &QLineEdit::textChanged, this, &CueEditor::onNameChanged);
     connect(m_typeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &CueEditor::onTypeChanged);
-    connect(m_fadeTimeSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
-            &CueEditor::onFadeTimeChanged);
     connect(m_autoFollowCheck, &QCheckBox::toggled, this, &CueEditor::onAutoFollowChanged);
     connect(m_autoFollowDelaySpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
             &CueEditor::onAutoFollowDelayChanged);
     connect(m_notesEdit, &QTextEdit::textChanged, this, &CueEditor::onNotesChanged);
-    connect(m_captureButton, &QPushButton::clicked, this, &CueEditor::onCaptureSnapshot);
-    connect(m_startLiveEditButton, &QPushButton::clicked, this, &CueEditor::onStartLiveEdit);
-    connect(m_commitLiveEditButton, &QPushButton::clicked, this, &CueEditor::onCommitLiveEdit);
-    connect(m_cancelLiveEditButton, &QPushButton::clicked, this, &CueEditor::onCancelLiveEdit);
+}
 
-    // connect to live edit session signals if available
-    if (m_app && m_app->playbackEngine() && m_app->playbackEngine()->liveEditSession()) {
-        LiveEditSession* session = m_app->playbackEngine()->liveEditSession();
-        connect(session, &LiveEditSession::modeChanged, this, &CueEditor::updateLiveEditState);
-        connect(session, &LiveEditSession::sessionStarted, this, &CueEditor::updateLiveEditState);
-        connect(session, &LiveEditSession::sessionEnded, this, &CueEditor::updateLiveEditState);
+void CueEditor::addBottomWidget(QWidget* widget) {
+    if (m_mainLayout && widget) {
+        // insert before stretch
+        m_mainLayout->addWidget(widget);
+    }
+}
+
+void CueEditor::createDCATargetingSection() {
+    m_dcaTargetingGroup = new QGroupBox(tr("Target DCAs"), this);
+    QVBoxLayout* layout = new QVBoxLayout(m_dcaTargetingGroup);
+
+    m_targetAllDCAsCheck = new QCheckBox(tr("Target All DCAs"), this);
+    m_targetAllDCAsCheck->setChecked(true);
+    layout->addWidget(m_targetAllDCAsCheck);
+
+    QWidget* dcaChecksWidget = new QWidget(this);
+    QGridLayout* dcaGrid = new QGridLayout(dcaChecksWidget);
+    dcaGrid->setContentsMargins(0, 0, 0, 0);
+    dcaGrid->setSpacing(4);
+
+    // create checkboxes for 8 DCAs (2 rows x 4 cols)
+    for (int i = 1; i <= 8; ++i) {
+        QCheckBox* check = new QCheckBox(tr("DCA %1").arg(i), dcaChecksWidget);
+        int row = (i - 1) / 4;
+        int col = (i - 1) % 4;
+        dcaGrid->addWidget(check, row, col);
+        m_dcaTargetChecks.append(check);
+
+        // when individual DCA is checked, uncheck "target all"
+        connect(check, &QCheckBox::toggled, this, [this](bool checked) {
+            if (m_updatingUi)
+                return;
+            if (checked && m_targetAllDCAsCheck->isChecked()) {
+                m_targetAllDCAsCheck->blockSignals(true);
+                m_targetAllDCAsCheck->setChecked(false);
+                m_targetAllDCAsCheck->blockSignals(false);
+            }
+            onTargetedDCAsChanged();
+        });
     }
 
-    if (m_app) {
-        connect(m_app, &Application::mixerConnected, this, &CueEditor::updateLiveEditState);
-        connect(m_app, &Application::mixerDisconnected, this, &CueEditor::updateLiveEditState);
-    }
+    layout->addWidget(dcaChecksWidget);
+
+    // when "target all" is checked, uncheck individual DCAs
+    connect(m_targetAllDCAsCheck, &QCheckBox::toggled, [this](bool checked) {
+        if (m_updatingUi)
+            return;
+        if (checked) {
+            for (QCheckBox* cb : m_dcaTargetChecks) {
+                cb->blockSignals(true);
+                cb->setChecked(false);
+                cb->blockSignals(false);
+            }
+        }
+        onTargetedDCAsChanged();
+    });
 }
 
 bool CueEditor::hasFocus() const { return m_nameEdit->hasFocus() || m_notesEdit->hasFocus(); }
@@ -171,7 +228,6 @@ void CueEditor::setCue(int index) {
     m_currentIndex = index;
     updateFromCue();
     setEnabled(index >= 0);
-    updateLiveEditState();
 }
 
 Cue* CueEditor::currentCue() {
@@ -190,34 +246,90 @@ void CueEditor::updateFromCue() {
     if (cue) {
         m_numberSpin->setValue(cue->number());
         m_nameEdit->setText(cue->name());
-        m_typeCombo->setCurrentIndex(static_cast<int>(cue->type()));
-        m_fadeTimeSpin->setValue(cue->fadeTime());
+
+        // map cue type to combo index
+        int typeIndex = 0;
+        switch (cue->type()) {
+        case CueType::Snapshot:
+            typeIndex = 0;
+            break;
+        case CueType::Stop:
+            typeIndex = 1;
+            break;
+        case CueType::GoTo:
+            typeIndex = 2;
+            break;
+        case CueType::Wait:
+            typeIndex = 3;
+            break;
+        case CueType::Macro:
+            typeIndex = 0;
+            break; // macro not in combo
+        }
+        m_typeCombo->setCurrentIndex(typeIndex);
+
         m_autoFollowCheck->setChecked(cue->autoFollow());
         m_autoFollowDelaySpin->setValue(cue->autoFollowDelay());
         m_autoFollowDelaySpin->setEnabled(cue->autoFollow());
         m_notesEdit->setPlainText(cue->notes());
+
+        // DCA targeting
+        QSet<int> targetedDCAs = cue->targetedDCAs();
+        m_targetAllDCAsCheck->setChecked(targetedDCAs.isEmpty());
+        for (int i = 0; i < m_dcaTargetChecks.size(); ++i) {
+            int dca = i + 1;
+            m_dcaTargetChecks[i]->setChecked(targetedDCAs.contains(dca));
+        }
+
+        // DCA overrides
+        updateDCAOverridesUI();
     } else {
         m_numberSpin->setValue(0);
         m_nameEdit->clear();
         m_typeCombo->setCurrentIndex(0);
-        m_fadeTimeSpin->setValue(0);
         m_autoFollowCheck->setChecked(false);
         m_autoFollowDelaySpin->setValue(0);
         m_notesEdit->clear();
+        m_targetAllDCAsCheck->setChecked(true);
+        for (QCheckBox* cb : m_dcaTargetChecks) {
+            cb->setChecked(false);
+        }
     }
 
     m_updatingUi = false;
+}
+
+void CueEditor::updateDCAOverridesUI() {
+    Cue* cue = currentCue();
+    if (!cue)
+        return;
+
+    QMap<int, DCAOverride> overrides = cue->dcaOverrides();
+
+    for (int i = 0; i < m_dcaOverrideWidgets.size(); ++i) {
+        int dca = i + 1;
+        DCAOverride override = overrides.value(dca);
+        DCAOverrideWidgets& widgets = m_dcaOverrideWidgets[i];
+
+        widgets.enableMute->setChecked(override.mute.has_value());
+        widgets.muteValue->setChecked(override.mute.value_or(false));
+        widgets.muteValue->setEnabled(override.mute.has_value());
+
+        widgets.enableLabel->setChecked(override.label.has_value());
+        widgets.labelValue->setText(override.label.value_or(""));
+        widgets.labelValue->setEnabled(override.label.has_value());
+    }
 }
 
 void CueEditor::setEnabled(bool enabled) {
     m_numberSpin->setEnabled(enabled);
     m_nameEdit->setEnabled(enabled);
     m_typeCombo->setEnabled(enabled);
-    m_fadeTimeSpin->setEnabled(enabled);
     m_autoFollowCheck->setEnabled(enabled);
     m_autoFollowDelaySpin->setEnabled(enabled && m_autoFollowCheck->isChecked());
     m_notesEdit->setEnabled(enabled);
-    m_captureButton->setEnabled(enabled && m_app->mixer() && m_app->mixer()->isConnected());
+    m_dcaTargetingGroup->setEnabled(enabled);
+    m_dcaOverridesGroup->setEnabled(enabled);
 }
 
 void CueEditor::onNumberChanged(double value) {
@@ -247,18 +359,22 @@ void CueEditor::onTypeChanged(int index) {
         return;
     Cue* cue = currentCue();
     if (cue) {
-        cue->setType(static_cast<CueType>(index));
-        m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
-        emit cueModified();
-    }
-}
-
-void CueEditor::onFadeTimeChanged(double value) {
-    if (m_updatingUi)
-        return;
-    Cue* cue = currentCue();
-    if (cue) {
-        cue->setFadeTime(value);
+        CueType type = CueType::Snapshot;
+        switch (index) {
+        case 0:
+            type = CueType::Snapshot;
+            break;
+        case 1:
+            type = CueType::Stop;
+            break;
+        case 2:
+            type = CueType::GoTo;
+            break;
+        case 3:
+            type = CueType::Wait;
+            break;
+        }
+        cue->setType(type);
         m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
         emit cueModified();
     }
@@ -298,94 +414,52 @@ void CueEditor::onNotesChanged() {
     }
 }
 
-void CueEditor::onCaptureSnapshot() {
-    Cue* cue = currentCue();
-    MixerProtocol* mixer = m_app->mixer();
-    if (cue && mixer && mixer->isConnected()) {
-        mixer->captureSnapshot(*cue);
-        m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
-        emit cueModified();
-    }
-}
-
-void CueEditor::onStartLiveEdit() {
-    if (!m_app || !m_app->playbackEngine()) {
+void CueEditor::onTargetedDCAsChanged() {
+    if (m_updatingUi)
         return;
-    }
-
-    LiveEditSession* session = m_app->playbackEngine()->liveEditSession();
-    if (!session) {
-        return;
-    }
 
     Cue* cue = currentCue();
-    if (cue) {
-        session->startLiveEdit(cue->id());
-    }
-}
-
-void CueEditor::onCommitLiveEdit() {
-    if (!m_app || !m_app->playbackEngine()) {
+    if (!cue)
         return;
-    }
 
-    LiveEditSession* session = m_app->playbackEngine()->liveEditSession();
-    if (session && session->isActive()) {
-        session->commitToCurrentCue();
-        emit cueModified();
-    }
-}
-
-void CueEditor::onCancelLiveEdit() {
-    if (!m_app || !m_app->playbackEngine()) {
-        return;
-    }
-
-    LiveEditSession* session = m_app->playbackEngine()->liveEditSession();
-    if (session && session->isActive()) {
-        session->cancel();
-    }
-}
-
-void CueEditor::updateLiveEditState() {
-    if (!m_app || !m_app->playbackEngine()) {
-        return;
-    }
-
-    LiveEditSession* session = m_app->playbackEngine()->liveEditSession();
-    bool isActive = session && session->isActive();
-    bool isThisCue = isActive && currentCue() && session->activeCueId() == currentCue()->id();
-
-    // update visibility
-    m_startLiveEditButton->setVisible(!isActive);
-    m_commitLiveEditButton->setVisible(isActive && isThisCue);
-    m_cancelLiveEditButton->setVisible(isActive && isThisCue);
-
-    // update status label
-    if (!isActive) {
-        m_liveEditStatusLabel->setText(tr("Not active"));
-        m_liveEditStatusLabel->setStyleSheet("color: gray; font-style: italic;");
-    } else if (isThisCue) {
-        if (session->isPreview()) {
-            m_liveEditStatusLabel->setText(tr("Preview mode - %1 edits").arg(session->editCount()));
-            m_liveEditStatusLabel->setStyleSheet("color: #6699ff; font-weight: bold;");
-        } else {
-            m_liveEditStatusLabel->setText(tr("Live editing - %1 edits").arg(session->editCount()));
-            m_liveEditStatusLabel->setStyleSheet("color: #44cc44; font-weight: bold;");
-        }
+    if (m_targetAllDCAsCheck->isChecked()) {
+        cue->clearTargetedDCAs();
     } else {
-        m_liveEditStatusLabel->setText(tr("Editing another cue"));
-        m_liveEditStatusLabel->setStyleSheet("color: orange; font-style: italic;");
+        QSet<int> targeted;
+        for (int i = 0; i < m_dcaTargetChecks.size(); ++i) {
+            if (m_dcaTargetChecks[i]->isChecked()) {
+                targeted.insert(i + 1);
+            }
+        }
+        cue->setTargetedDCAs(targeted);
     }
 
-    // enable/disable start button
-    bool canStart =
-        m_currentIndex >= 0 && !isActive && m_app->mixer() && m_app->mixer()->isConnected();
-    m_startLiveEditButton->setEnabled(canStart);
+    m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
+    emit cueModified();
+}
 
-    // enable/disable commit/cancel
-    m_commitLiveEditButton->setEnabled(isThisCue && session->hasEdits());
-    m_cancelLiveEditButton->setEnabled(isThisCue);
+void CueEditor::onDCAOverrideChanged(int dca) {
+    if (m_updatingUi)
+        return;
+
+    Cue* cue = currentCue();
+    if (!cue || dca < 1 || dca > m_dcaOverrideWidgets.size())
+        return;
+
+    DCAOverrideWidgets& widgets = m_dcaOverrideWidgets[dca - 1];
+    DCAOverride override;
+
+    if (widgets.enableMute->isChecked()) {
+        override.mute = widgets.muteValue->isChecked();
+    }
+
+    if (widgets.enableLabel->isChecked()) {
+        override.label = widgets.labelValue->text();
+    }
+
+    cue->setDCAOverride(dca, override);
+    m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
+    emit cueModified();
 }
 
 } // namespace OpenMix

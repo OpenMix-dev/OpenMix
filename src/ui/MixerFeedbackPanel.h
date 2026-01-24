@@ -3,6 +3,8 @@
 #include <QVector>
 #include <QWidget>
 
+class QKeyEvent;
+
 namespace OpenMix {
 
 class Application;
@@ -26,16 +28,20 @@ class MixerFeedbackPanel : public QWidget {
     void onMixerConnected();
     void onMixerDisconnected();
 
-    void onLiveEditModeChanged(int mode);
-    void onLiveEditSessionStarted(const QString& cueId);
-    void onLiveEditSessionEnded();
-
     void onActiveCueChanged(int cueIndex);
+
+  protected:
+    void keyPressEvent(QKeyEvent* event) override;
 
   private slots:
     void onDCALabelEdited(int dcaNumber, const QString& newLabel);
+    void onTabToNext(int dcaNumber);
+    void onTabToPrevious(int dcaNumber);
 
   private:
+    bool isAnyLabelBeingEdited() const;
+    DCAWidget* firstEditableDCA() const;
+    DCAWidget* lastEditableDCA() const;
     void setupUi();
     void connectDCASignals(DCAWidget* dca);
     bool parseParameterPath(const QString& path, QString& type, int& number, QString& param);

@@ -54,10 +54,15 @@ class DCAWidget : public QWidget {
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override;
 
+    // start inline label editing (called externally for tab navigation)
+    void startLabelEdit();
+
   signals:
     void levelChanged(int dcaNumber, float level);
     void muteToggled(int dcaNumber, bool muted);
     void labelEdited(int dcaNumber, const QString& newLabel);
+    void tabToNextRequested(int dcaNumber);
+    void tabToPreviousRequested(int dcaNumber);
 
   protected:
     void paintEvent(QPaintEvent* event) override;
@@ -67,7 +72,6 @@ class DCAWidget : public QWidget {
     void setupUi();
     void updateDisplay();
     void updateNameDisplay();
-    void startLabelEdit();
     void finishLabelEdit();
     void cancelLabelEdit();
     QString levelToDb(float level) const;

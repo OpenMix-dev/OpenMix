@@ -1,6 +1,7 @@
 #include "CueFilterBar.h"
 #include "CueFilterProxyModel.h"
 #include "core/Cue.h"
+#include "theme/Icons.h"
 #include <QComboBox>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -52,7 +53,8 @@ void CueFilterBar::setupUi() {
             &CueFilterBar::onTagFilterChanged);
 
     // clear button
-    m_clearButton = new QPushButton(tr("Clear Filters"), this);
+    m_clearButton = new QPushButton(Icons::editClear(), tr("Clear Filters"), this);
+    m_clearButton->setToolTip(tr("Clear all filter settings"));
     connect(m_clearButton, &QPushButton::clicked, this, &CueFilterBar::onClearFilters);
 
     // layout
@@ -75,7 +77,6 @@ void CueFilterBar::populateTypeCombo() {
     m_typeCombo->clear();
     m_typeCombo->addItem(tr("All Types"), -1);
     m_typeCombo->addItem(tr("Snapshot"), static_cast<int>(CueType::Snapshot));
-    m_typeCombo->addItem(tr("Fade"), static_cast<int>(CueType::Fade));
     m_typeCombo->addItem(tr("Stop"), static_cast<int>(CueType::Stop));
     m_typeCombo->addItem(tr("GoTo"), static_cast<int>(CueType::GoTo));
     m_typeCombo->addItem(tr("Wait"), static_cast<int>(CueType::Wait));

@@ -1,6 +1,7 @@
 #include "MacroPreviewWidget.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
+#include "theme/Theme.h"
 
 #include <QHeaderView>
 #include <QSet>
@@ -14,7 +15,7 @@ MacroPreviewWidget::MacroPreviewWidget(QWidget* parent) : QWidget(parent) {
 
     // header label
     m_headerLabel = new QLabel(this);
-    m_headerLabel->setStyleSheet("font-weight: bold;");
+    m_headerLabel->setProperty("role", "header");
     m_layout->addWidget(m_headerLabel);
 
     // tree widget for child cues
@@ -37,7 +38,7 @@ MacroPreviewWidget::MacroPreviewWidget(QWidget* parent) : QWidget(parent) {
     // empty state label
     m_emptyLabel = new QLabel(tr("Select a macro cue to preview its children"), this);
     m_emptyLabel->setAlignment(Qt::AlignCenter);
-    m_emptyLabel->setStyleSheet("color: gray;");
+    m_emptyLabel->setProperty("role", "muted");
     m_layout->addWidget(m_emptyLabel);
 
     clear();
@@ -89,8 +90,9 @@ void MacroPreviewWidget::setMacroCue(const Cue* cue, const CueList* cueList) {
             item->setText(0, "?");
             item->setText(1, tr("[Missing: %1]").arg(childId));
             item->setText(2, "-");
-            item->setForeground(0, Qt::red);
-            item->setForeground(1, Qt::red);
+            QColor errorColor = Theme::color(Theme::Colors::AccentRed);
+            item->setForeground(0, errorColor);
+            item->setForeground(1, errorColor);
             item->setData(0, Qt::UserRole, childId);
         }
     }
@@ -139,8 +141,9 @@ void MacroPreviewWidget::buildTree(QTreeWidgetItem* parent, const Cue* cue, cons
         item->setText(0, "!");
         item->setText(1, tr("[Circular reference]"));
         item->setText(2, "-");
-        item->setForeground(0, Qt::red);
-        item->setForeground(1, Qt::red);
+        QColor errorColor = Theme::color(Theme::Colors::AccentRed);
+        item->setForeground(0, errorColor);
+        item->setForeground(1, errorColor);
         return;
     }
 
@@ -164,8 +167,9 @@ void MacroPreviewWidget::buildTree(QTreeWidgetItem* parent, const Cue* cue, cons
             item->setText(0, "?");
             item->setText(1, tr("[Missing: %1]").arg(childId));
             item->setText(2, "-");
-            item->setForeground(0, Qt::red);
-            item->setForeground(1, Qt::red);
+            QColor errorColor = Theme::color(Theme::Colors::AccentRed);
+            item->setForeground(0, errorColor);
+            item->setForeground(1, errorColor);
             item->setData(0, Qt::UserRole, childId);
         }
     }
@@ -180,8 +184,6 @@ QString MacroPreviewWidget::cueTypeIcon(const Cue* cue) const {
     switch (cue->type()) {
     case CueType::Snapshot:
         return QString::fromUtf8("\u2B24"); // filled circle
-    case CueType::Fade:
-        return QString::fromUtf8("\u2192"); // arrow
     case CueType::Stop:
         return QString::fromUtf8("\u25A0"); // filled square
     case CueType::GoTo:

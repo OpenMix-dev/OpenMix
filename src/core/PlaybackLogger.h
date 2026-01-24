@@ -15,8 +15,6 @@ struct PlaybackLogEntry {
 
     enum Type {
         CueExecuted,
-        FadeStarted,
-        FadeCompleted,
         MacroExpanded,
         AutoFollowTriggered,
         ValidationWarning,
@@ -63,8 +61,6 @@ class PlaybackLogger : public QObject {
              const QJsonObject& params = {});
 
     void logCueExecuted(const QString& cueId, const QString& cueName, double cueNumber);
-    void logFadeStarted(const QString& cueId, double duration);
-    void logFadeCompleted(const QString& cueId);
     void logMacroExpanded(const QString& parentId, const QString& childId);
     void logAutoFollowTriggered(const QString& cueId, double delay);
     void logValidationWarning(const QString& cueId, const QString& message);

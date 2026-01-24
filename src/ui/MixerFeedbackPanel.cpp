@@ -3,12 +3,13 @@
 #include "app/Application.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
-#include "core/LiveEditSession.h"
 #include "core/PlaybackEngine.h"
 #include "core/Show.h"
 #include "protocol/MixerProtocol.h"
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QLabel>
+#include <QLineEdit>
 #include <QRegularExpression>
 #include <QTimer>
 
@@ -30,6 +31,10 @@ MixerFeedbackPanel::MixerFeedbackPanel(Application* app, QWidget* parent)
 }
 
 void MixerFeedbackPanel::setupUi() {
+    setMinimumSize(450, 200);
+    setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+    setFocusPolicy(Qt::StrongFocus);
+
     QHBoxLayout* layout = new QHBoxLayout(this);
     layout->setContentsMargins(8, 8, 8, 8);
     layout->setSpacing(4);
@@ -47,6 +52,8 @@ void MixerFeedbackPanel::setupUi() {
 
 void MixerFeedbackPanel::connectDCASignals(DCAWidget* dca) {
     connect(dca, &DCAWidget::labelEdited, this, &MixerFeedbackPanel::onDCALabelEdited);
+    connect(dca, &DCAWidget::tabToNextRequested, this, &MixerFeedbackPanel::onTabToNext);
+    connect(dca, &DCAWidget::tabToPreviousRequested, this, &MixerFeedbackPanel::onTabToPrevious);
 }
 
 void MixerFeedbackPanel::setDCACount(int count) {
@@ -160,38 +167,6 @@ bool MixerFeedbackPanel::parseParameterPath(const QString& path, QString& type, 
     return false;
 }
 
-void MixerFeedbackPanel::onLiveEditModeChanged(int mode) {
-    // 0 = inactive, 1 = live, 2 = preview
-    bool editMode = mode != 0;
-    bool previewMode = mode == 2;
-
-    for (DCAWidget* dca : m_dcaWidgets) {
-        dca->setEditMode(editMode);
-        dca->setPreviewMode(previewMode);
-    }
-}
-
-void MixerFeedbackPanel::onLiveEditSessionStarted(const QString& cueId) {
-    // capture current levels as original values
-    for (DCAWidget* dca : m_dcaWidgets) {
-        dca->setOriginalLevel(dca->level());
-        dca->setEditMode(true);
-    }
-
-    // load cue-specific labels (also sets m_activeCueId)
-    if (!cueId.isEmpty()) {
-        m_activeCueId = cueId;
-        loadCueSettings(cueId);
-    }
-}
-
-void MixerFeedbackPanel::onLiveEditSessionEnded() {
-    for (DCAWidget* dca : m_dcaWidgets) {
-        dca->setEditMode(false);
-        dca->setPreviewMode(false);
-    }
-}
-
 void MixerFeedbackPanel::onActiveCueChanged(int cueIndex) {
     if (!m_app || !m_app->show() || !m_app->show()->cueList()) {
         return;
@@ -249,6 +224,42 @@ void MixerFeedbackPanel::onDCALabelEdited(int dcaNumber, const QString& newLabel
     }
 }
 
+void MixerFeedbackPanel::onTabToNext(int dcaNumber) {
+    if (m_dcaWidgets.isEmpty()) {
+        return;
+    }
+
+    // find next visible DCA, wrapping around
+    int count = m_dcaWidgets.size();
+    int startIndex = dcaNumber - 1; // convert to 0-based
+    for (int i = 1; i <= count; ++i) {
+        int nextIndex = (startIndex + i) % count;
+        DCAWidget* next = m_dcaWidgets[nextIndex];
+        if (next->isVisible() && next->isLabelEditEnabled()) {
+            next->startLabelEdit();
+            return;
+        }
+    }
+}
+
+void MixerFeedbackPanel::onTabToPrevious(int dcaNumber) {
+    if (m_dcaWidgets.isEmpty()) {
+        return;
+    }
+
+    // find previous visible DCA, wrapping around
+    int count = m_dcaWidgets.size();
+    int startIndex = dcaNumber - 1; // convert to 0-based
+    for (int i = 1; i <= count; ++i) {
+        int prevIndex = (startIndex - i + count) % count;
+        DCAWidget* prev = m_dcaWidgets[prevIndex];
+        if (prev->isVisible() && prev->isLabelEditEnabled()) {
+            prev->startLabelEdit();
+            return;
+        }
+    }
+}
+
 void MixerFeedbackPanel::loadCueSettings(const QString& cueId) {
     if (!m_app || !m_app->show() || !m_app->show()->cueList()) {
         return;
@@ -276,6 +287,53 @@ void MixerFeedbackPanel::clearCueSettings() {
     for (DCAWidget* dca : m_dcaWidgets) {
         dca->setCueLabel(QString());
     }
+}
+
+void MixerFeedbackPanel::keyPressEvent(QKeyEvent* event) {
+    if (event->key() == Qt::Key_Tab && !isAnyLabelBeingEdited()) {
+        DCAWidget* first = firstEditableDCA();
+        if (first) {
+            first->startLabelEdit();
+            event->accept();
+            return;
+        }
+    } else if (event->key() == Qt::Key_Backtab && !isAnyLabelBeingEdited()) {
+        DCAWidget* last = lastEditableDCA();
+        if (last) {
+            last->startLabelEdit();
+            event->accept();
+            return;
+        }
+    }
+    QWidget::keyPressEvent(event);
+}
+
+bool MixerFeedbackPanel::isAnyLabelBeingEdited() const {
+    for (DCAWidget* dca : m_dcaWidgets) {
+        if (dca->findChild<QLineEdit*>() && dca->findChild<QLineEdit*>()->isVisible()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+DCAWidget* MixerFeedbackPanel::firstEditableDCA() const {
+    for (DCAWidget* dca : m_dcaWidgets) {
+        if (dca->isVisible() && dca->isLabelEditEnabled()) {
+            return dca;
+        }
+    }
+    return nullptr;
+}
+
+DCAWidget* MixerFeedbackPanel::lastEditableDCA() const {
+    for (int i = m_dcaWidgets.size() - 1; i >= 0; --i) {
+        DCAWidget* dca = m_dcaWidgets[i];
+        if (dca->isVisible() && dca->isLabelEditEnabled()) {
+            return dca;
+        }
+    }
+    return nullptr;
 }
 
 } // namespace OpenMix

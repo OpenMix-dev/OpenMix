@@ -2,33 +2,30 @@
 
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QMap>
+#include <QSet>
 #include <QString>
 #include <QStringList>
 #include <QUuid>
+#include <optional>
 
 namespace OpenMix {
 
-enum class CueType {
-    Snapshot, // instant recall of all parameters
-    Fade,     // timed crossfade to target values
-    Stop,     // stop/mute action
-    GoTo,     // jump to another cue
-    Wait,     // timed pause in auto-follow sequence
-    Macro     // execute multiple child cues
-};
-
-enum class FadeCurve {
-    Linear,     // linear interpolation (default)
-    EaseIn,     // slow start, fast end (quadratic)
-    EaseOut,    // fast start, slow end (quadratic)
-    SCurve,     // smooth ease in & out
-    Exponential // exponential curve
-};
+enum class CueType { Snapshot, Stop, GoTo, Wait, Macro };
 
 enum class AutoFollowCondition {
-    Always,            // always trigger after delay (default)
-    AfterFadeComplete, // wait for fade to complete, then apply delay
-    OnButtonPress      // require explicit GO command (sets flag only)
+    Always,       // always trigger after delay (default)
+    OnButtonPress // require GO command (sets flag only)
+};
+
+struct DCAOverride {
+    std::optional<bool> mute;     // mute state override (nullopt = don't change)
+    std::optional<QString> label; // label override (nullopt = don't change)
+
+    bool hasOverrides() const { return mute.has_value() || label.has_value(); }
+
+    QJsonObject toJson() const;
+    static DCAOverride fromJson(const QJsonObject& json);
 };
 
 enum class MacroExecutionMode {
@@ -37,15 +34,12 @@ enum class MacroExecutionMode {
 };
 
 enum class StopBehavior {
-    StopFadesOnly, // just stop active fades, don't change mixer state
-    StopAndApply,  // stop fades & immediately apply cue parameters
-    StopAndFadeOut // stop fades & fade to cue parameters using fadeTime
+    StopOnly,    // just stop, don't change mixer state
+    StopAndApply // stop & immediately apply cue parameters
 };
 
 QString cueTypeToString(CueType type);
 CueType stringToCueType(const QString& str);
-QString fadeCurveToString(FadeCurve curve);
-FadeCurve stringToFadeCurve(const QString& str);
 QString autoFollowConditionToString(AutoFollowCondition condition);
 AutoFollowCondition stringToAutoFollowCondition(const QString& str);
 QString macroExecutionModeToString(MacroExecutionMode mode);
@@ -71,12 +65,6 @@ class Cue {
     CueType type() const { return m_type; }
     void setType(CueType type) { m_type = type; }
 
-    double fadeTime() const { return m_fadeTime; }
-    void setFadeTime(double seconds) { m_fadeTime = seconds; }
-
-    FadeCurve fadeCurve() const { return m_fadeCurve; }
-    void setFadeCurve(FadeCurve curve) { m_fadeCurve = curve; }
-
     bool autoFollow() const { return m_autoFollow; }
     void setAutoFollow(bool autoFollow) { m_autoFollow = autoFollow; }
 
@@ -87,6 +75,25 @@ class Cue {
     void setAutoFollowCondition(AutoFollowCondition condition) {
         m_autoFollowCondition = condition;
     }
+
+    // DCA targeting
+    QSet<int> targetedDCAs() const { return m_targetedDCAs; }
+    void setTargetedDCAs(const QSet<int>& dcas) { m_targetedDCAs = dcas; }
+    void addTargetedDCA(int dca) { m_targetedDCAs.insert(dca); }
+    void removeTargetedDCA(int dca) { m_targetedDCAs.remove(dca); }
+    void clearTargetedDCAs() { m_targetedDCAs.clear(); }
+    bool targetsAllDCAs() const { return m_targetedDCAs.isEmpty(); }
+    bool targetsDCA(int dca) const {
+        return m_targetedDCAs.isEmpty() || m_targetedDCAs.contains(dca);
+    }
+
+    // per-DCA overrides
+    QMap<int, DCAOverride> dcaOverrides() const { return m_dcaOverrides; }
+    void setDCAOverrides(const QMap<int, DCAOverride>& overrides) { m_dcaOverrides = overrides; }
+    void setDCAOverride(int dca, const DCAOverride& override);
+    DCAOverride dcaOverride(int dca) const;
+    void clearDCAOverride(int dca);
+    void clearAllDCAOverrides() { m_dcaOverrides.clear(); }
 
     bool isMacro() const { return m_type == CueType::Macro; }
     QStringList childCueIds() const { return m_childCueIds; }
@@ -137,12 +144,13 @@ class Cue {
     QString m_notes;
     CueType m_type;
 
-    double m_fadeTime;
-    FadeCurve m_fadeCurve;
-
     bool m_autoFollow;
     double m_autoFollowDelay;
     AutoFollowCondition m_autoFollowCondition;
+
+    // DCA targeting
+    QSet<int> m_targetedDCAs;              // empty = all DCAs
+    QMap<int, DCAOverride> m_dcaOverrides; // per-DCA mute/label overrides
 
     QStringList m_childCueIds;
     MacroExecutionMode m_macroExecutionMode;

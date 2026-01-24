@@ -1,6 +1,7 @@
 #include "CueTableModel.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
+#include "theme/Theme.h"
 #include <QBrush>
 #include <QDataStream>
 #include <QFont>
@@ -53,11 +54,6 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
             return cue.name();
         case ColType:
             return cueTypeToString(cue.type());
-        case ColFade:
-            if (cue.fadeTime() > 0) {
-                return QString("%1s").arg(cue.fadeTime(), 0, 'f', 1);
-            }
-            return QString("-");
         case ColGroup:
             return cue.group();
         case ColTags:
@@ -68,12 +64,16 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
     }
 
     if (role == Qt::BackgroundRole) {
-        if (row == m_liveEditIndex) {
-            return QBrush(QColor(200, 150, 255)); // purple for live edit
-        } else if (row == m_currentIndex) {
-            return QBrush(QColor(100, 200, 100)); // green for active
+        if (row == m_currentIndex) {
+            return QBrush(Theme::withAlpha(Theme::Colors::AccentGreen, 45));
         } else if (row == m_standbyIndex) {
-            return QBrush(QColor(255, 200, 100)); // yellow for standby
+            return QBrush(Theme::withAlpha(Theme::Colors::AccentAmber, 40));
+        }
+    }
+
+    if (role == Qt::ForegroundRole) {
+        if (row == m_currentIndex) {
+            return QBrush(Theme::color(Theme::Colors::TextPrimary));
         }
     }
 
@@ -116,8 +116,6 @@ QVariant CueTableModel::headerData(int section, Qt::Orientation orientation, int
         return tr("Name");
     case ColType:
         return tr("Type");
-    case ColFade:
-        return tr("Fade");
     case ColGroup:
         return tr("Group");
     case ColTags:
@@ -297,19 +295,6 @@ void CueTableModel::setCurrentCueIndex(int index) {
 void CueTableModel::setStandbyCueIndex(int index) {
     int oldIndex = m_standbyIndex;
     m_standbyIndex = index;
-
-    // refresh old & new rows
-    if (oldIndex >= 0 && oldIndex < rowCount()) {
-        emit dataChanged(this->index(oldIndex, 0), this->index(oldIndex, ColCount - 1));
-    }
-    if (index >= 0 && index < rowCount()) {
-        emit dataChanged(this->index(index, 0), this->index(index, ColCount - 1));
-    }
-}
-
-void CueTableModel::setLiveEditCueIndex(int index) {
-    int oldIndex = m_liveEditIndex;
-    m_liveEditIndex = index;
 
     // refresh old & new rows
     if (oldIndex >= 0 && oldIndex < rowCount()) {

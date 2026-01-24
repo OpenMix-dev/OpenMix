@@ -14,13 +14,10 @@ class AutosaveManager;
 class CueValidator;
 class PlaybackGuard;
 class PlaybackLogger;
-class FadeConflictResolver;
 class DryRunEngine;
 class ShortcutManager;
 class OperationModeManager;
 class CrashRecovery;
-class LiveEditSession;
-class PreviewLayer;
 class MidiInputManager;
 
 class Application : public QObject {
@@ -44,7 +41,6 @@ class Application : public QObject {
     CueValidator* cueValidator() { return m_cueValidator; }
     PlaybackGuard* playbackGuard() { return m_playbackGuard; }
     PlaybackLogger* playbackLogger() { return m_playbackLogger; }
-    FadeConflictResolver* fadeConflictResolver() { return m_fadeConflictResolver; }
     DryRunEngine* dryRunEngine() { return m_dryRunEngine; }
 
     // operator experience
@@ -53,10 +49,6 @@ class Application : public QObject {
 
     // recovery
     CrashRecovery* crashRecovery() { return m_crashRecovery; }
-
-    // live edit
-    LiveEditSession* liveEditSession() { return m_liveEditSession; }
-    PreviewLayer* previewLayer() { return m_previewLayer; }
 
     // MIDI input
     MidiInputManager* midiInputManager() { return m_midiInputManager; }
@@ -90,7 +82,6 @@ class Application : public QObject {
     CueValidator* m_cueValidator;
     PlaybackGuard* m_playbackGuard;
     PlaybackLogger* m_playbackLogger;
-    FadeConflictResolver* m_fadeConflictResolver;
     DryRunEngine* m_dryRunEngine;
 
     // operator experience
@@ -99,10 +90,6 @@ class Application : public QObject {
 
     // recovery
     CrashRecovery* m_crashRecovery;
-
-    // live edit
-    LiveEditSession* m_liveEditSession;
-    PreviewLayer* m_previewLayer;
 
     // MIDI input
     MidiInputManager* m_midiInputManager;

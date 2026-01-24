@@ -3,7 +3,6 @@
 #include "CueList.h"
 #include "CueValidator.h"
 #include <QSet>
-#include <cmath>
 
 namespace OpenMix {
 
@@ -65,30 +64,6 @@ DryRunResult DryRunEngine::executeDryRun(int cueIndex) {
         break;
     }
 
-    case CueType::Fade: {
-        double fadeTime = cue.fadeTime();
-        if (fadeTime <= 0) {
-            QJsonObject targetParams = cue.parameters();
-            for (auto it = targetParams.begin(); it != targetParams.end(); ++it) {
-                currentState[it.key()] = it.value();
-            }
-            result.timeline.append(qMakePair(currentTime, currentState));
-        } else {
-            QJsonObject endState = currentState;
-            QJsonObject targetParams = cue.parameters();
-            for (auto it = targetParams.begin(); it != targetParams.end(); ++it) {
-                endState[it.key()] = it.value();
-            }
-
-            result.timeline = simulateFade(currentState, endState, fadeTime, cue.fadeCurve());
-            currentState = endState;
-            result.totalDuration = fadeTime;
-        }
-        result.finalState = currentState;
-        result.wouldSucceed = true;
-        break;
-    }
-
     case CueType::Macro: {
         QSet<QString> visited;
         result.macroExpansion = expandMacro(cue.id(), visited);
@@ -97,26 +72,14 @@ DryRunResult DryRunEngine::executeDryRun(int cueIndex) {
             result.warnings.append("Macro cue has no child cues");
         }
 
-        double totalChildDuration = 0.0;
-        for (const QString& childId : result.macroExpansion) {
-            const Cue* childCue = m_cueList->findById(childId);
-            if (childCue && childCue->type() == CueType::Fade) {
-                if (cue.macroExecutionMode() == MacroExecutionMode::Sequential) {
-                    totalChildDuration += childCue->fadeTime();
-                } else {
-                    totalChildDuration = qMax(totalChildDuration, childCue->fadeTime());
-                }
-            }
-        }
-        result.totalDuration = totalChildDuration;
-        result.finalState = currentState; // TODO: recursive simulation for accurate result
+        result.finalState = currentState;
         result.wouldSucceed = !result.macroExpansion.isEmpty() || !cue.childCueIds().isEmpty();
         break;
     }
 
     case CueType::Wait: {
         result.totalDuration = cue.autoFollowDelay();
-        result.finalState = currentState; // TODO: recursive simulation for accurate result
+        result.finalState = currentState;
         result.wouldSucceed = true;
         break;
     }
@@ -221,47 +184,6 @@ QJsonObject DryRunEngine::predictedFinalState(int cueIndex) {
     return result.finalState;
 }
 
-QVector<QPair<qint64, QJsonObject>> DryRunEngine::simulateFade(const QJsonObject& startState,
-                                                               const QJsonObject& endState,
-                                                               double durationSec, FadeCurve curve,
-                                                               int samplesPerSecond) {
-    QVector<QPair<qint64, QJsonObject>> timeline;
-
-    int numSamples = qMax(1, static_cast<int>(durationSec * samplesPerSecond));
-    double intervalMs = (durationSec * 1000.0) / numSamples;
-
-    timeline.append(qMakePair(qint64(0), startState));
-
-    for (int i = 1; i <= numSamples; ++i) {
-        double progress = static_cast<double>(i) / numSamples;
-        qint64 time = static_cast<qint64>(i * intervalMs);
-
-        double curvedProgress = interpolate(progress, curve);
-
-        QJsonObject state = startState;
-
-        for (auto it = endState.begin(); it != endState.end(); ++it) {
-            QString path = it.key();
-            QJsonValue endVal = it.value();
-
-            if (endVal.isDouble()) {
-                double start = startState.contains(path) ? startState[path].toDouble() : 0.0;
-                double end = endVal.toDouble();
-                double current = start + (end - start) * curvedProgress;
-                state[path] = current;
-            } else {
-                if (progress >= 0.5) {
-                    state[path] = endVal;
-                }
-            }
-        }
-
-        timeline.append(qMakePair(time, state));
-    }
-
-    return timeline;
-}
-
 QStringList DryRunEngine::expandMacro(const QString& cueId, QSet<QString>& visited) {
     QStringList expansion;
 
@@ -287,39 +209,6 @@ QStringList DryRunEngine::expandMacro(const QString& cueId, QSet<QString>& visit
     }
 
     return expansion;
-}
-
-double DryRunEngine::interpolate(double progress, FadeCurve curve) {
-    progress = qBound(0.0, progress, 1.0);
-
-    switch (curve) {
-    case FadeCurve::Linear:
-        return progress;
-
-    case FadeCurve::EaseIn:
-        // quadratic ease in: progress^2
-        return progress * progress;
-
-    case FadeCurve::EaseOut:
-        // quadratic ease out: 1 - (1 - progress)^2
-        return 1.0 - (1.0 - progress) * (1.0 - progress);
-
-    case FadeCurve::SCurve:
-        // smooth S-curve (ease in-out)
-        if (progress < 0.5) {
-            return 2.0 * progress * progress;
-        } else {
-            return 1.0 - std::pow(-2.0 * progress + 2.0, 2.0) / 2.0;
-        }
-
-    case FadeCurve::Exponential:
-        // exponential curve
-        // (exp(progress * 3) - 1) / (exp(3) - 1)
-        return (std::exp(progress * 3.0) - 1.0) / (std::exp(3.0) - 1.0);
-
-    default:
-        return progress;
-    }
 }
 
 } // namespace OpenMix

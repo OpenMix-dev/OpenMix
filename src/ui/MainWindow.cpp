@@ -1,49 +1,58 @@
 #include "MainWindow.h"
+#include "BubbleBar.h"
+#include "BubbleButton.h"
 #include "ConnectionPanel.h"
 #include "CueEditor.h"
 #include "CueListView.h"
 #include "CueTableModel.h"
-#include "LiveEditPanel.h"
+#include "DCAMappingPanel.h"
 #include "MixerFeedbackPanel.h"
-#include "TimelineView.h"
+#include "PopOutWindow.h"
 #include "app/Application.h"
 #include "core/CueList.h"
 #include "core/CueValidator.h"
-#include "core/LiveEditSession.h"
 #include "core/PlaybackEngine.h"
 #include "core/PlaybackGuard.h"
 #include "core/Show.h"
 #include "io/ProjectFile.h"
 #include "midi/MidiInputManager.h"
 #include "protocol/MixerProtocol.h"
+#include "theme/Icons.h"
+#include "theme/Theme.h"
 #include "ui/MidiConfigDialog.h"
 
 #include <QAction>
 #include <QCloseEvent>
-#include <QDockWidget>
 #include <QFileDialog>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QSettings>
 #include <QSplitter>
 #include <QStatusBar>
+#include <QTimer>
 #include <QToolBar>
 #include <QUndoStack>
+#include <QVBoxLayout>
 
 namespace OpenMix {
 
 MainWindow::MainWindow(Application* app, QWidget* parent) : QMainWindow(parent), m_app(app) {
     setWindowTitle("OpenMix");
-    setMinimumSize(800, 600);
+    setMinimumSize(1280, 720);
+    resize(1920, 1080);
+
+    setStyleSheet(Theme::globalStylesheet());
 
     setupUi();
     createActions();
     createMenus();
     createToolBars();
     createStatusBar();
-    createDockWidgets();
+    createPopOutWindows();
+    createBubbleBar();
     connectSignals();
     loadSettings();
     updateActions();
@@ -64,99 +73,115 @@ void MainWindow::setupUi() {
     m_mainSplitter->setStretchFactor(1, 1);
 
     m_mainSplitter->setChildrenCollapsible(false);
-    m_cueListView->setMinimumWidth(200);
-    m_cueEditor->setMinimumWidth(150);
+    m_cueListView->setMinimumWidth(300);
+    m_cueEditor->setMinimumWidth(250);
 
     setCentralWidget(m_mainSplitter);
 }
 
 void MainWindow::createActions() {
-    m_newAction = new QAction(tr("&New Show"), this);
+    m_newAction = new QAction(Icons::fileNew(), tr("&New Show"), this);
     m_newAction->setShortcut(QKeySequence::New);
+    m_newAction->setToolTip(tr("Create a new show (Ctrl+N)"));
     connect(m_newAction, &QAction::triggered, this, &MainWindow::newShow);
 
-    m_openAction = new QAction(tr("&Open..."), this);
+    m_openAction = new QAction(Icons::fileOpen(), tr("&Open..."), this);
     m_openAction->setShortcut(QKeySequence::Open);
+    m_openAction->setToolTip(tr("Open an existing show (Ctrl+O)"));
     connect(m_openAction, &QAction::triggered, this, &MainWindow::openShow);
 
-    m_saveAction = new QAction(tr("&Save"), this);
+    m_saveAction = new QAction(Icons::fileSave(), tr("&Save"), this);
     m_saveAction->setShortcut(QKeySequence::Save);
+    m_saveAction->setToolTip(tr("Save the current show (Ctrl+S)"));
     connect(m_saveAction, &QAction::triggered, this, &MainWindow::saveShow);
 
-    m_saveAsAction = new QAction(tr("Save &As..."), this);
+    m_saveAsAction = new QAction(Icons::fileSaveAs(), tr("Save &As..."), this);
     m_saveAsAction->setShortcut(QKeySequence::SaveAs);
+    m_saveAsAction->setToolTip(tr("Save the show with a new name (Ctrl+Shift+S)"));
     connect(m_saveAsAction, &QAction::triggered, this, &MainWindow::saveShowAs);
 
-    m_exitAction = new QAction(tr("E&xit"), this);
+    m_exitAction = new QAction(Icons::appExit(), tr("E&xit"), this);
     m_exitAction->setShortcut(QKeySequence::Quit);
+    m_exitAction->setToolTip(tr("Exit the application"));
     connect(m_exitAction, &QAction::triggered, this, &QMainWindow::close);
 
-    m_addCueAction = new QAction(tr("&Add Cue"), this);
+    m_addCueAction = new QAction(Icons::listAdd(), tr("&Add Cue"), this);
     m_addCueAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_N));
+    m_addCueAction->setToolTip(tr("Add a new cue to the list (Ctrl+N)"));
     connect(m_addCueAction, &QAction::triggered, this, &MainWindow::addCue);
 
-    m_deleteCueAction = new QAction(tr("&Delete Cue"), this);
+    m_deleteCueAction = new QAction(Icons::listRemove(), tr("&Delete Cue"), this);
     m_deleteCueAction->setShortcut(QKeySequence::Delete);
+    m_deleteCueAction->setToolTip(tr("Delete the selected cue (Delete)"));
     connect(m_deleteCueAction, &QAction::triggered, this, &MainWindow::deleteCue);
 
     m_renumberAction = new QAction(tr("&Renumber Cues..."), this);
+    m_renumberAction->setToolTip(tr("Renumber all cues sequentially"));
     connect(m_renumberAction, &QAction::triggered, this, &MainWindow::renumberCues);
 
     m_undoAction = m_app->undoStack()->createUndoAction(this, tr("&Undo"));
     m_undoAction->setShortcut(QKeySequence::Undo);
+    m_undoAction->setIcon(Icons::editUndo());
+    m_undoAction->setToolTip(tr("Undo the last action (Ctrl+Z)"));
 
     m_redoAction = m_app->undoStack()->createRedoAction(this, tr("&Redo"));
     m_redoAction->setShortcut(QKeySequence::Redo);
+    m_redoAction->setIcon(Icons::editRedo());
+    m_redoAction->setToolTip(tr("Redo the last undone action (Ctrl+Y)"));
 
-    m_goAction = new QAction(tr("&GO"), this);
+    m_goAction = new QAction(Icons::mediaPlay(), tr("&GO"), this);
     m_goAction->setShortcut(Qt::Key_Space);
+    m_goAction->setToolTip(tr("Execute the next cue (Space)"));
     connect(m_goAction, &QAction::triggered, this, &MainWindow::go);
 
-    m_stopAction = new QAction(tr("&Stop"), this);
+    m_stopAction = new QAction(Icons::mediaStop(), tr("&Stop"), this);
     m_stopAction->setShortcut(Qt::Key_Escape);
+    m_stopAction->setToolTip(tr("Stop playback (Escape)"));
     connect(m_stopAction, &QAction::triggered, this, &MainWindow::stopPlayback);
 
-    m_previousCueAction = new QAction(tr("&Previous Cue"), this);
+    m_previousCueAction = new QAction(Icons::mediaPrevious(), tr("&Previous Cue"), this);
     m_previousCueAction->setShortcut(Qt::Key_Up);
+    m_previousCueAction->setToolTip(tr("Select the previous cue (Up)"));
     connect(m_previousCueAction, &QAction::triggered,
             [this]() { m_app->playbackEngine()->previous(); });
 
-    m_nextCueAction = new QAction(tr("&Next Cue"), this);
+    m_nextCueAction = new QAction(Icons::mediaNext(), tr("&Next Cue"), this);
     m_nextCueAction->setShortcut(Qt::Key_Down);
+    m_nextCueAction->setToolTip(tr("Select the next cue (Down)"));
     connect(m_nextCueAction, &QAction::triggered, [this]() { m_app->playbackEngine()->next(); });
 
-    m_panicAction = new QAction(tr("PANIC"), this);
+    m_panicAction = new QAction(Icons::warning(), tr("PANIC"), this);
     m_panicAction->setShortcut(Qt::SHIFT | Qt::Key_Escape);
-    m_panicAction->setToolTip(tr("Emergency stop - fade all to safe values (Shift+Escape)"));
+    m_panicAction->setToolTip(tr("Emergency stop - recall safe values (Shift+Escape)"));
     connect(m_panicAction, &QAction::triggered, this, &MainWindow::panic);
 
-    m_panicRestoreAction = new QAction(tr("Panic + Restore"), this);
+    m_panicRestoreAction = new QAction(Icons::warning(), tr("Panic + Restore"), this);
     m_panicRestoreAction->setShortcut(Qt::CTRL | Qt::SHIFT | Qt::Key_Escape);
     m_panicRestoreAction->setToolTip(
         tr("Panic then restore to previous state (Ctrl+Shift+Escape)"));
     connect(m_panicRestoreAction, &QAction::triggered, this, &MainWindow::panicRestore);
 
-    m_showConnectionAction = new QAction(tr("&Connection Panel"), this);
-    m_showConnectionAction->setCheckable(true);
-    m_showConnectionAction->setChecked(true);
-    connect(m_showConnectionAction, &QAction::triggered, this, &MainWindow::showConnectionPanel);
+    m_showDCAMappingAction = new QAction(Icons::sliders(), tr("&DCA Mapping"), this);
+    m_showDCAMappingAction->setCheckable(true);
+    m_showDCAMappingAction->setChecked(false);
+    m_showDCAMappingAction->setShortcut(Qt::Key_F5);
+    m_showDCAMappingAction->setToolTip(tr("Show/hide DCA mapping panel (F5)"));
+    connect(m_showDCAMappingAction, &QAction::triggered, this, &MainWindow::toggleDCAMappingPanel);
 
-    m_showTimelineAction = new QAction(tr("&Timeline"), this);
-    m_showTimelineAction->setCheckable(true);
-    m_showTimelineAction->setChecked(true);
-    connect(m_showTimelineAction, &QAction::triggered, this, &MainWindow::showTimelineView);
-
-    m_showMixerFeedbackAction = new QAction(tr("&Mixer Feedback"), this);
+    m_showMixerFeedbackAction = new QAction(Icons::audioVolume(), tr("&Mixer Feedback"), this);
     m_showMixerFeedbackAction->setCheckable(true);
     m_showMixerFeedbackAction->setChecked(false);
+    m_showMixerFeedbackAction->setShortcut(Qt::Key_F6);
+    m_showMixerFeedbackAction->setToolTip(tr("Show/hide mixer feedback panel (F6)"));
     connect(m_showMixerFeedbackAction, &QAction::triggered, this,
-            &MainWindow::showMixerFeedbackPanel);
+            &MainWindow::toggleMixerFeedbackPanel);
 
-    m_showLiveEditAction = new QAction(tr("&Live Edit"), this);
-    m_showLiveEditAction->setCheckable(true);
-    m_showLiveEditAction->setChecked(false);
-    m_showLiveEditAction->setShortcut(Qt::CTRL | Qt::Key_L);
-    connect(m_showLiveEditAction, &QAction::triggered, this, &MainWindow::showLiveEditPanel);
+    m_showConnectionAction = new QAction(Icons::network(), tr("&Connection Panel"), this);
+    m_showConnectionAction->setCheckable(true);
+    m_showConnectionAction->setChecked(false);
+    m_showConnectionAction->setShortcut(Qt::Key_F7);
+    m_showConnectionAction->setToolTip(tr("Show/hide connection panel (F7)"));
+    connect(m_showConnectionAction, &QAction::triggered, this, &MainWindow::toggleConnectionPanel);
 }
 
 void MainWindow::createMenus() {
@@ -191,10 +216,9 @@ void MainWindow::createMenus() {
     m_playbackMenu->addAction(m_panicRestoreAction);
 
     m_viewMenu = menuBar()->addMenu(tr("&View"));
-    m_viewMenu->addAction(m_showConnectionAction);
-    m_viewMenu->addAction(m_showTimelineAction);
+    m_viewMenu->addAction(m_showDCAMappingAction);
     m_viewMenu->addAction(m_showMixerFeedbackAction);
-    m_viewMenu->addAction(m_showLiveEditAction);
+    m_viewMenu->addAction(m_showConnectionAction);
 
     m_settingsMenu = menuBar()->addMenu(tr("&Settings"));
     QAction* midiControllerAction = m_settingsMenu->addAction(tr("MIDI Controller..."));
@@ -243,58 +267,60 @@ void MainWindow::createStatusBar() {
     statusBar()->addPermanentWidget(m_playbackStatusLabel);
 }
 
-void MainWindow::createDockWidgets() {
-    m_connectionPanel = new ConnectionPanel(m_app, this);
-    m_connectionDock = new QDockWidget(tr("Mixer Connection"), this);
-    m_connectionDock->setObjectName("ConnectionDock");
-    m_connectionDock->setWidget(m_connectionPanel);
-    m_connectionDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    addDockWidget(Qt::RightDockWidgetArea, m_connectionDock);
+void MainWindow::createPopOutWindows() {
+    m_connectionPanel = new ConnectionPanel(m_app, nullptr);
+    m_connectionPopOut = new PopOutWindow("connection", tr("Mixer Connection"), this);
+    m_connectionPopOut->setContentWidget(m_connectionPanel);
+    m_connectionPopOut->setMinimumContentSize(350, 300);
 
-    m_showConnectionAction->setChecked(m_connectionDock->isVisible());
-    connect(m_connectionDock, &QDockWidget::visibilityChanged, m_showConnectionAction,
-            &QAction::setChecked);
+    connect(m_connectionPopOut, &PopOutWindow::visibilityChanged, [this](bool visible) {
+        m_showConnectionAction->setChecked(visible);
+        m_bubbleBar->setButtonActive("connection", visible);
+    });
 
-    m_timelineView = new TimelineView(m_app, this);
-    m_timelineDock = new QDockWidget(tr("Timeline"), this);
-    m_timelineDock->setObjectName("TimelineDock");
-    m_timelineDock->setWidget(m_timelineView);
-    m_timelineDock->setAllowedAreas(Qt::TopDockWidgetArea | Qt::BottomDockWidgetArea);
-    addDockWidget(Qt::BottomDockWidgetArea, m_timelineDock);
+    m_mixerFeedbackPanel = new MixerFeedbackPanel(m_app, nullptr);
+    m_mixerFeedbackPopOut = new PopOutWindow("mixerFeedback", tr("Mixer Feedback"), this);
+    m_mixerFeedbackPopOut->setContentWidget(m_mixerFeedbackPanel);
+    m_mixerFeedbackPopOut->setMinimumContentSize(400, 350);
 
-    m_showTimelineAction->setChecked(m_timelineDock->isVisible());
-    connect(m_timelineDock, &QDockWidget::visibilityChanged, m_showTimelineAction,
-            &QAction::setChecked);
+    connect(m_mixerFeedbackPopOut, &PopOutWindow::visibilityChanged, [this](bool visible) {
+        m_showMixerFeedbackAction->setChecked(visible);
+        m_bubbleBar->setButtonActive("mixer", visible);
+    });
 
-    m_mixerFeedbackPanel = new MixerFeedbackPanel(m_app, this);
-    m_mixerFeedbackDock = new QDockWidget(tr("Mixer Feedback"), this);
-    m_mixerFeedbackDock->setObjectName("MixerFeedbackDock");
-    m_mixerFeedbackDock->setWidget(m_mixerFeedbackPanel);
-    m_mixerFeedbackDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea |
-                                         Qt::BottomDockWidgetArea);
+    m_dcaMappingPanel = new DCAMappingPanel(m_app, nullptr);
+    m_dcaMappingPopOut = new PopOutWindow("dcaMapping", tr("DCA Mapping"), this);
+    m_dcaMappingPopOut->setContentWidget(m_dcaMappingPanel);
+    m_dcaMappingPopOut->setMinimumContentSize(500, 450);
 
-    addDockWidget(Qt::RightDockWidgetArea, m_mixerFeedbackDock);
-    m_mixerFeedbackDock->setVisible(false); // hidden by default
+    connect(m_dcaMappingPopOut, &PopOutWindow::visibilityChanged, [this](bool visible) {
+        m_showDCAMappingAction->setChecked(visible);
+        m_bubbleBar->setButtonActive("dcaMapping", visible);
+    });
+}
 
-    m_showMixerFeedbackAction->setChecked(m_mixerFeedbackDock->isVisible());
-    connect(m_mixerFeedbackDock, &QDockWidget::visibilityChanged, m_showMixerFeedbackAction,
-            &QAction::setChecked);
+void MainWindow::createBubbleBar() {
+    m_bubbleBar = new BubbleBar(this);
 
-    // live edit panel
-    m_liveEditPanel = new LiveEditPanel(m_app, this);
-    m_liveEditDock = new QDockWidget(tr("Live Edit"), this);
-    m_liveEditDock->setObjectName("LiveEditDock");
-    m_liveEditDock->setWidget(m_liveEditPanel);
-    m_liveEditDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    addDockWidget(Qt::RightDockWidgetArea, m_liveEditDock);
-    m_liveEditDock->setVisible(false); // hidden by default
+    m_bubbleBar->addButton("dcaMapping", Icons::sliders(), tr("DCA Mapping (F5)"));
+    m_bubbleBar->addButton("mixer", Icons::audioVolume(), tr("Mixer Feedback (F6)"));
+    m_bubbleBar->addButton("connection", Icons::network(), tr("Connection (F7)"));
 
-    m_showLiveEditAction->setChecked(m_liveEditDock->isVisible());
-    connect(m_liveEditDock, &QDockWidget::visibilityChanged, m_showLiveEditAction,
-            &QAction::setChecked);
+    connect(m_bubbleBar, &BubbleBar::buttonClicked, this, &MainWindow::onBubbleButtonClicked);
 
-    // tabify live edit dock w/ mixer feedback dock
-    tabifyDockWidget(m_mixerFeedbackDock, m_liveEditDock);
+    m_cueEditor->addBottomWidget(m_bubbleBar);
+}
+
+void MainWindow::onBubbleButtonClicked(const QString& id, bool checked) {
+    Q_UNUSED(checked)
+
+    if (id == "dcaMapping") {
+        toggleDCAMappingPanel();
+    } else if (id == "mixer") {
+        toggleMixerFeedbackPanel();
+    } else if (id == "connection") {
+        toggleConnectionPanel();
+    }
 }
 
 void MainWindow::connectSignals() {
@@ -332,46 +358,28 @@ void MainWindow::connectSignals() {
         connect(guard, &PlaybackGuard::lockoutStateChanged, this,
                 &MainWindow::onLockoutStateChanged);
     }
-
-    connect(m_timelineView, &TimelineView::cueClicked,
-            [this](int index) { m_app->playbackEngine()->goToIndex(index); });
-
-    // live edit session signals
-    LiveEditSession* liveEditSession = m_app->playbackEngine()->liveEditSession();
-    if (liveEditSession) {
-        connect(liveEditSession, &LiveEditSession::sessionStarted, [this](const QString& cueId) {
-            int index = m_app->show()->cueList()->indexOf(cueId);
-            m_cueListView->model()->setLiveEditCueIndex(index);
-
-            // show live edit panel when session starts
-            m_liveEditDock->setVisible(true);
-            m_liveEditDock->raise();
-
-            // notify mixer feedback panel
-            m_mixerFeedbackPanel->onLiveEditSessionStarted(cueId);
-        });
-
-        connect(liveEditSession, &LiveEditSession::sessionEnded, [this]() {
-            m_cueListView->model()->setLiveEditCueIndex(-1);
-            m_mixerFeedbackPanel->onLiveEditSessionEnded();
-        });
-
-        connect(liveEditSession, &LiveEditSession::modeChanged, [this](LiveEditMode mode) {
-            m_mixerFeedbackPanel->onLiveEditModeChanged(static_cast<int>(mode));
-        });
-    }
 }
 
 void MainWindow::loadSettings() {
     QSettings settings("OpenMix", "OpenMix");
-    restoreGeometry(settings.value("geometry").toByteArray());
-    restoreState(settings.value("windowState").toByteArray());
+    settings.beginGroup("MainWindow");
+
+    // restore splitter state
+    QByteArray mainSplitterState = settings.value("mainSplitter").toByteArray();
+    if (!mainSplitterState.isEmpty()) {
+        m_mainSplitter->restoreState(mainSplitterState);
+    }
+
+    settings.endGroup();
 }
 
 void MainWindow::saveSettings() {
     QSettings settings("OpenMix", "OpenMix");
-    settings.setValue("geometry", saveGeometry());
-    settings.setValue("windowState", saveState());
+    settings.beginGroup("MainWindow");
+
+    settings.setValue("mainSplitter", m_mainSplitter->saveState());
+
+    settings.endGroup();
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
@@ -393,19 +401,35 @@ void MainWindow::keyPressEvent(QKeyEvent* event) {
     QMainWindow::keyPressEvent(event);
 }
 
+void MainWindow::resizeEvent(QResizeEvent* event) { QMainWindow::resizeEvent(event); }
+
 bool MainWindow::maybeSave() {
     if (!m_app->show()->isModified()) {
         return true;
     }
 
-    QMessageBox::StandardButton ret = QMessageBox::warning(
-        this, tr("OpenMix"), tr("The show has been modified.\nDo you want to save your changes?"),
-        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle(tr("OpenMix"));
+    msgBox.setText(tr("The show has been modified."));
+    msgBox.setInformativeText(tr("Do you want to save your changes?"));
+    msgBox.setIcon(QMessageBox::Warning);
 
-    if (ret == QMessageBox::Save) {
+    QPushButton* saveBtn = msgBox.addButton(tr("Save"), QMessageBox::AcceptRole);
+    saveBtn->setIcon(Icons::fileSave());
+
+    QPushButton* discardBtn = msgBox.addButton(tr("Don't Save"), QMessageBox::DestructiveRole);
+    discardBtn->setIcon(Icons::listRemove());
+
+    QPushButton* cancelBtn = msgBox.addButton(tr("Cancel"), QMessageBox::RejectRole);
+    cancelBtn->setIcon(Icons::appExit());
+
+    msgBox.setDefaultButton(saveBtn);
+    msgBox.exec();
+
+    if (msgBox.clickedButton() == saveBtn) {
         saveShow();
         return !m_app->show()->isModified();
-    } else if (ret == QMessageBox::Cancel) {
+    } else if (msgBox.clickedButton() == cancelBtn) {
         return false;
     }
     return true;
@@ -500,27 +524,28 @@ void MainWindow::go() { m_app->playbackEngine()->go(); }
 
 void MainWindow::stopPlayback() { m_app->playbackEngine()->stop(); }
 
-void MainWindow::showConnectionPanel(bool show) {
-    if (m_connectionDock) {
-        m_connectionDock->setVisible(show);
+void MainWindow::toggleConnectionPanel() {
+    if (m_connectionPopOut->isVisible()) {
+        m_connectionPopOut->hide();
+    } else {
+        m_connectionPopOut->showAndRestore();
     }
 }
 
-void MainWindow::showTimelineView(bool show) {
-    if (m_timelineDock) {
-        m_timelineDock->setVisible(show);
+void MainWindow::toggleMixerFeedbackPanel() {
+    if (m_mixerFeedbackPopOut->isVisible()) {
+        m_mixerFeedbackPopOut->hide();
+    } else {
+        m_mixerFeedbackPopOut->showAndRestore();
     }
 }
 
-void MainWindow::showMixerFeedbackPanel(bool show) {
-    if (m_mixerFeedbackDock) {
-        m_mixerFeedbackDock->setVisible(show);
-    }
-}
-
-void MainWindow::showLiveEditPanel(bool show) {
-    if (m_liveEditDock) {
-        m_liveEditDock->setVisible(show);
+void MainWindow::toggleDCAMappingPanel() {
+    if (m_dcaMappingPopOut->isVisible()) {
+        m_dcaMappingPopOut->hide();
+    } else {
+        m_dcaMappingPopOut->showAndRestore();
+        m_dcaMappingPanel->refresh();
     }
 }
 
@@ -567,12 +592,6 @@ void MainWindow::onPlaybackStateChanged() {
         break;
     case PlaybackState::Running:
         stateStr = tr("Running");
-        break;
-    case PlaybackState::Fading:
-        stateStr = tr("Fading");
-        break;
-    case PlaybackState::Paused:
-        stateStr = tr("Paused");
         break;
     }
     // could update UI based on state
@@ -624,7 +643,7 @@ void MainWindow::updateRecentProjectsMenu() {
 void MainWindow::panic() {
     PlaybackGuard* guard = m_app->playbackEngine()->guard();
     if (guard) {
-        guard->panic(0.5); // 0.5 second fade to safe state
+        guard->panic(); // instant recall to safe state
     } else {
         // fallback: just stop playback
         m_app->playbackEngine()->stop();
@@ -634,7 +653,7 @@ void MainWindow::panic() {
 void MainWindow::panicRestore() {
     PlaybackGuard* guard = m_app->playbackEngine()->guard();
     if (guard) {
-        guard->panicAndRestore(0.5);
+        guard->panic();
     } else {
         m_app->playbackEngine()->stop();
     }
@@ -670,7 +689,7 @@ void MainWindow::onPanicTriggered() {
 void MainWindow::onLockoutStateChanged(bool locked) {
     if (locked) {
         m_goAction->setEnabled(false);
-        statusBar()->showMessage(tr("GO locked during fade"), 2000);
+        statusBar()->showMessage(tr("GO locked - please wait"), 2000);
     } else {
         m_goAction->setEnabled(true);
     }

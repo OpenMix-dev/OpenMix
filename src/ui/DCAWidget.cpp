@@ -1,4 +1,5 @@
 #include "DCAWidget.h"
+#include "theme/Theme.h"
 #include <QEvent>
 #include <QKeyEvent>
 #include <QLabel>
@@ -153,6 +154,14 @@ bool DCAWidget::eventFilter(QObject* obj, QEvent* event) {
         if (keyEvent->key() == Qt::Key_Escape) {
             cancelLabelEdit();
             return true;
+        } else if (keyEvent->key() == Qt::Key_Tab) {
+            finishLabelEdit();
+            emit tabToNextRequested(m_dcaNumber);
+            return true;
+        } else if (keyEvent->key() == Qt::Key_Backtab) {
+            finishLabelEdit();
+            emit tabToPreviousRequested(m_dcaNumber);
+            return true;
         }
     }
     return QWidget::eventFilter(obj, event);
@@ -217,12 +226,15 @@ QString DCAWidget::levelToDb(float level) const {
 void DCAWidget::updateDisplay() {
     m_levelLabel->setText(levelToDb(m_level) + " dB");
 
-    // update mute button style
+    // update mute button style using theme colors
     if (m_muted) {
         m_muteButton->setStyleSheet(
-            "QPushButton { background-color: #cc4444; color: white; font-weight: bold; }");
+            QString("QPushButton { background-color: %1; color: white; font-weight: bold; }")
+                .arg(Theme::Colors::AccentRed));
     } else {
-        m_muteButton->setStyleSheet("QPushButton { background-color: #444444; color: #aaa; }");
+        m_muteButton->setStyleSheet(QString("QPushButton { background-color: %1; color: %2; }")
+                                        .arg(Theme::Colors::BgActive)
+                                        .arg(Theme::Colors::TextSecondary));
     }
 }
 
@@ -232,11 +244,11 @@ void DCAWidget::paintEvent(QPaintEvent* event) {
     QPainter painter(this);
 
     if (m_editMode) {
-        // draw edit mode border
+        // draw edit mode border using theme colors
         if (m_previewMode) {
-            painter.setPen(QPen(QColor(100, 150, 255), 2, Qt::DashLine));
+            painter.setPen(QPen(Theme::color(Theme::Colors::AccentBlue), 2, Qt::DashLine));
         } else {
-            painter.setPen(QPen(QColor(200, 150, 255), 2));
+            painter.setPen(QPen(Theme::color(Theme::Colors::AccentAmber), 2));
         }
         painter.drawRect(rect().adjusted(1, 1, -1, -1));
 
@@ -251,11 +263,11 @@ void DCAWidget::paintEvent(QPaintEvent* event) {
             int originalY =
                 sliderY + sliderHeight - static_cast<int>(m_originalLevel * sliderHeight);
 
-            painter.setPen(QPen(QColor(255, 100, 100), 2));
+            painter.setPen(QPen(Theme::color(Theme::Colors::AccentRed), 2));
             painter.drawLine(sliderX - 4, originalY, sliderX + sliderWidth + 4, originalY);
         }
     } else if (m_active) {
-        painter.setPen(QPen(QColor(100, 200, 100), 2));
+        painter.setPen(QPen(Theme::color(Theme::Colors::AccentGreen), 2));
         painter.drawRect(rect().adjusted(1, 1, -1, -1));
     }
 }

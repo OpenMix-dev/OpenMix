@@ -37,9 +37,7 @@ class MixerProtocol : public QObject {
     virtual void requestParameter(const QString& path) = 0;
     virtual void requestParameterAsync(const QString& path, ParameterCallback callback) = 0;
 
-    virtual void captureSnapshot(Cue& cue) = 0;
     virtual void recallSnapshot(const Cue& cue) = 0;
-    virtual QJsonObject captureCurrentState() = 0;
     virtual void recallScene(int sceneNumber) = 0;
     virtual void refresh() = 0;
     virtual int latencyMs() const = 0;
@@ -55,7 +53,6 @@ class MixerProtocol : public QObject {
     void parameterChanged(const QString& path, const QVariant& value);
     void requestTimeout(const QString& path);
     void latencyChanged(int ms);
-    void snapshotCaptured();
     void sceneChanged(int sceneNumber);
 };
 

@@ -28,6 +28,9 @@ CueListView::CueListView(Application* app, QWidget* parent) : QWidget(parent), m
 }
 
 void CueListView::setupUi() {
+    setMinimumSize(300, 250);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
     QVBoxLayout* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
@@ -68,7 +71,6 @@ void CueListView::setupUi() {
     m_tableView->setColumnWidth(CueTableModel::ColNumber, 60);
     m_tableView->setColumnWidth(CueTableModel::ColName, 150);
     m_tableView->setColumnWidth(CueTableModel::ColType, 80);
-    m_tableView->setColumnWidth(CueTableModel::ColFade, 60);
     m_tableView->setColumnWidth(CueTableModel::ColGroup, 100);
     m_tableView->setColumnWidth(CueTableModel::ColTags, 120);
 

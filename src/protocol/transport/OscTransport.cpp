@@ -191,7 +191,7 @@ QVariant OscTransport::parseOscArgument(const QByteArray& data, int& offset, cha
             offset += 4;
             if (offset + size <= data.size()) {
                 QByteArray blob = data.mid(offset, size);
-                offset += ((size + 3) / 4) * 4; // Pad to 4-byte boundary
+                offset += ((size + 3) / 4) * 4; // pad to 4-byte boundary
                 return blob;
             }
         }

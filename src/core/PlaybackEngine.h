@@ -3,48 +3,19 @@
 #include "Cue.h"
 #include "CueList.h"
 #include "CueValidator.h"
+#include "DCAMapping.h"
 #include <QJsonObject>
 #include <QObject>
+#include <QSet>
 #include <QTimer>
-#include <QVector>
 
 namespace OpenMix {
 
 class MixerProtocol;
 class PlaybackGuard;
 class PlaybackLogger;
-class FadeConflictResolver;
-class LiveEditSession;
 
-enum class PlaybackState { Stopped, Running, Fading, Paused };
-
-class FadeInstance {
-  public:
-    FadeInstance() = default;
-    FadeInstance(const QString& cueId, const QJsonObject& startParams, const QJsonObject& endParams,
-                 double durationSec, FadeCurve curve);
-
-    QString cueId() const { return m_cueId; }
-    bool isComplete() const { return m_progress >= 1.0; }
-    double progress() const { return m_progress; }
-    FadeCurve curve() const { return m_curve; }
-    qint64 startTime() const { return m_startTime; }
-    double duration() const { return m_duration; }
-
-    QJsonObject update(qint64 currentTime);
-    QVariant interpolatedValue(const QString& path) const;
-    void adjustStartTime(qint64 offset);
-
-  private:
-    QString m_cueId;
-    QJsonObject m_startParams;
-    QJsonObject m_endParams;
-    double m_duration = 0.0;
-    qint64 m_startTime = 0;
-    double m_progress = 0.0;
-    FadeCurve m_curve = FadeCurve::Linear;
-    QJsonObject m_currentValues;
-};
+enum class PlaybackState { Stopped, Running };
 
 class PlaybackEngine : public QObject {
     Q_OBJECT
@@ -54,6 +25,7 @@ class PlaybackEngine : public QObject {
 
     void setCueList(CueList* cueList);
     void setMixer(MixerProtocol* mixer);
+    void setDCAMapping(DCAMapping* mapping);
 
     void setValidator(CueValidator* validator);
     CueValidator* validator() const { return m_validator; }
@@ -63,12 +35,6 @@ class PlaybackEngine : public QObject {
 
     void setLogger(PlaybackLogger* logger);
     PlaybackLogger* logger() const { return m_logger; }
-
-    void setConflictResolver(FadeConflictResolver* resolver);
-    FadeConflictResolver* conflictResolver() const { return m_conflictResolver; }
-
-    void setLiveEditSession(LiveEditSession* session);
-    LiveEditSession* liveEditSession() const { return m_liveEditSession; }
 
     void setDryRunMode(bool enabled) { m_dryRunMode = enabled; }
     bool isDryRunMode() const { return m_dryRunMode; }
@@ -81,17 +47,11 @@ class PlaybackEngine : public QObject {
     const Cue* currentCue() const;
     const Cue* standbyCue() const;
 
-    double fadeProgress() const;
-    int activeFadeCount() const { return m_activeFades.size(); }
     bool isAutoFollowArmed() const { return m_autoFollowArmed; }
-
-    static double interpolate(double progress, FadeCurve curve);
 
   public slots:
     void go();
     void stop();
-    void pause();
-    void resume();
 
     void goToFirst();
     void goToLast();
@@ -103,16 +63,10 @@ class PlaybackEngine : public QObject {
     void executeCue(int index);
     void executeCueById(const QString& id);
 
-    void executePanicFade(const QJsonObject& targetValues, double durationSec, FadeCurve curve);
-    void cancelPanicFade();
-
   signals:
     void stateChanged(PlaybackState state);
     void currentCueChanged(int index);
     void standbyCueChanged(int index);
-    void fadeProgressChanged(double progress);
-    void fadeStarted(const QString& cueId);
-    void fadeCompleted(const QString& cueId);
     void cueExecuted(int index);
     void cueCompleted(int index);
     void autoFollowArmed(bool armed);
@@ -121,10 +75,8 @@ class PlaybackEngine : public QObject {
     void cueValidationFailed(int index, const ValidationResult& result);
     void goLockout(const QString& reason);
     void emergencyStopped();
-    void panicFadeCompleted();
 
   private slots:
-    void onFadeTimerTick();
     void onAutoFollowTimerTimeout();
 
   private:
@@ -133,23 +85,24 @@ class PlaybackEngine : public QObject {
     void setStandbyIndex(int index);
     void advanceStandby();
     void executeCueInternal(const Cue& cue);
-    void syncDCALabels(const Cue& cue);
-    void startFade(const Cue& cue);
+    void applyDCAOverrides(const Cue& cue, const QSet<int>& targetDCAs);
     void executeMacroCue(const Cue& cue);
     void executeGoToCue(const Cue& cue);
     void executeStopCue(const Cue& cue);
     void executeNextMacroChild();
     void handleAutoFollow(const Cue& cue);
-    void checkFadeCompletion();
+
+    // DCA filtering helper
+    QJsonObject filterParametersForDCAs(const QJsonObject& params,
+                                        const QSet<int>& targetDCAs) const;
+    QSet<int> allDCAs() const;
 
     CueList* m_cueList = nullptr;
     MixerProtocol* m_mixer = nullptr;
+    DCAMapping* m_dcaMapping = nullptr;
     PlaybackState m_state = PlaybackState::Stopped;
     int m_currentIndex = -1;
     int m_standbyIndex = -1;
-
-    QTimer m_fadeTimer;
-    QVector<FadeInstance> m_activeFades;
 
     QTimer m_autoFollowTimer;
     bool m_autoFollowArmed = false;
@@ -161,13 +114,8 @@ class PlaybackEngine : public QObject {
     CueValidator* m_validator = nullptr;
     PlaybackGuard* m_guard = nullptr;
     PlaybackLogger* m_logger = nullptr;
-    FadeConflictResolver* m_conflictResolver = nullptr;
-    LiveEditSession* m_liveEditSession = nullptr;
 
     bool m_dryRunMode = false;
-    qint64 m_pauseStartTime = 0;
-    bool m_panicFadeActive = false;
-    QString m_panicFadeId;
 };
 
 } // namespace OpenMix

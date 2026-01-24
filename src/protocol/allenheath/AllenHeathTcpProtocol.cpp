@@ -108,20 +108,6 @@ void AllenHeathTcpProtocol::requestParameterAsync(const QString& path, Parameter
     }
 }
 
-void AllenHeathTcpProtocol::captureSnapshot(Cue& cue) {
-    if (m_connectionState != ConnectionState::Connected)
-        return;
-
-    QJsonObject params;
-    for (const QString& param : m_snapshotParams) {
-        if (m_parameterCache.contains(param)) {
-            params[param] = QJsonValue::fromVariant(m_parameterCache[param]);
-        }
-    }
-    cue.setParameters(params);
-    emit snapshotCaptured();
-}
-
 void AllenHeathTcpProtocol::recallSnapshot(const Cue& cue) {
     if (m_connectionState != ConnectionState::Connected)
         return;
@@ -130,16 +116,6 @@ void AllenHeathTcpProtocol::recallSnapshot(const Cue& cue) {
     for (auto it = params.begin(); it != params.end(); ++it) {
         sendParameter(it.key(), it.value().toVariant());
     }
-}
-
-QJsonObject AllenHeathTcpProtocol::captureCurrentState() {
-    QJsonObject state;
-    for (const QString& param : m_snapshotParams) {
-        if (m_parameterCache.contains(param)) {
-            state[param] = QJsonValue::fromVariant(m_parameterCache[param]);
-        }
-    }
-    return state;
 }
 
 void AllenHeathTcpProtocol::recallScene(int sceneNumber) {

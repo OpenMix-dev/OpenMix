@@ -10,10 +10,6 @@ QString PlaybackLogEntry::typeString() const {
     switch (type) {
     case CueExecuted:
         return "CueExecuted";
-    case FadeStarted:
-        return "FadeStarted";
-    case FadeCompleted:
-        return "FadeCompleted";
     case MacroExpanded:
         return "MacroExpanded";
     case AutoFollowTriggered:
@@ -55,10 +51,6 @@ PlaybackLogEntry PlaybackLogEntry::fromJson(const QJsonObject& json) {
     QString typeStr = json["type"].toString();
     if (typeStr == "CueExecuted")
         entry.type = CueExecuted;
-    else if (typeStr == "FadeStarted")
-        entry.type = FadeStarted;
-    else if (typeStr == "FadeCompleted")
-        entry.type = FadeCompleted;
     else if (typeStr == "MacroExpanded")
         entry.type = MacroExpanded;
     else if (typeStr == "AutoFollowTriggered")
@@ -125,15 +117,6 @@ void PlaybackLogger::logCueExecuted(const QString& cueId, const QString& cueName
                                     double cueNumber) {
     QString details = QString("Executed cue %1: %2").arg(cueNumber, 0, 'f', 1).arg(cueName);
     log(PlaybackLogEntry::CueExecuted, cueId, details);
-}
-
-void PlaybackLogger::logFadeStarted(const QString& cueId, double duration) {
-    QString details = QString("Fade started (duration: %1s)").arg(duration, 0, 'f', 2);
-    log(PlaybackLogEntry::FadeStarted, cueId, details);
-}
-
-void PlaybackLogger::logFadeCompleted(const QString& cueId) {
-    log(PlaybackLogEntry::FadeCompleted, cueId, "Fade completed");
 }
 
 void PlaybackLogger::logMacroExpanded(const QString& parentId, const QString& childId) {

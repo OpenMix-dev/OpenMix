@@ -45,9 +45,7 @@ class X32Protocol : public MixerProtocol {
     void requestParameterAsync(const QString& path, ParameterCallback callback) override;
 
     // snapshot operations
-    void captureSnapshot(Cue& cue) override;
     void recallSnapshot(const Cue& cue) override;
-    QJsonObject captureCurrentState() override;
 
     // scene/snapshot recall
     void recallScene(int sceneNumber) override;
@@ -61,7 +59,7 @@ class X32Protocol : public MixerProtocol {
     // capabilities
     const MixerCapabilities& capabilities() const override { return m_capabilities; }
 
-    // X32-specific: list of parameters to capture
+    // X32-specific: list of parameters to recall
     QStringList snapshotParameters() const { return m_snapshotParams; }
     void setSnapshotParameters(const QStringList& params) { m_snapshotParams = params; }
 
@@ -82,6 +80,7 @@ class X32Protocol : public MixerProtocol {
 
   private:
     void initializeSnapshotParams();
+    void rebuildSnapshotParams();
     void setStatus(const QString& status);
     void setConnectionState(ConnectionState state);
     void handleXinfoResponse(const QVariant& value);

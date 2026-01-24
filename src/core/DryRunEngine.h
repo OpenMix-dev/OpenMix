@@ -24,7 +24,7 @@ struct DryRunResult {
     // macro expansion order (if macro cue)
     QStringList macroExpansion;
 
-    // total duration of all fades & auto-follows
+    // total duration of auto-follows
     double totalDuration;
 
     // whether the cue would execute successfully
@@ -64,11 +64,7 @@ class DryRunEngine : public QObject {
     void sequenceCompleted(const QVector<DryRunResult>& results);
 
   private:
-    QVector<QPair<qint64, QJsonObject>>
-    simulateFade(const QJsonObject& startState, const QJsonObject& endState, double durationSec,
-                 FadeCurve curve = FadeCurve::Linear, int samplesPerSecond = 10);
     QStringList expandMacro(const QString& cueId, QSet<QString>& visited);
-    static double interpolate(double progress, FadeCurve curve);
 
     CueList* m_cueList = nullptr;
     CueValidator* m_validator = nullptr;

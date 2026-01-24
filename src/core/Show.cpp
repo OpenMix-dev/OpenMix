@@ -20,7 +20,7 @@ MixerConfig MixerConfig::fromJson(const QJsonObject& json) {
     return config;
 }
 
-Show::Show(QObject* parent) : QObject(parent), m_cueList(this) {
+Show::Show(QObject* parent) : QObject(parent), m_cueList(this), m_dcaMapping(this) {
     connectCueListSignals();
     newShow();
 }
@@ -56,17 +56,19 @@ void Show::newShow() {
     m_mixerConfig.type = "x32";
     m_mixerConfig.port = 10023;
     m_cueList.clear();
+    m_dcaMapping.clear();
     m_modified = false;
 }
 
 QJsonObject Show::toJson() const {
     QJsonObject json;
-    json["version"] = "1.0";
+    json["version"] = "1.1";
     json["name"] = m_name;
     json["author"] = m_author;
     json["notes"] = m_notes;
     json["mixer"] = m_mixerConfig.toJson();
     json["cues"] = m_cueList.toJson();
+    json["dcaMapping"] = m_dcaMapping.toJson();
     return json;
 }
 
@@ -76,6 +78,13 @@ void Show::fromJson(const QJsonObject& json) {
     m_notes = json["notes"].toString();
     m_mixerConfig = MixerConfig::fromJson(json["mixer"].toObject());
     m_cueList.fromJson(json["cues"].toArray());
+
+    if (json.contains("dcaMapping")) {
+        m_dcaMapping.loadFromJson(json["dcaMapping"].toObject());
+    } else {
+        m_dcaMapping.clear();
+    }
+
     m_modified = false;
     emit nameChanged(m_name);
 }

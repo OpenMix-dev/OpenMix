@@ -92,19 +92,12 @@ bool CueValidator::validateMacroIds(const Cue& cue, const CueList* cueList,
 bool CueValidator::validateParameters(const Cue& cue, QList<ValidationIssue>& issues) const {
     bool valid = true;
 
-    if (cue.type() == CueType::Fade || cue.type() == CueType::Snapshot) {
+    if (cue.type() == CueType::Snapshot) {
         QJsonObject params = cue.parameters();
         if (params.isEmpty()) {
-            issues.append({ValidationIssue::Warning,
-                           tr("%1 cue has no parameters defined")
-                               .arg(cue.type() == CueType::Fade ? tr("Fade") : tr("Snapshot")),
+            issues.append({ValidationIssue::Warning, tr("Snapshot cue has no parameters defined"),
                            QString()});
         }
-    }
-
-    if (cue.type() == CueType::Fade && cue.fadeTime() <= 0) {
-        issues.append(
-            {ValidationIssue::Warning, tr("Fade cue has zero or negative fade time"), QString()});
     }
 
     // basic check for OSC-like format

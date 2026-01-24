@@ -2,14 +2,12 @@
 #include "core/Cue.h"
 #include "core/CueList.h"
 #include "core/CueValidator.h"
+#include "core/DCAMapping.h"
 #include "core/DryRunEngine.h"
-#include "core/FadeConflictResolver.h"
-#include "core/LiveEditSession.h"
 #include "core/OperationMode.h"
 #include "core/PlaybackEngine.h"
 #include "core/PlaybackGuard.h"
-#include "core/PlaybackLogger.h" // includes PlaybackLogEntry
-#include "core/PreviewLayer.h"
+#include "core/PlaybackLogger.h"
 #include "core/ShortcutManager.h"
 #include "core/Show.h"
 #include "io/AutosaveManager.h"
@@ -33,17 +31,12 @@ Application::Application(QObject* parent) : QObject(parent) {
     m_cueValidator = new CueValidator(this);
     m_playbackGuard = new PlaybackGuard(m_playbackEngine, this);
     m_playbackLogger = new PlaybackLogger(this);
-    m_fadeConflictResolver = new FadeConflictResolver(this);
     m_dryRunEngine = new DryRunEngine(this);
 
     m_shortcutManager = new ShortcutManager(this);
     m_operationModeManager = new OperationModeManager(this);
 
     m_crashRecovery = new CrashRecovery(this);
-
-    // live edit components
-    m_liveEditSession = new LiveEditSession(this);
-    m_previewLayer = new PreviewLayer(this);
 
     // MIDI input
     m_midiInputManager = new MidiInputManager(this);
@@ -63,6 +56,7 @@ Application::~Application() {
 
 void Application::initialize() {
     m_playbackEngine->setCueList(m_show->cueList());
+    m_playbackEngine->setDCAMapping(m_show->dcaMapping());
 
     if (m_mixer) {
         m_playbackEngine->setMixer(m_mixer);
@@ -71,9 +65,7 @@ void Application::initialize() {
     m_playbackEngine->setValidator(m_cueValidator);
     m_playbackEngine->setGuard(m_playbackGuard);
     m_playbackEngine->setLogger(m_playbackLogger);
-    m_playbackEngine->setConflictResolver(m_fadeConflictResolver);
 
-    m_fadeConflictResolver->setCueList(m_show->cueList());
     m_dryRunEngine->setCueList(m_show->cueList());
     m_dryRunEngine->setValidator(m_cueValidator);
 
@@ -100,21 +92,6 @@ void Application::initialize() {
         }
     });
 
-    connect(m_playbackEngine, &PlaybackEngine::fadeStarted, [this](const QString& cueId) {
-        if (m_playbackLogger && m_show->cueList()) {
-            const Cue* cue = m_show->cueList()->findById(cueId);
-            if (cue) {
-                m_playbackLogger->logFadeStarted(cueId, cue->fadeTime());
-            }
-        }
-    });
-
-    connect(m_playbackEngine, &PlaybackEngine::fadeCompleted, [this](const QString& cueId) {
-        if (m_playbackLogger) {
-            m_playbackLogger->logFadeCompleted(cueId);
-        }
-    });
-
     connect(m_playbackEngine, &PlaybackEngine::goLockout, [this](const QString& reason) {
         if (m_playbackLogger) {
             m_playbackLogger->logGoLockout(reason);
@@ -128,32 +105,6 @@ void Application::initialize() {
     m_midiInputManager->setPlaybackEngine(m_playbackEngine);
     m_midiInputManager->setPlaybackGuard(m_playbackGuard);
     m_midiInputManager->loadFromSettings();
-
-    m_liveEditSession->setCueList(m_show->cueList());
-    m_liveEditSession->setPreviewLayer(m_previewLayer);
-
-    m_playbackEngine->setLiveEditSession(m_liveEditSession);
-
-    connect(m_liveEditSession, &LiveEditSession::sessionStarted, [this](const QString& cueId) {
-        if (m_playbackLogger) {
-            m_playbackLogger->log(PlaybackLogEntry::Custom, cueId,
-                                  QString("Live edit session started"));
-        }
-    });
-
-    connect(m_liveEditSession, &LiveEditSession::editsCommitted, [this](const QString& cueId) {
-        if (m_playbackLogger) {
-            m_playbackLogger->log(PlaybackLogEntry::Custom, cueId, QString("Live edits committed"));
-        }
-        m_show->setModified(true);
-    });
-
-    connect(m_liveEditSession, &LiveEditSession::editsCancelled, [this]() {
-        if (m_playbackLogger) {
-            m_playbackLogger->log(PlaybackLogEntry::Custom, QString(),
-                                  QString("Live edit session cancelled"));
-        }
-    });
 }
 
 void Application::connectToMixer(const QString& type, const QString& host, int port) {
@@ -166,9 +117,6 @@ void Application::connectToMixer(const QString& type, const QString& host, int p
 
     m_playbackEngine->setMixer(m_mixer);
 
-    m_liveEditSession->setMixer(m_mixer);
-    m_previewLayer->setMixer(m_mixer);
-
     connect(m_mixer, &MixerProtocol::connected, this, [this]() { emit mixerConnected(); });
     connect(m_mixer, &MixerProtocol::disconnected, this, [this]() { emit mixerDisconnected(); });
 
@@ -177,14 +125,8 @@ void Application::connectToMixer(const QString& type, const QString& host, int p
 
 void Application::disconnectFromMixer() {
     if (m_mixer) {
-        if (m_liveEditSession && m_liveEditSession->isActive()) {
-            m_liveEditSession->cancel();
-        }
-
         m_mixer->disconnect();
         m_playbackEngine->setMixer(nullptr);
-        m_liveEditSession->setMixer(nullptr);
-        m_previewLayer->setMixer(nullptr);
         delete m_mixer;
         m_mixer = nullptr;
     }

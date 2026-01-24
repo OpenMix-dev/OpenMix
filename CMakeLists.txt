@@ -18,7 +18,17 @@ find_package(Qt6 REQUIRED COMPONENTS
     Core
     Widgets
     Network
+    Svg
 )
+
+# icons
+include(FetchContent)
+FetchContent_Declare(
+    qlementine-icons
+    GIT_REPOSITORY "https://github.com/oclero/qlementine-icons.git"
+    GIT_TAG "master"
+)
+FetchContent_MakeAvailable(qlementine-icons)
 
 # find liblo for OSC
 if(WIN32)
@@ -45,12 +55,10 @@ set(SOURCES
     src/core/CueValidator.cpp
     src/core/PlaybackGuard.cpp
     src/core/PlaybackLogger.cpp
-    src/core/FadeConflictResolver.cpp
     src/core/DryRunEngine.cpp
     src/core/ShortcutManager.cpp
     src/core/OperationMode.cpp
-    src/core/LiveEditSession.cpp
-    src/core/PreviewLayer.cpp
+    src/core/DCAMapping.cpp
     src/ui/MainWindow.cpp
     src/ui/CueListView.cpp
     src/ui/CueEditor.cpp
@@ -59,17 +67,15 @@ set(SOURCES
     src/ui/CueFilterProxyModel.cpp
     src/ui/CueFilterBar.cpp
     src/ui/ConnectionStateWidget.cpp
-    src/ui/TimelineView.cpp
-    src/ui/TimelineItem.cpp
     src/ui/MixerFeedbackPanel.cpp
     src/ui/DCAWidget.cpp
     src/ui/CueConfidenceIndicator.cpp
     src/ui/MacroPreviewWidget.cpp
-    src/ui/ShortcutConfigDialog.cpp
-    src/ui/RecoveryDialog.cpp
-    src/ui/LimitationsDialog.cpp
-    src/ui/LiveEditPanel.cpp
-    src/ui/ParameterEditWidget.cpp
+    src/ui/DCAMappingPanel.cpp
+    src/ui/PopOutWindow.cpp
+    src/ui/BubbleButton.cpp
+    src/ui/BubbleBar.cpp
+    src/ui/theme/Theme.cpp
 
     src/protocol/MixerProtocol.cpp
     src/protocol/MixerCapabilities.cpp
@@ -97,7 +103,6 @@ set(SOURCES
     src/io/ProjectFile.cpp
     src/io/AutosaveManager.cpp
     src/io/CrashRecovery.cpp
-    src/io/ProjectMigration.cpp
 
     src/midi/MidiControlMapping.cpp
     src/midi/MidiInputManager.cpp
@@ -115,12 +120,10 @@ set(HEADERS
     src/core/CueValidator.h
     src/core/PlaybackGuard.h
     src/core/PlaybackLogger.h
-    src/core/FadeConflictResolver.h
     src/core/DryRunEngine.h
     src/core/ShortcutManager.h
     src/core/OperationMode.h
-    src/core/LiveEditSession.h
-    src/core/PreviewLayer.h
+    src/core/DCAMapping.h
     src/ui/MainWindow.h
     src/ui/CueListView.h
     src/ui/CueEditor.h
@@ -129,17 +132,16 @@ set(HEADERS
     src/ui/CueFilterProxyModel.h
     src/ui/CueFilterBar.h
     src/ui/ConnectionStateWidget.h
-    src/ui/TimelineView.h
-    src/ui/TimelineItem.h
     src/ui/MixerFeedbackPanel.h
     src/ui/DCAWidget.h
     src/ui/CueConfidenceIndicator.h
     src/ui/MacroPreviewWidget.h
-    src/ui/ShortcutConfigDialog.h
-    src/ui/RecoveryDialog.h
-    src/ui/LimitationsDialog.h
-    src/ui/LiveEditPanel.h
-    src/ui/ParameterEditWidget.h
+    src/ui/DCAMappingPanel.h
+    src/ui/PopOutWindow.h
+    src/ui/BubbleButton.h
+    src/ui/BubbleBar.h
+    src/ui/theme/Theme.h
+    src/ui/theme/Icons.h
 
     src/protocol/MixerProtocol.h
     src/protocol/MixerCapabilities.h
@@ -166,11 +168,15 @@ set(HEADERS
     src/io/ProjectFile.h
     src/io/AutosaveManager.h
     src/io/CrashRecovery.h
-    src/io/ProjectMigration.h
 
     src/midi/MidiControlMapping.h
     src/midi/MidiInputManager.h
     src/ui/MidiConfigDialog.h
+)
+
+# Qt resources
+set(RESOURCES
+    resources/resources.qrc
 )
 
 # create executable
@@ -179,11 +185,13 @@ add_executable(${PROJECT_NAME}
     ${HEADERS}
     ${RTMIDI_SOURCES}
     ${RTMIDI_HEADERS}
+    ${RESOURCES}
 )
 
 # include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/RtMidi
 )
@@ -193,6 +201,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Core
     Qt6::Widgets
     Qt6::Network
+    Qt6::Svg
+    qlementine-icons
 )
 
 # liblo
@@ -203,7 +213,7 @@ else()
     target_link_libraries(${PROJECT_NAME} PRIVATE PkgConfig::LIBLO)
 endif()
 
-# RtMidi platform configuration
+# RtMidi config
 if(WIN32)
     target_compile_definitions(${PROJECT_NAME} PRIVATE __WINDOWS_MM__)
     target_link_libraries(${PROJECT_NAME} PRIVATE winmm)

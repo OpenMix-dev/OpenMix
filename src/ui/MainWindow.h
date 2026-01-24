@@ -8,7 +8,6 @@ class QMenu;
 class QToolBar;
 class QLabel;
 class QSplitter;
-class QDockWidget;
 
 namespace OpenMix {
 
@@ -16,9 +15,10 @@ class Application;
 class CueListView;
 class CueEditor;
 class ConnectionPanel;
-class TimelineView;
 class MixerFeedbackPanel;
-class LiveEditPanel;
+class DCAMappingPanel;
+class PopOutWindow;
+class BubbleBar;
 class PlaybackGuard;
 struct ValidationResult;
 
@@ -32,6 +32,7 @@ class MainWindow : public QMainWindow {
   protected:
     void closeEvent(QCloseEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 
   private slots:
     // file menu actions
@@ -49,11 +50,10 @@ class MainWindow : public QMainWindow {
     void go();
     void stopPlayback();
 
-    // view actions
-    void showConnectionPanel(bool show);
-    void showTimelineView(bool show);
-    void showMixerFeedbackPanel(bool show);
-    void showLiveEditPanel(bool show);
+    // view actions - pop-out windows
+    void toggleConnectionPanel();
+    void toggleMixerFeedbackPanel();
+    void toggleDCAMappingPanel();
 
     // update UI state
     void updateTitle();
@@ -74,18 +74,23 @@ class MainWindow : public QMainWindow {
     // settings dialogs
     void showMidiConfigDialog();
 
+    // bubble bar interaction
+    void onBubbleButtonClicked(const QString& id, bool checked);
+
   private:
     void setupUi();
     void createActions();
     void createMenus();
     void createToolBars();
     void createStatusBar();
-    void createDockWidgets();
+    void createPopOutWindows();
+    void createBubbleBar();
     void connectSignals();
     void loadSettings();
     void saveSettings();
     bool maybeSave();
     void updateRecentProjectsMenu();
+    void updateBubbleBarPosition();
 
     Application* m_app;
 
@@ -94,17 +99,18 @@ class MainWindow : public QMainWindow {
     CueListView* m_cueListView;
     CueEditor* m_cueEditor;
 
-    // dock widget contents
+    // pop-out window contents (owned by pop-out windows)
     ConnectionPanel* m_connectionPanel;
-    TimelineView* m_timelineView;
     MixerFeedbackPanel* m_mixerFeedbackPanel;
-    LiveEditPanel* m_liveEditPanel;
+    DCAMappingPanel* m_dcaMappingPanel;
 
-    // dock widgets
-    QDockWidget* m_connectionDock;
-    QDockWidget* m_timelineDock;
-    QDockWidget* m_mixerFeedbackDock;
-    QDockWidget* m_liveEditDock;
+    // pop-out windows
+    PopOutWindow* m_connectionPopOut;
+    PopOutWindow* m_mixerFeedbackPopOut;
+    PopOutWindow* m_dcaMappingPopOut;
+
+    // bubble bar
+    BubbleBar* m_bubbleBar;
 
     // menus
     QMenu* m_fileMenu;
@@ -143,11 +149,10 @@ class MainWindow : public QMainWindow {
     QAction* m_panicAction;
     QAction* m_panicRestoreAction;
 
-    // view actions
+    // view actions (for menu checkable items)
     QAction* m_showConnectionAction;
-    QAction* m_showTimelineAction;
     QAction* m_showMixerFeedbackAction;
-    QAction* m_showLiveEditAction;
+    QAction* m_showDCAMappingAction;
 
     // status bar
     QLabel* m_connectionStatusLabel;

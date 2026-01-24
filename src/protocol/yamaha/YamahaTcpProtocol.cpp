@@ -140,20 +140,6 @@ void YamahaTcpProtocol::requestParameterAsync(const QString& path, ParameterCall
     requestParameter(path);
 }
 
-void YamahaTcpProtocol::captureSnapshot(Cue& cue) {
-    if (m_connectionState != ConnectionState::Connected)
-        return;
-
-    QJsonObject params;
-    for (const QString& param : m_snapshotParams) {
-        if (m_parameterCache.contains(param)) {
-            params[param] = QJsonValue::fromVariant(m_parameterCache[param]);
-        }
-    }
-    cue.setParameters(params);
-    emit snapshotCaptured();
-}
-
 void YamahaTcpProtocol::recallSnapshot(const Cue& cue) {
     if (m_connectionState != ConnectionState::Connected)
         return;
@@ -162,16 +148,6 @@ void YamahaTcpProtocol::recallSnapshot(const Cue& cue) {
     for (auto it = params.begin(); it != params.end(); ++it) {
         sendParameter(it.key(), it.value().toVariant());
     }
-}
-
-QJsonObject YamahaTcpProtocol::captureCurrentState() {
-    QJsonObject state;
-    for (const QString& param : m_snapshotParams) {
-        if (m_parameterCache.contains(param)) {
-            state[param] = QJsonValue::fromVariant(m_parameterCache[param]);
-        }
-    }
-    return state;
 }
 
 void YamahaTcpProtocol::recallScene(int sceneNumber) {

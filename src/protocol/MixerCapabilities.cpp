@@ -19,6 +19,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.matrixOutputs = 6;
         caps.scenes = 100;
         caps.maxDCANameLength = 12;
+        caps.eqBandsPerChannel = 6;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LCut", "LShv", "PEQ", "VEQ", "HShv", "HCut"};
+        // 16 mix buses can be used as effect sends
+        caps.effectSendBuses = 16;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::M32:
@@ -33,6 +39,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.matrixOutputs = 6;
         caps.scenes = 100;
         caps.maxDCANameLength = 12;
+        caps.eqBandsPerChannel = 6;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LCut", "LShv", "PEQ", "VEQ", "HShv", "HCut"};
+        // 16 mix buses
+        caps.effectSendBuses = 16;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::Wing:
@@ -47,6 +59,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.matrixOutputs = 8;
         caps.scenes = 100;
         caps.maxDCANameLength = 8;
+        caps.eqBandsPerChannel = 6;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LCut", "LShv", "PEQ", "VEQ", "HShv", "HCut"};
+        // 16 effect send buses
+        caps.effectSendBuses = 16;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::SQ5:
@@ -61,6 +79,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.matrixOutputs = 3;
         caps.scenes = 300;
         caps.maxDCANameLength = 6;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LShv", "PEQ", "PEQ", "HShv"};
+        // 4 dedicated FX sends
+        caps.effectSendBuses = 4;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::SQ6:
@@ -75,6 +99,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.matrixOutputs = 3;
         caps.scenes = 300;
         caps.maxDCANameLength = 6;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LShv", "PEQ", "PEQ", "HShv"};
+        // 4 dedicated FX sends
+        caps.effectSendBuses = 4;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::SQ7:
@@ -89,6 +119,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.matrixOutputs = 3;
         caps.scenes = 300;
         caps.maxDCANameLength = 6;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LShv", "PEQ", "PEQ", "HShv"};
+        // 4 dedicated FX sends
+        caps.effectSendBuses = 4;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::GLD80:
@@ -103,6 +139,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.matrixOutputs = 4;
         caps.scenes = 250;
         caps.maxDCANameLength = 8;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LShv", "PEQ", "PEQ", "HShv"};
+        // 8 dedicated FX sends
+        caps.effectSendBuses = 8;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::GLD112:
@@ -117,6 +159,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.matrixOutputs = 4;
         caps.scenes = 250;
         caps.maxDCANameLength = 8;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LShv", "PEQ", "PEQ", "HShv"};
+        // 8 dedicated FX sends
+        caps.effectSendBuses = 8;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::Avantis:
@@ -131,6 +179,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.matrixOutputs = 6;
         caps.scenes = 500;
         caps.maxDCANameLength = 8;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LShv", "PEQ", "PEQ", "HShv"};
+        // 8 dedicated FX sends
+        caps.effectSendBuses = 8;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::DLive:
@@ -145,6 +199,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.matrixOutputs = 16;
         caps.scenes = 500;
         caps.maxDCANameLength = 8;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LShv", "PEQ", "PEQ", "HShv"};
+        // 16 dedicated FX sends
+        caps.effectSendBuses = 16;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::TF1:
@@ -158,6 +218,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 20;
         caps.matrixOutputs = 0;
         caps.scenes = 100;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"HPF", "LShv", "PEQ", "HShv"};
+        // 8 effect sends (4 dedicated + 4 matrix)
+        caps.effectSendBuses = 8;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::TF3:
@@ -171,6 +237,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 20;
         caps.matrixOutputs = 0;
         caps.scenes = 100;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"HPF", "LShv", "PEQ", "HShv"};
+        // 8 effect sends
+        caps.effectSendBuses = 8;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::TF5:
@@ -184,6 +256,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 20;
         caps.matrixOutputs = 0;
         caps.scenes = 100;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"HPF", "LShv", "PEQ", "HShv"};
+        // 8 effect sends
+        caps.effectSendBuses = 8;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::QL1:
@@ -198,6 +276,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.matrixOutputs = 8;
         caps.scenes = 300;
         caps.maxDCANameLength = 8;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"HPF", "LShv", "PEQ", "HShv"};
+        // 16 mix buses as effect sends
+        caps.effectSendBuses = 16;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::QL5:
@@ -212,6 +296,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.matrixOutputs = 8;
         caps.scenes = 300;
         caps.maxDCANameLength = 8;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"HPF", "LShv", "PEQ", "HShv"};
+        // 16 mix buses as effect sends
+        caps.effectSendBuses = 16;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::CL1:
@@ -225,6 +315,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 24;
         caps.matrixOutputs = 8;
         caps.scenes = 300;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"HPF", "LShv", "PEQ", "HShv"};
+        // 24 mix buses as effect sends
+        caps.effectSendBuses = 24;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::CL3:
@@ -238,6 +334,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 24;
         caps.matrixOutputs = 8;
         caps.scenes = 300;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"HPF", "LShv", "PEQ", "HShv"};
+        // 24 mix buses as effect sends
+        caps.effectSendBuses = 24;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::CL5:
@@ -251,6 +353,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 24;
         caps.matrixOutputs = 8;
         caps.scenes = 300;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"HPF", "LShv", "PEQ", "HShv"};
+        // 24 mix buses as effect sends
+        caps.effectSendBuses = 24;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::DM7:
@@ -264,6 +372,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.mixBuses = 48;
         caps.matrixOutputs = 24;
         caps.scenes = 300;
+        caps.eqBandsPerChannel = 6;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"HPF", "LShv", "PEQ", "PEQ", "HShv", "LPF"};
+        // 48 mix buses as effect sends
+        caps.effectSendBuses = 48;
+        caps.supportsEffectSends = true;
         break;
 
     case ConsoleType::Loopback:
@@ -278,6 +392,12 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.matrixOutputs = 6;
         caps.scenes = 100;
         caps.maxDCANameLength = 12;
+        caps.eqBandsPerChannel = 6;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LCut", "LShv", "PEQ", "VEQ", "HShv", "HCut"};
+        // 16 effect send buses (for testing)
+        caps.effectSendBuses = 16;
+        caps.supportsEffectSends = true;
         break;
 
     default:
@@ -413,7 +533,7 @@ bool MixerCapabilities::isSupported() const {
     case ConsoleType::DLive:
         return true;
 
-    // Yamaha QL/CL/DM7 (not tested)
+    // Yamaha QL/CL/DM7
     case ConsoleType::QL1:
     case ConsoleType::QL5:
     case ConsoleType::CL1:
@@ -422,7 +542,7 @@ bool MixerCapabilities::isSupported() const {
     case ConsoleType::DM7:
         return true;
 
-    // Behringer Wing (not tested)
+    // Behringer Wing
     case ConsoleType::Wing:
         return true;
 

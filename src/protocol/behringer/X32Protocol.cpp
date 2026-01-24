@@ -34,22 +34,77 @@ X32Protocol::X32Protocol(const MixerCapabilities& caps, QObject* parent)
 
 X32Protocol::~X32Protocol() { disconnect(); }
 
-void X32Protocol::initializeSnapshotParams() {
+void X32Protocol::initializeSnapshotParams() { rebuildSnapshotParams(); }
+
+void X32Protocol::rebuildSnapshotParams() {
     m_snapshotParams.clear();
 
+    // basic fader/mute parameters
     for (int i = 1; i <= m_capabilities.inputChannels && i <= 32; ++i) {
-        m_snapshotParams.append(QString("/ch/%1/mix/fader").arg(i, 2, 10, QChar('0')));
-        m_snapshotParams.append(QString("/ch/%1/mix/on").arg(i, 2, 10, QChar('0')));
+        QString chPrefix = QString("/ch/%1").arg(i, 2, 10, QChar('0'));
+        m_snapshotParams.append(chPrefix + "/mix/fader");
+        m_snapshotParams.append(chPrefix + "/mix/on");
+
+        // EQ parameters
+        if (m_capabilities.supportsChannelEQ) {
+            m_snapshotParams.append(chPrefix + "/eq/on");
+            for (int band = 1; band <= m_capabilities.eqBandsPerChannel; ++band) {
+                QString bandPrefix = QString("%1/eq/%2").arg(chPrefix).arg(band);
+                m_snapshotParams.append(bandPrefix + "/type");
+                m_snapshotParams.append(bandPrefix + "/f");
+                m_snapshotParams.append(bandPrefix + "/g");
+                m_snapshotParams.append(bandPrefix + "/q");
+            }
+        }
+
+        // effect send parameters (mix bus sends)
+        if (m_capabilities.supportsEffectSends) {
+            int sends = qMin(m_capabilities.effectSendBuses, 16);
+            for (int send = 1; send <= sends; ++send) {
+                QString sendPrefix =
+                    QString("%1/mix/%2").arg(chPrefix).arg(send, 2, 10, QChar('0'));
+                m_snapshotParams.append(sendPrefix + "/level");
+                m_snapshotParams.append(sendPrefix + "/on");
+            }
+        }
     }
 
+    // mix bus parameters
     for (int i = 1; i <= m_capabilities.mixBuses && i <= 16; ++i) {
-        m_snapshotParams.append(QString("/bus/%1/mix/fader").arg(i, 2, 10, QChar('0')));
-        m_snapshotParams.append(QString("/bus/%1/mix/on").arg(i, 2, 10, QChar('0')));
+        QString busPrefix = QString("/bus/%1").arg(i, 2, 10, QChar('0'));
+        m_snapshotParams.append(busPrefix + "/mix/fader");
+        m_snapshotParams.append(busPrefix + "/mix/on");
+
+        // bus EQ parameters
+        if (m_capabilities.supportsChannelEQ) {
+            m_snapshotParams.append(busPrefix + "/eq/on");
+            for (int band = 1; band <= m_capabilities.eqBandsPerChannel; ++band) {
+                QString bandPrefix = QString("%1/eq/%2").arg(busPrefix).arg(band);
+                m_snapshotParams.append(bandPrefix + "/type");
+                m_snapshotParams.append(bandPrefix + "/f");
+                m_snapshotParams.append(bandPrefix + "/g");
+                m_snapshotParams.append(bandPrefix + "/q");
+            }
+        }
     }
 
+    // main stereo bus
     m_snapshotParams.append("/main/st/mix/fader");
     m_snapshotParams.append("/main/st/mix/on");
 
+    // main stereo EQ
+    if (m_capabilities.supportsChannelEQ) {
+        m_snapshotParams.append("/main/st/eq/on");
+        for (int band = 1; band <= m_capabilities.eqBandsPerChannel; ++band) {
+            QString bandPrefix = QString("/main/st/eq/%1").arg(band);
+            m_snapshotParams.append(bandPrefix + "/type");
+            m_snapshotParams.append(bandPrefix + "/f");
+            m_snapshotParams.append(bandPrefix + "/g");
+            m_snapshotParams.append(bandPrefix + "/q");
+        }
+    }
+
+    // DCA parameters
     for (int i = 1; i <= m_capabilities.dcaCount; ++i) {
         m_snapshotParams.append(QString("/dca/%1/fader").arg(i));
         m_snapshotParams.append(QString("/dca/%1/on").arg(i));
@@ -145,24 +200,6 @@ void X32Protocol::requestParameterAsync(const QString& path, ParameterCallback c
     m_transport.send(path);
 }
 
-void X32Protocol::captureSnapshot(Cue& cue) {
-    if (m_connectionState != ConnectionState::Connected)
-        return;
-
-    for (const QString& param : m_snapshotParams) {
-        requestParameter(param);
-    }
-
-    QJsonObject params;
-    for (const QString& param : m_snapshotParams) {
-        if (m_parameterCache.contains(param)) {
-            params[param] = QJsonValue::fromVariant(m_parameterCache[param]);
-        }
-    }
-    cue.setParameters(params);
-    emit snapshotCaptured();
-}
-
 void X32Protocol::recallSnapshot(const Cue& cue) {
     if (m_connectionState != ConnectionState::Connected)
         return;
@@ -171,16 +208,6 @@ void X32Protocol::recallSnapshot(const Cue& cue) {
     for (auto it = params.begin(); it != params.end(); ++it) {
         sendParameter(it.key(), it.value().toVariant());
     }
-}
-
-QJsonObject X32Protocol::captureCurrentState() {
-    QJsonObject state;
-    for (const QString& param : m_snapshotParams) {
-        if (m_parameterCache.contains(param)) {
-            state[param] = QJsonValue::fromVariant(m_parameterCache[param]);
-        }
-    }
-    return state;
 }
 
 void X32Protocol::recallScene(int sceneNumber) {

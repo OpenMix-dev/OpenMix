@@ -10,6 +10,10 @@ class QCheckBox;
 class QPushButton;
 class QFormLayout;
 class QLabel;
+class QListWidget;
+class QGroupBox;
+class QScrollArea;
+class QVBoxLayout;
 
 namespace OpenMix {
 
@@ -24,9 +28,10 @@ class CueEditor : public QWidget {
 
     bool hasFocus() const;
 
+    void addBottomWidget(QWidget* widget);
+
   public slots:
     void setCue(int index);
-    void updateLiveEditState();
 
   signals:
     void cueModified();
@@ -35,18 +40,17 @@ class CueEditor : public QWidget {
     void onNumberChanged(double value);
     void onNameChanged(const QString& text);
     void onTypeChanged(int index);
-    void onFadeTimeChanged(double value);
     void onAutoFollowChanged(bool checked);
     void onAutoFollowDelayChanged(double value);
     void onNotesChanged();
-    void onCaptureSnapshot();
-    void onStartLiveEdit();
-    void onCommitLiveEdit();
-    void onCancelLiveEdit();
+    void onTargetedDCAsChanged();
+    void onDCAOverrideChanged(int dca);
 
   private:
     void setupUi();
+    void createDCATargetingSection();
     void updateFromCue();
+    void updateDCAOverridesUI();
     void setEnabled(bool enabled);
     Cue* currentCue();
 
@@ -54,21 +58,31 @@ class CueEditor : public QWidget {
     int m_currentIndex = -1;
     bool m_updatingUi = false;
 
+    QVBoxLayout* m_mainLayout = nullptr;
+
     // widgets
     QDoubleSpinBox* m_numberSpin;
     QLineEdit* m_nameEdit;
     QComboBox* m_typeCombo;
-    QDoubleSpinBox* m_fadeTimeSpin;
     QCheckBox* m_autoFollowCheck;
     QDoubleSpinBox* m_autoFollowDelaySpin;
     QTextEdit* m_notesEdit;
-    QPushButton* m_captureButton;
 
-    // live edit widgets
-    QPushButton* m_startLiveEditButton;
-    QPushButton* m_commitLiveEditButton;
-    QPushButton* m_cancelLiveEditButton;
-    QLabel* m_liveEditStatusLabel;
+    // DCA targeting widgets
+    QGroupBox* m_dcaTargetingGroup;
+    QCheckBox* m_targetAllDCAsCheck;
+    QVector<QCheckBox*> m_dcaTargetChecks;
+
+    // DCA overrides (mute/label per DCA)
+    QGroupBox* m_dcaOverridesGroup;
+    QScrollArea* m_dcaOverridesScroll;
+    struct DCAOverrideWidgets {
+        QCheckBox* enableMute;
+        QCheckBox* muteValue;
+        QCheckBox* enableLabel;
+        QLineEdit* labelValue;
+    };
+    QVector<DCAOverrideWidgets> m_dcaOverrideWidgets;
 };
 
 } // namespace OpenMix
