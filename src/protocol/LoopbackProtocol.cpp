@@ -31,6 +31,10 @@ void LoopbackProtocol::initializeDefaultState() {
         m_parameterState[chPrefix + "/mix/on"] = 1;
         m_parameterState[chPrefix + "/config/name"] = QString("Ch %1").arg(i);
 
+        // DCA group assignment bitmask (assign ch 1-4 to DCA1, 5-8 to DCA2, etc.)
+        int dcaIndex = ((i - 1) / 4) % m_capabilities.dcaCount;
+        m_parameterState[chPrefix + "/grp/dca"] = (1 << dcaIndex);
+
         // EQ parameters
         if (m_capabilities.supportsChannelEQ) {
             m_parameterState[chPrefix + "/eq/on"] = 1; // EQ enabled
@@ -62,6 +66,10 @@ void LoopbackProtocol::initializeDefaultState() {
         m_parameterState[busPrefix + "/mix/fader"] = 0.75f;
         m_parameterState[busPrefix + "/mix/on"] = 1;
         m_parameterState[busPrefix + "/config/name"] = QString("Bus %1").arg(i);
+
+        // DCA group assignment bitmask (assign bus 1-2 to DCA1, 3-4 to DCA2, etc.)
+        int dcaIndex = ((i - 1) / 2) % m_capabilities.dcaCount;
+        m_parameterState[busPrefix + "/grp/dca"] = (1 << dcaIndex);
 
         // bus EQ parameters
         if (m_capabilities.supportsChannelEQ) {

@@ -15,9 +15,11 @@
 #include <QJsonDocument>
 #include <QLabel>
 #include <QMessageBox>
+#include <QPointer>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QVBoxLayout>
+#include <memory>
 
 namespace OpenMix {
 
@@ -319,9 +321,112 @@ void DCAMappingPanel::refresh() {
 }
 
 void DCAMappingPanel::syncFromMixer() {
-    // TODO: implement mixer query for DCA assignments if protocol supports it
-    QMessageBox::information(this, tr("Sync from Mixer"),
-                             tr("DCA assignment sync is not yet supported for this mixer."));
+    if (!m_app || !m_app->mixer() || !m_mapping) {
+        QMessageBox::warning(this, tr("Sync from Mixer"), tr("No mixer connected."));
+        return;
+    }
+
+    MixerProtocol* mixer = m_app->mixer();
+    if (!mixer->isConnected()) {
+        QMessageBox::warning(this, tr("Sync from Mixer"), tr("Mixer is not connected."));
+        return;
+    }
+
+    const MixerCapabilities& caps = mixer->capabilities();
+
+    // only OSC (X32/M32/WING) & loopback support DCA queries
+    if (caps.protocol != ProtocolType::OscUdp && caps.protocol != ProtocolType::Internal) {
+        QMessageBox::information(
+            this, tr("Sync from Mixer"),
+            tr("DCA assignment sync is not supported for %1.").arg(caps.displayName));
+        return;
+    }
+
+    // clear existing assignments before sync
+    m_mapping->clear();
+
+    // track pending requests
+    struct SyncState {
+        int pendingCount = 0;
+        QMap<int, int> channelDCAMasks;
+        QMap<int, int> busDCAMasks;
+    };
+    auto state = std::make_shared<SyncState>();
+
+    // X32/M32/loopback use zero-padded paths, WING uses non-padded
+    bool useZeroPadding = (caps.type != ConsoleType::Wing);
+
+    int channelCount = qMin(caps.inputChannels, 32);
+    int busCount = qMin(caps.mixBuses, 16);
+    state->pendingCount = channelCount + busCount;
+
+    // capture references for callbacks
+    DCAMapping* mapping = m_mapping;
+    QPointer<DCAMappingPanel> self = this;
+    int dcaCount = caps.dcaCount;
+
+    auto processCompletedSync = [self, mapping, state, dcaCount]() {
+        if (--state->pendingCount > 0)
+            return;
+
+        // requests completed, populate mapping from bitmasks
+        for (auto it = state->channelDCAMasks.constBegin(); it != state->channelDCAMasks.constEnd();
+             ++it) {
+            int channel = it.key();
+            int mask = it.value();
+            for (int d = 1; d <= dcaCount; ++d) {
+                if (mask & (1 << (d - 1))) {
+                    mapping->assignChannelToDCA(channel, d);
+                }
+            }
+        }
+
+        for (auto it = state->busDCAMasks.constBegin(); it != state->busDCAMasks.constEnd(); ++it) {
+            int bus = it.key();
+            int mask = it.value();
+            for (int d = 1; d <= dcaCount; ++d) {
+                if (mask & (1 << (d - 1))) {
+                    mapping->assignBusToDCA(bus, d);
+                }
+            }
+        }
+
+        if (self) {
+            self->refresh();
+            QMessageBox::information(self, tr("Sync from Mixer"),
+                                     tr("DCA assignments synced from mixer."));
+        }
+    };
+
+    // request channel DCA assignments
+    for (int ch = 1; ch <= channelCount; ++ch) {
+        QString path = useZeroPadding ? QString("/ch/%1/grp/dca").arg(ch, 2, 10, QChar('0'))
+                                      : QString("/ch/%1/grp/dca").arg(ch);
+
+        mixer->requestParameterAsync(
+            path,
+            [state, ch, processCompletedSync](const QString&, const QVariant& value, bool success) {
+                if (success && value.isValid()) {
+                    state->channelDCAMasks[ch] = value.toInt();
+                }
+                processCompletedSync();
+            });
+    }
+
+    // request bus DCA assignments
+    for (int bus = 1; bus <= busCount; ++bus) {
+        QString path = useZeroPadding ? QString("/bus/%1/grp/dca").arg(bus, 2, 10, QChar('0'))
+                                      : QString("/bus/%1/grp/dca").arg(bus);
+
+        mixer->requestParameterAsync(path, [state, bus, processCompletedSync](const QString&,
+                                                                              const QVariant& value,
+                                                                              bool success) {
+            if (success && value.isValid()) {
+                state->busDCAMasks[bus] = value.toInt();
+            }
+            processCompletedSync();
+        });
+    }
 }
 
 void DCAMappingPanel::saveMappingPreset() {
