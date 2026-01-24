@@ -244,6 +244,14 @@ void X32Protocol::onTransportError(const QString& error) {
 
     if (m_connectionState == ConnectionState::Connecting) {
         startReconnection();
+    } else if (m_connectionState == ConnectionState::Reconnecting) {
+        if (m_reconnectAttempts >= m_maxReconnectAttempts) {
+            setStatus("Reconnection failed - max attempts reached");
+            setConnectionState(ConnectionState::Disconnected);
+        } else {
+            int delay = m_reconnectDelayMs * (1 << m_reconnectAttempts);
+            m_reconnectTimer.start(delay);
+        }
     }
 }
 
@@ -270,6 +278,15 @@ void X32Protocol::onConnectionTimeout() {
         setStatus("Connection timeout");
         emit connectionError("Connection timeout - no response from mixer");
         startReconnection();
+    } else if (m_connectionState == ConnectionState::Reconnecting) {
+        if (m_reconnectAttempts >= m_maxReconnectAttempts) {
+            setStatus("Reconnection failed - max attempts reached");
+            setConnectionState(ConnectionState::Disconnected);
+            emit connectionError("Failed to reconnect after maximum attempts");
+        } else {
+            int delay = m_reconnectDelayMs * (1 << m_reconnectAttempts);
+            m_reconnectTimer.start(delay);
+        }
     }
 }
 

@@ -286,6 +286,8 @@ void ConnectionPanel::onProtocolTypeChanged(int index) {
     if (!isLoopback) {
         m_portSpin->setValue(caps.defaultPort);
     }
+
+    updateUiState();
 }
 
 void ConnectionPanel::updateUiState() {
