@@ -322,13 +322,15 @@ void DCAMappingPanel::refresh() {
 
 void DCAMappingPanel::syncFromMixer() {
     if (!m_app || !m_app->mixer() || !m_mapping) {
-        QMessageBox::warning(this, tr("Sync from Mixer"), tr("No mixer connected."));
+        QMessageBox::warning(m_app ? m_app->mainWindow() : nullptr, tr("Sync from Mixer"),
+                             tr("No mixer connected."));
         return;
     }
 
     MixerProtocol* mixer = m_app->mixer();
     if (!mixer->isConnected()) {
-        QMessageBox::warning(this, tr("Sync from Mixer"), tr("Mixer is not connected."));
+        QMessageBox::warning(m_app->mainWindow(), tr("Sync from Mixer"),
+                             tr("Mixer is not connected."));
         return;
     }
 
@@ -337,7 +339,7 @@ void DCAMappingPanel::syncFromMixer() {
     // only OSC (X32/M32/WING) & loopback support DCA queries
     if (caps.protocol != ProtocolType::OscUdp && caps.protocol != ProtocolType::Internal) {
         QMessageBox::information(
-            this, tr("Sync from Mixer"),
+            m_app->mainWindow(), tr("Sync from Mixer"),
             tr("DCA assignment sync is not supported for %1.").arg(caps.displayName));
         return;
     }
@@ -363,9 +365,10 @@ void DCAMappingPanel::syncFromMixer() {
     // capture references for callbacks
     DCAMapping* mapping = m_mapping;
     QPointer<DCAMappingPanel> self = this;
+    QWidget* mainWindow = m_app->mainWindow();
     int dcaCount = caps.dcaCount;
 
-    auto processCompletedSync = [self, mapping, state, dcaCount]() {
+    auto processCompletedSync = [self, mapping, state, dcaCount, mainWindow]() {
         if (--state->pendingCount > 0)
             return;
 
@@ -393,7 +396,7 @@ void DCAMappingPanel::syncFromMixer() {
 
         if (self) {
             self->refresh();
-            QMessageBox::information(self, tr("Sync from Mixer"),
+            QMessageBox::information(mainWindow, tr("Sync from Mixer"),
                                      tr("DCA assignments synced from mixer."));
         }
     };
@@ -433,8 +436,9 @@ void DCAMappingPanel::saveMappingPreset() {
     if (!m_mapping)
         return;
 
-    QString filePath = QFileDialog::getSaveFileName(this, tr("Save DCA Mapping Preset"), QString(),
-                                                    tr("DCA Mapping (*.dcamap)"));
+    QString filePath =
+        QFileDialog::getSaveFileName(m_app->mainWindow(), tr("Save DCA Mapping Preset"), QString(),
+                                     tr("DCA Mapping (*.dcamap)"));
     if (filePath.isEmpty())
         return;
 
@@ -444,7 +448,7 @@ void DCAMappingPanel::saveMappingPreset() {
 
     QFile file(filePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, tr("Error"),
+        QMessageBox::warning(m_app->mainWindow(), tr("Error"),
                              tr("Failed to save preset: %1").arg(file.errorString()));
         return;
     }
@@ -458,14 +462,15 @@ void DCAMappingPanel::loadMappingPreset() {
     if (!m_mapping)
         return;
 
-    QString filePath = QFileDialog::getOpenFileName(this, tr("Load DCA Mapping Preset"), QString(),
-                                                    tr("DCA Mapping (*.dcamap)"));
+    QString filePath =
+        QFileDialog::getOpenFileName(m_app->mainWindow(), tr("Load DCA Mapping Preset"), QString(),
+                                     tr("DCA Mapping (*.dcamap)"));
     if (filePath.isEmpty())
         return;
 
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, tr("Error"),
+        QMessageBox::warning(m_app->mainWindow(), tr("Error"),
                              tr("Failed to load preset: %1").arg(file.errorString()));
         return;
     }
@@ -475,7 +480,7 @@ void DCAMappingPanel::loadMappingPreset() {
     file.close();
 
     if (parseError.error != QJsonParseError::NoError) {
-        QMessageBox::warning(this, tr("Error"),
+        QMessageBox::warning(m_app->mainWindow(), tr("Error"),
                              tr("Invalid preset file: %1").arg(parseError.errorString()));
         return;
     }
