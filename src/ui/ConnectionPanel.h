@@ -4,7 +4,6 @@
 #include <QWidget>
 
 class QLineEdit;
-class QSpinBox;
 class QComboBox;
 class QPushButton;
 class QLabel;
@@ -43,7 +42,7 @@ class ConnectionPanel : public QWidget {
 
     QComboBox* m_protocolCombo;
     QLineEdit* m_hostEdit;
-    QSpinBox* m_portSpin;
+    QLineEdit* m_portEdit;
     QLabel* m_hostLabel;
     QLabel* m_portLabel;
     QLabel* m_loopbackLabel;

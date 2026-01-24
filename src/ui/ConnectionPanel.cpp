@@ -13,7 +13,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
-#include <QSpinBox>
 #include <QVBoxLayout>
 
 namespace OpenMix {
@@ -65,10 +64,9 @@ void ConnectionPanel::setupUi() {
     formLayout->addRow(m_hostLabel, m_hostEdit);
 
     m_portLabel = new QLabel(tr("Port:"), this);
-    m_portSpin = new QSpinBox(this);
-    m_portSpin->setRange(1, 65535);
-    m_portSpin->setValue(10023); // default X32 port
-    formLayout->addRow(m_portLabel, m_portSpin);
+    m_portEdit = new QLineEdit(this);
+    m_portEdit->setPlaceholderText(tr("10023")); // default X32 port
+    formLayout->addRow(m_portLabel, m_portEdit);
 
     m_loopbackLabel = new QLabel(tr("No hardware connection required."), this);
     m_loopbackLabel->setStyleSheet("color: gray; font-style: italic;");
@@ -122,7 +120,7 @@ void ConnectionPanel::onConnectClicked() {
 
     QString type = m_protocolCombo->currentData().toString();
     QString host = m_hostEdit->text().trimmed();
-    int port = m_portSpin->value();
+    int port = m_portEdit->text().toInt();
 
     MixerCapabilities caps = MixerCapabilities::forProtocolId(type);
     bool isLoopback = (caps.protocol == ProtocolType::Internal);
@@ -194,7 +192,7 @@ void ConnectionPanel::onConnectionStateChanged(ConnectionState state) {
         break;
     case ConnectionState::Connected:
         m_statusLabel->setText(
-            tr("Connected to %1:%2").arg(m_hostEdit->text()).arg(m_portSpin->value()));
+            tr("Connected to %1:%2").arg(m_hostEdit->text()).arg(m_portEdit->text()));
         m_latencyLabel->setVisible(true);
         m_timeoutCount = 0;
         break;
@@ -248,7 +246,7 @@ void ConnectionPanel::onConnected() {
         m_statusLabel->setText(mixer->connectionStatus());
     } else {
         m_statusLabel->setText(
-            tr("Connected to %1:%2").arg(m_hostEdit->text()).arg(m_portSpin->value()));
+            tr("Connected to %1:%2").arg(m_hostEdit->text()).arg(m_portEdit->text()));
     }
 
     m_stateWidget->setState(ConnectionState::Connected);
@@ -280,11 +278,11 @@ void ConnectionPanel::onProtocolTypeChanged(int index) {
     m_hostLabel->setVisible(!isLoopback);
     m_hostEdit->setVisible(!isLoopback);
     m_portLabel->setVisible(!isLoopback);
-    m_portSpin->setVisible(!isLoopback);
+    m_portEdit->setVisible(!isLoopback);
     m_loopbackLabel->setVisible(isLoopback);
 
     if (!isLoopback) {
-        m_portSpin->setValue(caps.defaultPort);
+        m_portEdit->setText(QString::number(caps.defaultPort));
     }
 
     updateUiState();
@@ -300,7 +298,7 @@ void ConnectionPanel::updateUiState() {
 
     m_protocolCombo->setEnabled(!connected);
     m_hostEdit->setEnabled(!connected && !isLoopback);
-    m_portSpin->setEnabled(!connected && !isLoopback);
+    m_portEdit->setEnabled(!connected && !isLoopback);
     m_connectButton->setEnabled(!connected);
     m_disconnectButton->setEnabled(connected);
     m_refreshButton->setEnabled(connected);
@@ -315,14 +313,14 @@ void ConnectionPanel::loadFromConfig() {
     }
 
     m_hostEdit->setText(config.host);
-    m_portSpin->setValue(config.port);
+    m_portEdit->setText(QString::number(config.port));
 }
 
 void ConnectionPanel::saveToConfig() {
     MixerConfig config;
     config.type = m_protocolCombo->currentData().toString();
     config.host = m_hostEdit->text().trimmed();
-    config.port = m_portSpin->value();
+    config.port = m_portEdit->text().toInt();
     m_app->show()->setMixerConfig(config);
 }
 
