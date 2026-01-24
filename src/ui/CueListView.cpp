@@ -200,10 +200,11 @@ void CueListView::onDoubleClicked(const QModelIndex& index) {
     // map to source index
     QModelIndex sourceIndex = m_proxyModel->mapToSource(index);
 
-    // if not an editable column, emit double-click signal
+    // if not an editable/type column, emit double-click signal
     int col = sourceIndex.column();
     if (col != CueTableModel::ColGroup && col != CueTableModel::ColTags &&
-        col != CueTableModel::ColNotes && col != CueTableModel::ColName) {
+        col != CueTableModel::ColNotes && col != CueTableModel::ColName &&
+        col != CueTableModel::ColType) {
         emit cueDoubleClicked(sourceIndex.row());
     }
 }
