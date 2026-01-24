@@ -79,6 +79,16 @@ void CueListView::setupUi() {
             &CueListView::onSelectionChanged);
     connect(m_tableView, &QTableView::doubleClicked, this, &CueListView::onDoubleClicked);
 
+    // update filter options when group/tags are edited
+    connect(
+        m_model, &CueTableModel::cueEditRequested, this,
+        [this](int, int column, const QVariant&, const QVariant&) {
+            if (column == CueTableModel::ColGroup || column == CueTableModel::ColTags) {
+                m_filterBar->updateFilterOptions();
+            }
+        },
+        Qt::QueuedConnection);
+
     layout->addWidget(m_filterBar);
     layout->addWidget(m_tableView);
 }
