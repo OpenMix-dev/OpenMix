@@ -15,6 +15,11 @@
 #include "midi/MidiInputManager.h"
 #include "protocol/MixerProtocol.h"
 #include "protocol/ProtocolFactory.h"
+#include "protocol/discovery/ConsoleDiscoveryService.h"
+#include "protocol/discovery/DiscoveredConsole.h"
+#include "protocol/discovery/probes/BehringerWingProbeStrategy.h"
+#include "protocol/discovery/probes/BehringerX32ProbeStrategy.h"
+#include "protocol/discovery/probes/YamahaOscProbeStrategy.h"
 
 namespace OpenMix {
 
@@ -40,6 +45,12 @@ Application::Application(QObject* parent) : QObject(parent) {
 
     // MIDI input
     m_midiInputManager = new MidiInputManager(this);
+
+    // console discovery
+    m_discoveryService = new ConsoleDiscoveryService(this);
+    m_discoveryService->registerStrategy(std::make_shared<BehringerX32ProbeStrategy>());
+    m_discoveryService->registerStrategy(std::make_shared<BehringerWingProbeStrategy>());
+    m_discoveryService->registerStrategy(std::make_shared<YamahaOscProbeStrategy>());
 }
 
 Application::~Application() {
@@ -121,6 +132,26 @@ void Application::connectToMixer(const QString& type, const QString& host, int p
     connect(m_mixer, &MixerProtocol::disconnected, this, [this]() { emit mixerDisconnected(); });
 
     m_mixer->connect(host, port);
+}
+
+void Application::connectToDiscoveredConsole(const DiscoveredConsole& console) {
+    if (!console.isValid()) {
+        return;
+    }
+
+    disconnectFromMixer();
+
+    m_mixer = ProtocolFactory::create(console, this);
+    if (!m_mixer) {
+        return;
+    }
+
+    m_playbackEngine->setMixer(m_mixer);
+
+    connect(m_mixer, &MixerProtocol::connected, this, [this]() { emit mixerConnected(); });
+    connect(m_mixer, &MixerProtocol::disconnected, this, [this]() { emit mixerDisconnected(); });
+
+    m_mixer->connect(console.address.toString(), console.port);
 }
 
 void Application::disconnectFromMixer() {

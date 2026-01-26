@@ -19,6 +19,8 @@ class ShortcutManager;
 class OperationModeManager;
 class CrashRecovery;
 class MidiInputManager;
+class ConsoleDiscoveryService;
+struct DiscoveredConsole;
 
 class Application : public QObject {
     Q_OBJECT
@@ -53,8 +55,12 @@ class Application : public QObject {
     // MIDI input
     MidiInputManager* midiInputManager() { return m_midiInputManager; }
 
+    // console discovery
+    ConsoleDiscoveryService* discoveryService() { return m_discoveryService; }
+
     // mixer connection
     void connectToMixer(const QString& type, const QString& host, int port);
+    void connectToDiscoveredConsole(const DiscoveredConsole& console);
     void disconnectFromMixer();
 
     // main window
@@ -93,6 +99,9 @@ class Application : public QObject {
 
     // MIDI input
     MidiInputManager* m_midiInputManager;
+
+    // console discovery
+    ConsoleDiscoveryService* m_discoveryService;
 };
 
 } // namespace OpenMix

@@ -94,11 +94,19 @@ set(SOURCES
     src/protocol/allenheath/AvantisProtocol.cpp
     src/protocol/allenheath/DLiveProtocol.cpp
 
-    src/protocol/yamaha/YamahaTcpProtocol.cpp
+    src/protocol/yamaha/YamahaProtocol.cpp
     src/protocol/yamaha/YamahaTFProtocol.cpp
     src/protocol/yamaha/YamahaQLProtocol.cpp
     src/protocol/yamaha/YamahaCLProtocol.cpp
     src/protocol/yamaha/YamahaDM7Protocol.cpp
+
+    src/protocol/discovery/DiscoveredConsole.cpp
+    src/protocol/discovery/ConsoleDiscoveryService.cpp
+    src/protocol/discovery/probes/BehringerX32ProbeStrategy.cpp
+    src/protocol/discovery/probes/BehringerWingProbeStrategy.cpp
+    src/protocol/discovery/probes/YamahaOscProbeStrategy.cpp
+
+    src/ui/ConsoleDiscoveryWidget.cpp
 
     src/io/ProjectFile.cpp
     src/io/AutosaveManager.cpp
@@ -159,11 +167,20 @@ set(HEADERS
     src/protocol/allenheath/AvantisProtocol.h
     src/protocol/allenheath/DLiveProtocol.h
 
-    src/protocol/yamaha/YamahaTcpProtocol.h
+    src/protocol/yamaha/YamahaProtocol.h
     src/protocol/yamaha/YamahaTFProtocol.h
     src/protocol/yamaha/YamahaQLProtocol.h
     src/protocol/yamaha/YamahaCLProtocol.h
     src/protocol/yamaha/YamahaDM7Protocol.h
+
+    src/protocol/discovery/DiscoveredConsole.h
+    src/protocol/discovery/OscProbeStrategy.h
+    src/protocol/discovery/ConsoleDiscoveryService.h
+    src/protocol/discovery/probes/BehringerX32ProbeStrategy.h
+    src/protocol/discovery/probes/BehringerWingProbeStrategy.h
+    src/protocol/discovery/probes/YamahaOscProbeStrategy.h
+
+    src/ui/ConsoleDiscoveryWidget.h
 
     src/io/ProjectFile.h
     src/io/AutosaveManager.h

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MixerCapabilities.h"
+#include "discovery/DiscoveredConsole.h"
 #include <QObject>
 
 namespace OpenMix {
@@ -12,6 +13,7 @@ class ProtocolFactory {
     static MixerProtocol* create(const QString& type, QObject* parent = nullptr);
     static MixerProtocol* create(ConsoleType type, QObject* parent = nullptr);
     static MixerProtocol* create(const MixerCapabilities& caps, QObject* parent = nullptr);
+    static MixerProtocol* create(const DiscoveredConsole& console, QObject* parent = nullptr);
 
     static bool isImplemented(const QString& type);
     static bool isImplemented(ConsoleType type);

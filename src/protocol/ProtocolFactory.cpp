@@ -1,6 +1,7 @@
 #include "ProtocolFactory.h"
 #include "LoopbackProtocol.h"
 #include "MixerProtocol.h"
+#include "discovery/DiscoveredConsole.h"
 
 #include "allenheath/AvantisProtocol.h"
 #include "allenheath/DLiveProtocol.h"
@@ -105,6 +106,11 @@ bool ProtocolFactory::isImplemented(ConsoleType type) {
     default:
         return false;
     }
+}
+
+MixerProtocol* ProtocolFactory::create(const DiscoveredConsole& console, QObject* parent) {
+    MixerCapabilities caps = console.toCapabilities();
+    return create(caps, parent);
 }
 
 MixerCapabilities ProtocolFactory::capabilities(const QString& type) {

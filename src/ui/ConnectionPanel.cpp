@@ -1,9 +1,11 @@
 #include "ConnectionPanel.h"
 #include "ConnectionStateWidget.h"
+#include "ConsoleDiscoveryWidget.h"
 #include "app/Application.h"
 #include "core/Show.h"
 #include "protocol/MixerCapabilities.h"
 #include "protocol/MixerProtocol.h"
+#include "protocol/discovery/ConsoleDiscoveryService.h"
 #include "theme/Icons.h"
 
 #include <QComboBox>
@@ -25,12 +27,26 @@ ConnectionPanel::ConnectionPanel(Application* app, QWidget* parent) : QWidget(pa
 }
 
 void ConnectionPanel::setupUi() {
-    setMinimumSize(240, 300);
+    setMinimumSize(240, 600);
     setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
 
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
-    QGroupBox* connectionGroup = new QGroupBox(tr("Mixer Connection"), this);
+    // auto-discovery section
+    QGroupBox* discoveryGroup = new QGroupBox(tr("Auto-Discovery"), this);
+    QVBoxLayout* discoveryLayout = new QVBoxLayout(discoveryGroup);
+
+    m_discoveryWidget = new ConsoleDiscoveryWidget(m_app->discoveryService(), this);
+    connect(m_discoveryWidget, &ConsoleDiscoveryWidget::consoleSelected, this,
+            &ConnectionPanel::onDiscoveredConsoleSelected);
+    connect(m_discoveryWidget, &ConsoleDiscoveryWidget::consoleDoubleClicked, this,
+            &ConnectionPanel::onDiscoveredConsoleDoubleClicked);
+    discoveryLayout->addWidget(m_discoveryWidget);
+
+    mainLayout->addWidget(discoveryGroup);
+
+    // manual connection section
+    QGroupBox* connectionGroup = new QGroupBox(tr("Manual Connection"), this);
     QFormLayout* formLayout = new QFormLayout(connectionGroup);
 
     m_protocolCombo = new QComboBox(this);
@@ -285,6 +301,42 @@ void ConnectionPanel::onProtocolTypeChanged(int index) {
         m_portEdit->setText(QString::number(caps.defaultPort));
     }
 
+    updateUiState();
+}
+
+void ConnectionPanel::onDiscoveredConsoleSelected(const DiscoveredConsole& console) {
+    if (!console.isValid()) {
+        return;
+    }
+
+    // populate connection fields from discovered console
+    MixerCapabilities caps = console.toCapabilities();
+
+    int idx = m_protocolCombo->findData(caps.protocolId);
+    if (idx >= 0) {
+        m_protocolCombo->setCurrentIndex(idx);
+    }
+
+    m_hostEdit->setText(console.address.toString());
+    m_portEdit->setText(QString::number(console.port));
+
+    m_statusLabel->setText(tr("Selected: %1").arg(console.toString()));
+}
+
+void ConnectionPanel::onDiscoveredConsoleDoubleClicked(const DiscoveredConsole& console) {
+    if (!console.isValid()) {
+        return;
+    }
+
+    // auto-connect to the discovered console
+    onDiscoveredConsoleSelected(console);
+
+    m_statusLabel->setText(tr("Connecting to %1...").arg(console.displayName));
+    m_stateWidget->setState(ConnectionState::Connecting);
+    m_timeoutCount = 0;
+
+    m_app->connectToDiscoveredConsole(console);
+    connectMixerSignals();
     updateUiState();
 }
 

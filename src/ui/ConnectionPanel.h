@@ -1,6 +1,7 @@
 #pragma once
 
 #include "protocol/MixerProtocol.h"
+#include "protocol/discovery/DiscoveredConsole.h"
 #include <QWidget>
 
 class QLineEdit;
@@ -12,6 +13,7 @@ namespace OpenMix {
 
 class Application;
 class ConnectionStateWidget;
+class ConsoleDiscoveryWidget;
 
 class ConnectionPanel : public QWidget {
     Q_OBJECT
@@ -30,6 +32,8 @@ class ConnectionPanel : public QWidget {
     void onConnected();
     void onDisconnected();
     void onProtocolTypeChanged(int index);
+    void onDiscoveredConsoleSelected(const DiscoveredConsole& console);
+    void onDiscoveredConsoleDoubleClicked(const DiscoveredConsole& console);
 
   private:
     void setupUi();
@@ -40,6 +44,7 @@ class ConnectionPanel : public QWidget {
 
     Application* m_app;
 
+    ConsoleDiscoveryWidget* m_discoveryWidget;
     QComboBox* m_protocolCombo;
     QLineEdit* m_hostEdit;
     QLineEdit* m_portEdit;

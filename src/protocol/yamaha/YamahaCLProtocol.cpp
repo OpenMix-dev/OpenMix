@@ -3,14 +3,14 @@
 namespace OpenMix {
 
 YamahaCLProtocol::YamahaCLProtocol(const MixerCapabilities& caps, QObject* parent)
-    : YamahaTcpProtocol(caps, parent) {
+    : YamahaProtocol(caps, parent) {
     initializeSnapshotParams();
 }
 
 void YamahaCLProtocol::initializeSnapshotParams() {
     m_snapshotParams.clear();
 
-    // input channels with EQ (CL series has up to 72)
+    // CL series input channels (up to 72)
     for (int ch = 1; ch <= m_capabilities.inputChannels && ch <= 72; ++ch) {
         QString chPrefix = QString("/ch/%1").arg(ch, 2, 10, QChar('0'));
         m_snapshotParams.append(chPrefix + "/mix/fader");
@@ -43,7 +43,7 @@ void YamahaCLProtocol::initializeSnapshotParams() {
     // CL series has 16 DCAs
     for (int i = 1; i <= m_capabilities.dcaCount && i <= 16; ++i) {
         m_snapshotParams.append(QString("/dca/%1/fader").arg(i));
-        m_snapshotParams.append(QString("/dca/%1/mute").arg(i));
+        m_snapshotParams.append(QString("/dca/%1/on").arg(i));
     }
 }
 

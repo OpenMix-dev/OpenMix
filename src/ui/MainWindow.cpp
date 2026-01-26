@@ -271,7 +271,7 @@ void MainWindow::createPopOutWindows() {
     m_connectionPanel = new ConnectionPanel(m_app, nullptr);
     m_connectionPopOut = new PopOutWindow("connection", tr("Mixer Connection"), this);
     m_connectionPopOut->setContentWidget(m_connectionPanel);
-    m_connectionPopOut->setMinimumContentSize(350, 300);
+    m_connectionPopOut->setMinimumContentSize(350, 600);
 
     connect(m_connectionPopOut, &PopOutWindow::visibilityChanged, [this](bool visible) {
         m_showConnectionAction->setChecked(visible);
