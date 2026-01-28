@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QAction>
 #include <QWidget>
 
 class QLineEdit;
@@ -8,6 +9,7 @@ class QPushButton;
 
 namespace OpenMix {
 
+class Application;
 class CueFilterProxyModel;
 
 class CueFilterBar : public QWidget {
@@ -17,6 +19,8 @@ class CueFilterBar : public QWidget {
     explicit CueFilterBar(CueFilterProxyModel* proxyModel, QWidget* parent = nullptr);
 
     void updateFilterOptions();
+
+    QAction* clearFiltersAction() const { return m_clearFiltersAction; }
 
   signals:
     void filtersChanged();
@@ -38,6 +42,9 @@ class CueFilterBar : public QWidget {
     QComboBox* m_groupCombo;
     QComboBox* m_tagCombo;
     QPushButton* m_clearButton;
+
+    // actions
+    QAction* m_clearFiltersAction;
 };
 
 } // namespace OpenMix

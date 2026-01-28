@@ -22,6 +22,7 @@ MixerConfig MixerConfig::fromJson(const QJsonObject& json) {
 
 Show::Show(QObject* parent) : QObject(parent), m_cueList(this), m_dcaMapping(this) {
     connectCueListSignals();
+    connectDcaMappingSignals();
     newShow();
 }
 
@@ -33,18 +34,39 @@ void Show::setName(const QString& name) {
     }
 }
 
+bool Show::isModified() const { return toJson() != m_originalState; }
+
 void Show::setModified(bool modified) {
-    if (m_modified != modified) {
-        m_modified = modified;
-        emit modifiedChanged(modified);
+    if (!modified) {
+        m_originalState = toJson();
+        if (m_lastEmittedModified) {
+            m_lastEmittedModified = false;
+            emit modifiedChanged(false);
+        }
+    } else {
+        checkModifiedState();
+    }
+}
+
+void Show::checkModifiedState() {
+    bool nowModified = isModified();
+    if (nowModified != m_lastEmittedModified) {
+        m_lastEmittedModified = nowModified;
+        emit modifiedChanged(nowModified);
     }
 }
 
 void Show::connectCueListSignals() {
-    connect(&m_cueList, &CueList::cueAdded, this, [this]() { setModified(true); });
-    connect(&m_cueList, &CueList::cueRemoved, this, [this]() { setModified(true); });
-    connect(&m_cueList, &CueList::cueUpdated, this, [this]() { setModified(true); });
-    connect(&m_cueList, &CueList::cueMoved, this, [this]() { setModified(true); });
+    connect(&m_cueList, &CueList::cueAdded, this, &Show::checkModifiedState);
+    connect(&m_cueList, &CueList::cueRemoved, this, &Show::checkModifiedState);
+    connect(&m_cueList, &CueList::cueUpdated, this, &Show::checkModifiedState);
+    connect(&m_cueList, &CueList::cueMoved, this, &Show::checkModifiedState);
+}
+
+void Show::connectDcaMappingSignals() {
+    connect(&m_dcaMapping, &DCAMapping::channelAssignmentChanged, this, &Show::checkModifiedState);
+    connect(&m_dcaMapping, &DCAMapping::busAssignmentChanged, this, &Show::checkModifiedState);
+    connect(&m_dcaMapping, &DCAMapping::mappingCleared, this, &Show::checkModifiedState);
 }
 
 void Show::newShow() {
@@ -57,7 +79,8 @@ void Show::newShow() {
     m_mixerConfig.port = 10023;
     m_cueList.clear();
     m_dcaMapping.clear();
-    m_modified = false;
+    m_originalState = toJson();
+    m_lastEmittedModified = false;
 }
 
 QJsonObject Show::toJson() const {
@@ -85,7 +108,8 @@ void Show::fromJson(const QJsonObject& json) {
         m_dcaMapping.clear();
     }
 
-    m_modified = false;
+    m_originalState = toJson();
+    m_lastEmittedModified = false;
     emit nameChanged(m_name);
 }
 

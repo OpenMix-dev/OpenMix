@@ -13,12 +13,14 @@
 #include "core/CueValidator.h"
 #include "core/PlaybackEngine.h"
 #include "core/PlaybackGuard.h"
+#include "core/ShortcutManager.h"
 #include "core/Show.h"
 #include "io/ProjectFile.h"
 #include "midi/MidiInputManager.h"
 #include "protocol/MixerProtocol.h"
 #include "theme/Icons.h"
 #include "theme/Theme.h"
+#include "ui/KeyboardShortcutsDialog.h"
 #include "ui/MidiConfigDialog.h"
 
 #include <QAction>
@@ -48,6 +50,7 @@ MainWindow::MainWindow(Application* app, QWidget* parent) : QMainWindow(parent),
 
     setupUi();
     createActions();
+    registerShortcuts();
     createMenus();
     createToolBars();
     createStatusBar();
@@ -106,8 +109,8 @@ void MainWindow::createActions() {
     connect(m_exitAction, &QAction::triggered, this, &QMainWindow::close);
 
     m_addCueAction = new QAction(Icons::listAdd(), tr("&Add Cue"), this);
-    m_addCueAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_N));
-    m_addCueAction->setToolTip(tr("Add a new cue to the list (Ctrl+N)"));
+    m_addCueAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
+    m_addCueAction->setToolTip(tr("Add a new cue to the list (Ctrl+Shift+N)"));
     connect(m_addCueAction, &QAction::triggered, this, &MainWindow::addCue);
 
     m_deleteCueAction = new QAction(Icons::listRemove(), tr("&Delete Cue"), this);
@@ -182,6 +185,69 @@ void MainWindow::createActions() {
     m_showConnectionAction->setShortcut(Qt::Key_F7);
     m_showConnectionAction->setToolTip(tr("Show/hide connection panel (F7)"));
     connect(m_showConnectionAction, &QAction::triggered, this, &MainWindow::toggleConnectionPanel);
+
+    // settings actions
+    m_keyboardShortcutsAction = new QAction(tr("Keyboard Shortcuts..."), this);
+    m_keyboardShortcutsAction->setToolTip(tr("Configure keyboard shortcuts"));
+    connect(m_keyboardShortcutsAction, &QAction::triggered, this,
+            &MainWindow::showKeyboardShortcutsDialog);
+
+    m_midiControllerAction = new QAction(tr("MIDI Controller..."), this);
+    m_midiControllerAction->setToolTip(tr("Configure MIDI controller mappings"));
+    connect(m_midiControllerAction, &QAction::triggered, this, &MainWindow::showMidiConfigDialog);
+
+    // help actions
+    m_aboutAction = new QAction(tr("&About OpenMix"), this);
+    m_aboutAction->setToolTip(tr("About this application"));
+    connect(m_aboutAction, &QAction::triggered, [this]() {
+        QMessageBox::about(
+            this, tr("About OpenMix"),
+            tr("<h3>OpenMix</h3>"
+               "<p>Open Source Theatre Sound Mixing Control</p>"
+               "<p>Version 0.1.0</p>"
+               "<p>A live-sound mixing control application for theatre productions.</p>"));
+    });
+}
+
+void MainWindow::registerShortcuts() {
+    ShortcutManager* sm = m_app->shortcutManager();
+
+    // file actions
+    sm->registerAction("file.new", m_newAction, QKeySequence::New);
+    sm->registerAction("file.open", m_openAction, QKeySequence::Open);
+    sm->registerAction("file.save", m_saveAction, QKeySequence::Save);
+    sm->registerAction("file.saveAs", m_saveAsAction, QKeySequence::SaveAs);
+    sm->registerAction("file.exit", m_exitAction, QKeySequence::Quit);
+
+    // edit actions
+    sm->registerAction("edit.addCue", m_addCueAction,
+                       QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
+
+    sm->registerAction("edit.deleteCue", m_deleteCueAction, QKeySequence::Delete);
+    sm->registerAction("edit.renumber", m_renumberAction, QKeySequence());
+    sm->registerAction("edit.undo", m_undoAction, QKeySequence::Undo);
+    sm->registerAction("edit.redo", m_redoAction, QKeySequence::Redo);
+
+    // playback actions
+    sm->registerAction("playback.go", m_goAction, QKeySequence(Qt::Key_Space));
+    sm->registerAction("playback.stop", m_stopAction, QKeySequence(Qt::Key_Escape));
+    sm->registerAction("playback.previous", m_previousCueAction, QKeySequence(Qt::Key_Up));
+    sm->registerAction("playback.next", m_nextCueAction, QKeySequence(Qt::Key_Down));
+    sm->registerAction("playback.panic", m_panicAction, QKeySequence(Qt::SHIFT | Qt::Key_Escape));
+    sm->registerAction("playback.panicRestore", m_panicRestoreAction,
+                       QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Escape));
+
+    // view actions
+    sm->registerAction("view.dcaMapping", m_showDCAMappingAction, QKeySequence(Qt::Key_F5));
+    sm->registerAction("view.mixerFeedback", m_showMixerFeedbackAction, QKeySequence(Qt::Key_F6));
+    sm->registerAction("view.connection", m_showConnectionAction, QKeySequence(Qt::Key_F7));
+
+    // settings actions
+    sm->registerAction("settings.keyboardShortcuts", m_keyboardShortcutsAction, QKeySequence());
+    sm->registerAction("settings.midiController", m_midiControllerAction, QKeySequence());
+
+    // help actions
+    sm->registerAction("help.about", m_aboutAction, QKeySequence());
 }
 
 void MainWindow::createMenus() {
@@ -221,19 +287,11 @@ void MainWindow::createMenus() {
     m_viewMenu->addAction(m_showConnectionAction);
 
     m_settingsMenu = menuBar()->addMenu(tr("&Settings"));
-    QAction* midiControllerAction = m_settingsMenu->addAction(tr("MIDI Controller..."));
-    connect(midiControllerAction, &QAction::triggered, this, &MainWindow::showMidiConfigDialog);
+    m_settingsMenu->addAction(m_keyboardShortcutsAction);
+    m_settingsMenu->addAction(m_midiControllerAction);
 
     m_helpMenu = menuBar()->addMenu(tr("&Help"));
-    QAction* aboutAction = m_helpMenu->addAction(tr("&About OpenMix"));
-    connect(aboutAction, &QAction::triggered, [this]() {
-        QMessageBox::about(
-            this, tr("About OpenMix"),
-            tr("<h3>OpenMix</h3>"
-               "<p>Open Source Theatre Sound Mixing Control</p>"
-               "<p>Version 0.1.0</p>"
-               "<p>A live-sound mixing control application for theatre productions.</p>"));
-    });
+    m_helpMenu->addAction(m_aboutAction);
 }
 
 void MainWindow::createToolBars() {
@@ -332,10 +390,13 @@ void MainWindow::connectSignals() {
 
     connect(m_app->playbackEngine(), &PlaybackEngine::stateChanged, this,
             &MainWindow::onPlaybackStateChanged);
+
     connect(m_app->playbackEngine(), &PlaybackEngine::currentCueChanged, this,
             &MainWindow::onCurrentCueChanged);
+
     connect(m_app->playbackEngine(), &PlaybackEngine::currentCueChanged, m_mixerFeedbackPanel,
             &MixerFeedbackPanel::onActiveCueChanged);
+
     connect(m_app->playbackEngine(), &PlaybackEngine::standbyCueChanged, this,
             &MainWindow::updateStatusBar);
 
@@ -343,6 +404,7 @@ void MainWindow::connectSignals() {
     connect(m_cueListView, &CueListView::cueSelected, m_cueEditor, &CueEditor::setCue);
     connect(m_cueListView, &CueListView::cueSelected, m_mixerFeedbackPanel,
             &MixerFeedbackPanel::onActiveCueChanged);
+
     connect(m_cueListView, &CueListView::cueDoubleClicked,
             [this](int index) { m_app->playbackEngine()->executeCue(index); });
 
@@ -371,6 +433,9 @@ void MainWindow::loadSettings() {
     }
 
     settings.endGroup();
+
+    // load keyboard shortcuts
+    m_app->shortcutManager()->loadFromSettings();
 }
 
 void MainWindow::saveSettings() {
@@ -380,6 +445,9 @@ void MainWindow::saveSettings() {
     settings.setValue("mainSplitter", m_mainSplitter->saveState());
 
     settings.endGroup();
+
+    // save keyboard shortcuts
+    m_app->shortcutManager()->saveToSettings();
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
@@ -697,6 +765,11 @@ void MainWindow::onLockoutStateChanged(bool locked) {
 
 void MainWindow::showMidiConfigDialog() {
     MidiConfigDialog dialog(m_app->midiInputManager(), this);
+    dialog.exec();
+}
+
+void MainWindow::showKeyboardShortcutsDialog() {
+    KeyboardShortcutsDialog dialog(m_app->shortcutManager(), this);
     dialog.exec();
 }
 

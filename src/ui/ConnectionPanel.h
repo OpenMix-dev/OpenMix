@@ -2,6 +2,7 @@
 
 #include "protocol/MixerProtocol.h"
 #include "protocol/discovery/DiscoveredConsole.h"
+#include <QAction>
 #include <QWidget>
 
 class QLineEdit;
@@ -57,6 +58,11 @@ class ConnectionPanel : public QWidget {
     QLabel* m_statusLabel;
     QLabel* m_latencyLabel;
     ConnectionStateWidget* m_stateWidget;
+
+    // actions
+    QAction* m_connectAction;
+    QAction* m_disconnectAction;
+    QAction* m_refreshDiscoveryAction;
 
     int m_timeoutCount = 0;
 };

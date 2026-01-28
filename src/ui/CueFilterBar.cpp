@@ -52,10 +52,15 @@ void CueFilterBar::setupUi() {
     connect(m_tagCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &CueFilterBar::onTagFilterChanged);
 
+    // clear filter action
+    m_clearFiltersAction = new QAction(Icons::editClear(), tr("Clear Filters"), this);
+    m_clearFiltersAction->setToolTip(tr("Clear all filter settings"));
+    connect(m_clearFiltersAction, &QAction::triggered, this, &CueFilterBar::onClearFilters);
+
     // clear button
     m_clearButton = new QPushButton(Icons::editClear(), tr("Clear Filters"), this);
     m_clearButton->setToolTip(tr("Clear all filter settings"));
-    connect(m_clearButton, &QPushButton::clicked, this, &CueFilterBar::onClearFilters);
+    connect(m_clearButton, &QPushButton::clicked, m_clearFiltersAction, &QAction::trigger);
 
     // layout
     layout->addWidget(searchLabel);

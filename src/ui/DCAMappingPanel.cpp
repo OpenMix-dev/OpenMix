@@ -1,6 +1,7 @@
 #include "DCAMappingPanel.h"
 #include "app/Application.h"
 #include "core/DCAMapping.h"
+#include "core/ShortcutManager.h"
 #include "core/Show.h"
 #include "protocol/MixerCapabilities.h"
 #include "protocol/MixerProtocol.h"
@@ -47,33 +48,65 @@ void DCAMappingPanel::setupUi() {
     mainLayout->setContentsMargins(8, 8, 8, 8);
     mainLayout->setSpacing(8);
 
+    // create actions
+    m_syncFromMixerAction = new QAction(Icons::refresh(), tr("Sync from Mixer"), this);
+    m_syncFromMixerAction->setToolTip(tr("Pull current DCA assignments from connected mixer"));
+    m_syncFromMixerAction->setEnabled(false);
+    m_syncFromMixerAction->setShortcutContext(Qt::ApplicationShortcut);
+    connect(m_syncFromMixerAction, &QAction::triggered, this, &DCAMappingPanel::syncFromMixer);
+
+    m_savePresetAction = new QAction(Icons::download(), tr("Save DCA Preset"), this);
+    m_savePresetAction->setToolTip(tr("Save current mapping as a preset file"));
+    m_savePresetAction->setShortcutContext(Qt::ApplicationShortcut);
+    connect(m_savePresetAction, &QAction::triggered, this, &DCAMappingPanel::saveMappingPreset);
+
+    m_loadPresetAction = new QAction(Icons::upload(), tr("Load DCA Preset"), this);
+    m_loadPresetAction->setToolTip(tr("Load mapping from a preset file"));
+    m_loadPresetAction->setShortcutContext(Qt::ApplicationShortcut);
+    connect(m_loadPresetAction, &QAction::triggered, this, &DCAMappingPanel::loadMappingPreset);
+
+    m_clearAllAction = new QAction(Icons::editClear(), tr("Clear All DCA Mappings"), this);
+    m_clearAllAction->setToolTip(tr("Remove all channel and bus assignments"));
+    m_clearAllAction->setShortcutContext(Qt::ApplicationShortcut);
+    connect(m_clearAllAction, &QAction::triggered, this, &DCAMappingPanel::clearAllMappings);
+
+    // add actions to widget
+    addAction(m_syncFromMixerAction);
+    addAction(m_savePresetAction);
+    addAction(m_loadPresetAction);
+    addAction(m_clearAllAction);
+
+    // register actions w/ shortcut manager
+    if (m_app) {
+        ShortcutManager* sm = m_app->shortcutManager();
+        sm->registerAction("dca.syncFromMixer", m_syncFromMixerAction, QKeySequence());
+        sm->registerAction("dca.savePreset", m_savePresetAction, QKeySequence());
+        sm->registerAction("dca.loadPreset", m_loadPresetAction, QKeySequence());
+        sm->registerAction("dca.clearAll", m_clearAllAction, QKeySequence());
+    }
+
     // toolbar
     QHBoxLayout* toolbarLayout = new QHBoxLayout();
 
     m_syncButton = new QPushButton(Icons::refresh(), tr("Sync from Mixer"), this);
-    m_syncButton->setToolTip(tr("Pull current DCA assignments from connected mixer"));
+    m_syncButton->setToolTip(m_syncFromMixerAction->toolTip());
     m_syncButton->setEnabled(false);
-    connect(m_syncButton, &QPushButton::clicked, this, &DCAMappingPanel::syncFromMixer);
+    connect(m_syncButton, &QPushButton::clicked, m_syncFromMixerAction, &QAction::trigger);
     toolbarLayout->addWidget(m_syncButton);
 
     m_savePresetButton = new QPushButton(Icons::download(), tr("Save Preset"), this);
-    m_savePresetButton->setToolTip(tr("Save current mapping as a preset file"));
-    connect(m_savePresetButton, &QPushButton::clicked, this, &DCAMappingPanel::saveMappingPreset);
+    m_savePresetButton->setToolTip(m_savePresetAction->toolTip());
+    connect(m_savePresetButton, &QPushButton::clicked, m_savePresetAction, &QAction::trigger);
     toolbarLayout->addWidget(m_savePresetButton);
 
     m_loadPresetButton = new QPushButton(Icons::upload(), tr("Load Preset"), this);
-    m_loadPresetButton->setToolTip(tr("Load mapping from a preset file"));
-    connect(m_loadPresetButton, &QPushButton::clicked, this, &DCAMappingPanel::loadMappingPreset);
+    m_loadPresetButton->setToolTip(m_loadPresetAction->toolTip());
+    connect(m_loadPresetButton, &QPushButton::clicked, m_loadPresetAction, &QAction::trigger);
     toolbarLayout->addWidget(m_loadPresetButton);
 
     m_clearAllButton = new QPushButton(Icons::editClear(), tr("Clear All"), this);
-    m_clearAllButton->setToolTip(tr("Remove all channel and bus assignments"));
-    connect(m_clearAllButton, &QPushButton::clicked, [this]() {
-        if (m_mapping) {
-            m_mapping->clear();
-            m_app->show()->setModified(true);
-        }
-    });
+    m_clearAllButton->setToolTip(m_clearAllAction->toolTip());
+    connect(m_clearAllButton, &QPushButton::clicked, m_clearAllAction, &QAction::trigger);
     toolbarLayout->addWidget(m_clearAllButton);
 
     toolbarLayout->addStretch();
@@ -490,6 +523,13 @@ void DCAMappingPanel::loadMappingPreset() {
     populateFromMapping();
 }
 
+void DCAMappingPanel::clearAllMappings() {
+    if (m_mapping) {
+        m_mapping->clear();
+        m_app->show()->setModified(true);
+    }
+}
+
 void DCAMappingPanel::onChannelDCAChanged(int channel, int dca) {
     if (!m_mapping)
         return;
@@ -516,9 +556,13 @@ void DCAMappingPanel::onBusDCAChanged(int bus, int dca) {
 
 void DCAMappingPanel::onMixerConnected() {
     m_syncButton->setEnabled(true);
+    m_syncFromMixerAction->setEnabled(true);
     updateDCAOptions();
 }
 
-void DCAMappingPanel::onMixerDisconnected() { m_syncButton->setEnabled(false); }
+void DCAMappingPanel::onMixerDisconnected() {
+    m_syncButton->setEnabled(false);
+    m_syncFromMixerAction->setEnabled(false);
+}
 
 } // namespace OpenMix

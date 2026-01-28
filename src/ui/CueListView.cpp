@@ -1,21 +1,29 @@
 #include "CueListView.h"
 #include "CueFilterBar.h"
 #include "CueFilterProxyModel.h"
+#include "CueItemDelegates.h"
 #include "CueTableModel.h"
 #include "app/Application.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
 #include "core/PlaybackEngine.h"
+#include "core/ShortcutManager.h"
 #include "core/Show.h"
 #include "core/UndoCommands.h"
 
+#include <QApplication>
+#include <QFocusEvent>
 #include <QHeaderView>
+#include <QKeyEvent>
+#include <QTimer>
 #include <QVBoxLayout>
 
 namespace OpenMix {
 
 CueListView::CueListView(Application* app, QWidget* parent) : QWidget(parent), m_app(app) {
     setupUi();
+    setupDelegates();
+    createActions();
 
     // connect playback engine for highlighting
     connect(m_app->playbackEngine(), &PlaybackEngine::currentCueChanged, this,
@@ -25,6 +33,10 @@ CueListView::CueListView(Application* app, QWidget* parent) : QWidget(parent), m
 
     // connect model signals for undo integration
     connect(m_model, &CueTableModel::cueReordered, this, &CueListView::onCueReordered);
+
+    // install event filter
+    m_tableView->installEventFilter(this);
+    m_tableView->viewport()->installEventFilter(this);
 }
 
 void CueListView::setupUi() {
@@ -49,11 +61,14 @@ void CueListView::setupUi() {
     m_tableView->setModel(m_proxyModel);
 
     // selection & editing
-    m_tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_tableView->setSelectionBehavior(QAbstractItemView::SelectItems);
     m_tableView->setSelectionMode(QAbstractItemView::SingleSelection);
     m_tableView->setEditTriggers(QAbstractItemView::DoubleClicked |
-                                 QAbstractItemView::EditKeyPressed);
+                                 QAbstractItemView::EditKeyPressed |
+                                 QAbstractItemView::SelectedClicked);
+
     m_tableView->setAlternatingRowColors(true);
+    m_tableView->setTabKeyNavigation(false);
 
     // drag & drop
     m_tableView->setDragEnabled(true);
@@ -70,14 +85,13 @@ void CueListView::setupUi() {
     // column widths
     m_tableView->setColumnWidth(CueTableModel::ColNumber, 60);
     m_tableView->setColumnWidth(CueTableModel::ColName, 150);
-    m_tableView->setColumnWidth(CueTableModel::ColType, 80);
+    m_tableView->setColumnWidth(CueTableModel::ColType, 100);
     m_tableView->setColumnWidth(CueTableModel::ColGroup, 100);
     m_tableView->setColumnWidth(CueTableModel::ColTags, 120);
 
     // connections
     connect(m_tableView->selectionModel(), &QItemSelectionModel::selectionChanged, this,
             &CueListView::onSelectionChanged);
-    connect(m_tableView, &QTableView::doubleClicked, this, &CueListView::onDoubleClicked);
 
     // update filter options when group/tags are edited
     connect(
@@ -93,13 +107,58 @@ void CueListView::setupUi() {
     layout->addWidget(m_tableView);
 }
 
+void CueListView::setupDelegates() {
+    CueList* cueList = m_app->show()->cueList();
+
+    // create delegates
+    m_numberDelegate = new CueNumberDelegate(cueList, this);
+    m_typeDelegate = new CueTypeDelegate(this);
+    m_textDelegate = new CueTextDelegate(this);
+
+    // assign delegates to columns
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColNumber, m_numberDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColName, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColType, m_typeDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColGroup, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColTags, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColNotes, m_textDelegate);
+
+    // connect tab navigation
+    connect(m_numberDelegate, &CueNumberDelegate::tabNavigationRequested, this,
+            &CueListView::onTabNavigationRequested);
+
+    connect(m_typeDelegate, &CueTypeDelegate::tabNavigationRequested, this,
+            &CueListView::onTabNavigationRequested);
+
+    connect(m_textDelegate, &CueTextDelegate::tabNavigationRequested, this,
+            &CueListView::onTabNavigationRequested);
+}
+
+void CueListView::createActions() {
+    m_duplicateCueAction = new QAction(tr("Duplicate Cue"), this);
+    m_duplicateCueAction->setToolTip(tr("Duplicate the selected cue"));
+    m_duplicateCueAction->setShortcutContext(Qt::ApplicationShortcut);
+    connect(m_duplicateCueAction, &QAction::triggered, this, &CueListView::duplicateSelectedCue);
+    addAction(m_duplicateCueAction);
+
+    // register with shortcut manager
+    ShortcutManager* sm = m_app->shortcutManager();
+    sm->registerAction("edit.duplicateCue", m_duplicateCueAction, QKeySequence());
+
+    // register filter bar clear action
+    QAction* clearAction = m_filterBar->clearFiltersAction();
+    clearAction->setShortcutContext(Qt::ApplicationShortcut);
+    addAction(clearAction);
+    sm->registerAction("view.clearFilters", clearAction, QKeySequence());
+}
+
 int CueListView::selectedCueIndex() const {
-    QModelIndexList selected = m_tableView->selectionModel()->selectedRows();
-    if (selected.isEmpty())
+    QModelIndex current = m_tableView->currentIndex();
+    if (!current.isValid())
         return -1;
 
     // map from proxy to source
-    QModelIndex sourceIndex = m_proxyModel->mapToSource(selected.first());
+    QModelIndex sourceIndex = m_proxyModel->mapToSource(current);
     return sourceIndex.row();
 }
 
@@ -206,19 +265,6 @@ void CueListView::duplicateSelectedCue() {
 
 void CueListView::onSelectionChanged() { emit cueSelected(selectedCueIndex()); }
 
-void CueListView::onDoubleClicked(const QModelIndex& index) {
-    // map to source index
-    QModelIndex sourceIndex = m_proxyModel->mapToSource(index);
-
-    // if not an editable/type column, emit double-click signal
-    int col = sourceIndex.column();
-    if (col != CueTableModel::ColGroup && col != CueTableModel::ColTags &&
-        col != CueTableModel::ColNotes && col != CueTableModel::ColName &&
-        col != CueTableModel::ColType) {
-        emit cueDoubleClicked(sourceIndex.row());
-    }
-}
-
 void CueListView::onCueReordered(int fromIndex, int toIndex) {
     CueList* cueList = m_app->show()->cueList();
 
@@ -231,6 +277,158 @@ void CueListView::onCueReordered(int fromIndex, int toIndex) {
 
 void CueListView::onFiltersChanged() {
     // could emit a signal or update status
+}
+
+void CueListView::onTabNavigationRequested(const QModelIndex& fromIndex, bool forward) {
+    if (m_tabNavigationPending) {
+        return;
+    }
+    m_tabNavigationPending = true;
+
+    // find next editable cell
+    QModelIndex next = nextEditableIndex(fromIndex, forward);
+    if (next.isValid()) {
+        m_tableView->setFocus();
+        m_tableView->setCurrentIndex(next);
+        m_tableView->scrollTo(next);
+        QTimer::singleShot(10, this, [this, next]() {
+            m_tabNavigationPending = false;
+            if (next.isValid()) {
+                m_tableView->edit(next);
+            }
+        });
+    } else {
+        m_tabNavigationPending = false;
+    }
+}
+
+bool CueListView::eventFilter(QObject* watched, QEvent* event) {
+    if (watched == m_tableView && event->type() == QEvent::FocusOut) {
+        QFocusEvent* focusEvent = static_cast<QFocusEvent*>(event);
+        if (focusEvent->reason() != Qt::PopupFocusReason &&
+            focusEvent->reason() != Qt::ActiveWindowFocusReason) {
+            QWidget* newFocus = QApplication::focusWidget();
+            if (!newFocus || !m_tableView->isAncestorOf(newFocus)) {
+                m_wasEditing = false;
+            }
+        }
+    }
+
+    if (watched == m_tableView && event->type() == QEvent::KeyPress) {
+        QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
+        QModelIndex current = m_tableView->currentIndex();
+
+        // check if there's an active editor by looking for index widget
+        bool isEditing = current.isValid() && m_tableView->indexWidget(current) != nullptr;
+
+        // handle enter to edit current cell
+        if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {
+            if (current.isValid() && !isEditing) {
+                Qt::ItemFlags flags = m_proxyModel->flags(current);
+                if (flags & Qt::ItemIsEditable) {
+                    m_wasEditing = true;
+                    m_tableView->edit(current);
+                    return true;
+                }
+            }
+        }
+
+        // handle tab/shift+tab for navigation
+        if (keyEvent->key() == Qt::Key_Tab || keyEvent->key() == Qt::Key_Backtab) {
+            if (current.isValid() && !isEditing) {
+                bool forward = (keyEvent->key() == Qt::Key_Tab);
+
+                QModelIndex targetCell;
+                if (m_wasEditing) {
+                    // advance to next cell
+                    targetCell = nextEditableIndex(current, forward);
+                } else {
+                    // start at first/last column
+                    int row = current.row();
+                    int col = forward ? CueTableModel::ColNumber : CueTableModel::ColNotes;
+                    targetCell = m_proxyModel->index(row, col);
+                }
+
+                if (targetCell.isValid()) {
+                    m_wasEditing = true;
+                    m_tableView->setCurrentIndex(targetCell);
+                    m_tableView->edit(targetCell);
+                }
+                return true;
+            }
+        }
+    }
+
+    return QWidget::eventFilter(watched, event);
+}
+
+void CueListView::editNextCell(bool forward) {
+    QModelIndex current = m_tableView->currentIndex();
+    if (!current.isValid()) {
+        return;
+    }
+
+    QModelIndex next = nextEditableIndex(current, forward);
+    if (next.isValid()) {
+        m_tableView->setCurrentIndex(next);
+        m_tableView->scrollTo(next);
+        m_tableView->edit(next);
+    }
+}
+
+QModelIndex CueListView::nextEditableIndex(const QModelIndex& current, bool forward) const {
+    if (!current.isValid())
+        return QModelIndex();
+
+    int rowCount = m_proxyModel->rowCount();
+    if (rowCount == 0)
+        return QModelIndex();
+
+    int row = current.row();
+    int col = current.column();
+
+    // order of editable columns
+    static const int editableColumns[] = {CueTableModel::ColNumber, CueTableModel::ColName,
+                                          CueTableModel::ColType,   CueTableModel::ColGroup,
+                                          CueTableModel::ColTags,   CueTableModel::ColNotes};
+
+    static const int editableCount = sizeof(editableColumns) / sizeof(editableColumns[0]);
+
+    // find column's position in list
+    int colPos = -1;
+    for (int i = 0; i < editableCount; ++i) {
+        if (editableColumns[i] == col) {
+            colPos = i;
+            break;
+        }
+    }
+    if (colPos < 0)
+        colPos = 0;
+
+    // move to next position
+    if (forward) {
+        colPos++;
+        if (colPos >= editableCount) {
+            colPos = 0;
+            row++;
+            // wrap to first row if past end
+            if (row >= rowCount) {
+                row = 0;
+            }
+        }
+    } else {
+        colPos--;
+        if (colPos < 0) {
+            colPos = editableCount - 1;
+            row--;
+            // wrap to last row if before start
+            if (row < 0) {
+                row = rowCount - 1;
+            }
+        }
+    }
+
+    return m_proxyModel->index(row, editableColumns[colPos]);
 }
 
 } // namespace OpenMix

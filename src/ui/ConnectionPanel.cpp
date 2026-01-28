@@ -2,6 +2,7 @@
 #include "ConnectionStateWidget.h"
 #include "ConsoleDiscoveryWidget.h"
 #include "app/Application.h"
+#include "core/ShortcutManager.h"
 #include "core/Show.h"
 #include "protocol/MixerCapabilities.h"
 #include "protocol/MixerProtocol.h"
@@ -91,13 +92,41 @@ void ConnectionPanel::setupUi() {
 
     mainLayout->addWidget(connectionGroup);
 
+    // create actions
+    m_connectAction = new QAction(Icons::network(), tr("Connect to Mixer"), this);
+    m_connectAction->setToolTip(tr("Connect to the mixer"));
+    m_connectAction->setShortcutContext(Qt::ApplicationShortcut);
+    connect(m_connectAction, &QAction::triggered, this, &ConnectionPanel::onConnectClicked);
+
+    m_disconnectAction = new QAction(Icons::disconnect(), tr("Disconnect from Mixer"), this);
+    m_disconnectAction->setToolTip(tr("Disconnect from the mixer"));
+    m_disconnectAction->setShortcutContext(Qt::ApplicationShortcut);
+    connect(m_disconnectAction, &QAction::triggered, this, &ConnectionPanel::onDisconnectClicked);
+
+    m_refreshDiscoveryAction = new QAction(Icons::refresh(), tr("Refresh Mixer Data"), this);
+    m_refreshDiscoveryAction->setToolTip(tr("Request all parameters from mixer"));
+    m_refreshDiscoveryAction->setShortcutContext(Qt::ApplicationShortcut);
+    connect(m_refreshDiscoveryAction, &QAction::triggered, this,
+            &ConnectionPanel::onRefreshClicked);
+
+    // add actions to widget
+    addAction(m_connectAction);
+    addAction(m_disconnectAction);
+    addAction(m_refreshDiscoveryAction);
+
+    // register actions w/ shortcut manager
+    ShortcutManager* sm = m_app->shortcutManager();
+    sm->registerAction("connection.connect", m_connectAction, QKeySequence());
+    sm->registerAction("connection.disconnect", m_disconnectAction, QKeySequence());
+    sm->registerAction("connection.refresh", m_refreshDiscoveryAction, QKeySequence());
+
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     m_connectButton = new QPushButton(Icons::network(), tr("Connect"), this);
-    m_connectButton->setToolTip(tr("Connect to the mixer"));
+    m_connectButton->setToolTip(m_connectAction->toolTip());
     m_disconnectButton = new QPushButton(Icons::disconnect(), tr("Disconnect"), this);
-    m_disconnectButton->setToolTip(tr("Disconnect from the mixer"));
+    m_disconnectButton->setToolTip(m_disconnectAction->toolTip());
     m_refreshButton = new QPushButton(Icons::refresh(), tr("Refresh"), this);
-    m_refreshButton->setToolTip(tr("Request all parameters from mixer"));
+    m_refreshButton->setToolTip(m_refreshDiscoveryAction->toolTip());
 
     buttonLayout->addWidget(m_connectButton);
     buttonLayout->addWidget(m_disconnectButton);
@@ -126,9 +155,10 @@ void ConnectionPanel::setupUi() {
 
     connect(m_protocolCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &ConnectionPanel::onProtocolTypeChanged);
-    connect(m_connectButton, &QPushButton::clicked, this, &ConnectionPanel::onConnectClicked);
-    connect(m_disconnectButton, &QPushButton::clicked, this, &ConnectionPanel::onDisconnectClicked);
-    connect(m_refreshButton, &QPushButton::clicked, this, &ConnectionPanel::onRefreshClicked);
+
+    connect(m_connectButton, &QPushButton::clicked, m_connectAction, &QAction::trigger);
+    connect(m_disconnectButton, &QPushButton::clicked, m_disconnectAction, &QAction::trigger);
+    connect(m_refreshButton, &QPushButton::clicked, m_refreshDiscoveryAction, &QAction::trigger);
 }
 
 void ConnectionPanel::onConnectClicked() {
@@ -162,14 +192,19 @@ void ConnectionPanel::connectMixerSignals() {
 
     connect(mixer, &MixerProtocol::connectionStatusChanged, this,
             &ConnectionPanel::onConnectionStatusChanged, Qt::UniqueConnection);
+
     connect(mixer, &MixerProtocol::connectionStateChanged, this,
             &ConnectionPanel::onConnectionStateChanged, Qt::UniqueConnection);
+
     connect(mixer, &MixerProtocol::latencyChanged, this, &ConnectionPanel::onLatencyChanged,
             Qt::UniqueConnection);
+
     connect(mixer, &MixerProtocol::requestTimeout, this, &ConnectionPanel::onRequestTimeout,
             Qt::UniqueConnection);
+
     connect(mixer, &MixerProtocol::connected, this, &ConnectionPanel::onConnected,
             Qt::UniqueConnection);
+
     connect(mixer, &MixerProtocol::disconnected, this, &ConnectionPanel::onDisconnected,
             Qt::UniqueConnection);
 }
@@ -203,15 +238,18 @@ void ConnectionPanel::onConnectionStateChanged(ConnectionState state) {
         m_statusLabel->setText(tr("Disconnected"));
         m_latencyLabel->setVisible(false);
         break;
+
     case ConnectionState::Connecting:
         m_statusLabel->setText(tr("Connecting..."));
         break;
+
     case ConnectionState::Connected:
         m_statusLabel->setText(
             tr("Connected to %1:%2").arg(m_hostEdit->text()).arg(m_portEdit->text()));
         m_latencyLabel->setVisible(true);
         m_timeoutCount = 0;
         break;
+
     case ConnectionState::Reconnecting:
         m_statusLabel->setText(tr("Connection lost, reconnecting..."));
         break;

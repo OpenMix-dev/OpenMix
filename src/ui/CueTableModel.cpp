@@ -137,9 +137,10 @@ Qt::ItemFlags CueTableModel::flags(const QModelIndex& index) const {
     // all rows are draggable & drop targets
     Qt::ItemFlags flags = defaultFlags | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled;
 
-    // enable editing for certain columns
+    // enable editing for primary cue props
     int col = index.column();
-    if (col == ColGroup || col == ColTags || col == ColNotes || col == ColName) {
+    if (col == ColNumber || col == ColName || col == ColType || col == ColGroup || col == ColTags ||
+        col == ColNotes) {
         flags |= Qt::ItemIsEditable;
     }
 
@@ -161,10 +162,22 @@ bool CueTableModel::setData(const QModelIndex& index, const QVariant& value, int
     QVariant oldValue;
 
     switch (col) {
+    case ColNumber: {
+        oldValue = cue.number();
+        double newNumber = value.toDouble();
+        cue.setNumber(newNumber);
+        break;
+    }
     case ColName:
         oldValue = cue.name();
         cue.setName(value.toString());
         break;
+    case ColType: {
+        oldValue = cueTypeToString(cue.type());
+        CueType newType = stringToCueType(value.toString());
+        cue.setType(newType);
+        break;
+    }
     case ColGroup:
         oldValue = cue.group();
         cue.setGroup(value.toString());

@@ -66,6 +66,7 @@ set(SOURCES
     src/ui/CueTableModel.cpp
     src/ui/CueFilterProxyModel.cpp
     src/ui/CueFilterBar.cpp
+    src/ui/CueItemDelegates.cpp
     src/ui/ConnectionStateWidget.cpp
     src/ui/MixerFeedbackPanel.cpp
     src/ui/DCAWidget.cpp
@@ -115,6 +116,7 @@ set(SOURCES
     src/midi/MidiControlMapping.cpp
     src/midi/MidiInputManager.cpp
     src/ui/MidiConfigDialog.cpp
+    src/ui/KeyboardShortcutsDialog.cpp
 )
 
 # header files
@@ -139,6 +141,7 @@ set(HEADERS
     src/ui/CueTableModel.h
     src/ui/CueFilterProxyModel.h
     src/ui/CueFilterBar.h
+    src/ui/CueItemDelegates.h
     src/ui/ConnectionStateWidget.h
     src/ui/MixerFeedbackPanel.h
     src/ui/DCAWidget.h
@@ -189,6 +192,7 @@ set(HEADERS
     src/midi/MidiControlMapping.h
     src/midi/MidiInputManager.h
     src/ui/MidiConfigDialog.h
+    src/ui/KeyboardShortcutsDialog.h
 )
 
 # Qt resources

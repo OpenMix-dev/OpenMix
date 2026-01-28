@@ -73,6 +73,7 @@ class MainWindow : public QMainWindow {
 
     // settings dialogs
     void showMidiConfigDialog();
+    void showKeyboardShortcutsDialog();
 
     // bubble bar interaction
     void onBubbleButtonClicked(const QString& id, bool checked);
@@ -80,6 +81,7 @@ class MainWindow : public QMainWindow {
   private:
     void setupUi();
     void createActions();
+    void registerShortcuts();
     void createMenus();
     void createToolBars();
     void createStatusBar();
@@ -153,6 +155,13 @@ class MainWindow : public QMainWindow {
     QAction* m_showConnectionAction;
     QAction* m_showMixerFeedbackAction;
     QAction* m_showDCAMappingAction;
+
+    // settings actions
+    QAction* m_keyboardShortcutsAction;
+    QAction* m_midiControllerAction;
+
+    // help actions
+    QAction* m_aboutAction;
 
     // status bar
     QLabel* m_connectionStatusLabel;

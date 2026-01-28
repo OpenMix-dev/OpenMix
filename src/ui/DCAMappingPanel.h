@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QAction>
 #include <QWidget>
 
 class QComboBox;
@@ -25,6 +26,7 @@ class DCAMappingPanel : public QWidget {
     void syncFromMixer();
     void saveMappingPreset();
     void loadMappingPreset();
+    void clearAllMappings();
 
   private slots:
     void onChannelDCAChanged(int channel, int dcaIndex);
@@ -61,6 +63,12 @@ class DCAMappingPanel : public QWidget {
     QPushButton* m_savePresetButton;
     QPushButton* m_loadPresetButton;
     QPushButton* m_clearAllButton;
+
+    // actions
+    QAction* m_syncFromMixerAction;
+    QAction* m_savePresetAction;
+    QAction* m_loadPresetAction;
+    QAction* m_clearAllAction;
 
     int m_channelCount = 32;
     int m_busCount = 16;

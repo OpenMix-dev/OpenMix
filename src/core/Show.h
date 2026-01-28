@@ -36,8 +36,9 @@ class Show : public QObject {
     QString filePath() const { return m_filePath; }
     void setFilePath(const QString& path) { m_filePath = path; }
 
-    bool isModified() const { return m_modified; }
+    bool isModified() const;
     void setModified(bool modified);
+    void checkModifiedState();
 
     CueList* cueList() { return &m_cueList; }
     const CueList* cueList() const { return &m_cueList; }
@@ -59,15 +60,17 @@ class Show : public QObject {
 
   private:
     void connectCueListSignals();
+    void connectDcaMappingSignals();
 
     QString m_name;
     QString m_author;
     QString m_notes;
     QString m_filePath;
-    bool m_modified = false;
     CueList m_cueList;
     MixerConfig m_mixerConfig;
     DCAMapping m_dcaMapping;
+    QJsonObject m_originalState;
+    bool m_lastEmittedModified = false;
 };
 
 } // namespace OpenMix
