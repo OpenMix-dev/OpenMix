@@ -124,6 +124,8 @@ Cue::Cue(double number, const QString& name)
       m_autoFollowCondition(AutoFollowCondition::Always),
       m_macroExecutionMode(MacroExecutionMode::Sequential), m_gotoAutoExecute(false) {}
 
+void Cue::regenerateId() { m_id = QUuid::createUuid().toString(QUuid::WithoutBraces); }
+
 void Cue::setParameter(const QString& path, const QVariant& value) {
     m_parameters[path] = QJsonValue::fromVariant(value);
 }

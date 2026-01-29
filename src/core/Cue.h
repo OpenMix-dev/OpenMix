@@ -53,6 +53,8 @@ class Cue {
     explicit Cue(double number, const QString& name = QString());
 
     QString id() const { return m_id; }
+    void regenerateId();
+
     double number() const { return m_number; }
     void setNumber(double number) { m_number = number; }
 

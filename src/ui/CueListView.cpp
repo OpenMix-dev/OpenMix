@@ -242,8 +242,9 @@ void CueListView::duplicateSelectedCue() {
     CueList* cueList = m_app->show()->cueList();
     Cue original = cueList->at(idx);
 
-    // create duplicate w/ next available number
+    // create duplicate w/ next available number & new ID
     Cue duplicate = original;
+    duplicate.regenerateId();
     duplicate.setNumber(cueList->nextCueNumber());
 
     // push to undo stack
