@@ -2,6 +2,7 @@
 
 #include <QComboBox>
 #include <QLineEdit>
+#include <QPainter>
 #include <QStyledItemDelegate>
 
 namespace OpenMix {
@@ -13,6 +14,9 @@ class CueNumberDelegate : public QStyledItemDelegate {
 
   public:
     explicit CueNumberDelegate(CueList* cueList, QObject* parent = nullptr);
+
+    void paint(QPainter* painter, const QStyleOptionViewItem& option,
+               const QModelIndex& index) const override;
 
     QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option,
                           const QModelIndex& index) const override;
@@ -41,6 +45,9 @@ class CueTypeDelegate : public QStyledItemDelegate {
   public:
     explicit CueTypeDelegate(QObject* parent = nullptr);
 
+    void paint(QPainter* painter, const QStyleOptionViewItem& option,
+               const QModelIndex& index) const override;
+
     QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option,
                           const QModelIndex& index) const override;
 
@@ -66,6 +73,9 @@ class CueTextDelegate : public QStyledItemDelegate {
 
   public:
     explicit CueTextDelegate(QObject* parent = nullptr);
+
+    void paint(QPainter* painter, const QStyleOptionViewItem& option,
+               const QModelIndex& index) const override;
 
     QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option,
                           const QModelIndex& index) const override;

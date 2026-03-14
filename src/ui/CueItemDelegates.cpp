@@ -16,6 +16,21 @@ namespace OpenMix {
 CueNumberDelegate::CueNumberDelegate(CueList* cueList, QObject* parent)
     : QStyledItemDelegate(parent), m_cueList(cueList) {}
 
+void CueNumberDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
+                              const QModelIndex& index) const {
+    QVariant bgData = index.data(Qt::BackgroundRole);
+    if (bgData.isValid()) {
+        painter->fillRect(option.rect, bgData.value<QBrush>());
+    }
+
+    QStyleOptionViewItem opt = option;
+    if (bgData.isValid()) {
+        opt.backgroundBrush = bgData.value<QBrush>();
+    }
+
+    QStyledItemDelegate::paint(painter, opt, index);
+}
+
 QWidget* CueNumberDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option,
                                          const QModelIndex& index) const {
     Q_UNUSED(option);
@@ -102,6 +117,21 @@ bool CueNumberDelegate::eventFilter(QObject* object, QEvent* event) {
 
 CueTypeDelegate::CueTypeDelegate(QObject* parent) : QStyledItemDelegate(parent) {}
 
+void CueTypeDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
+                            const QModelIndex& index) const {
+    QVariant bgData = index.data(Qt::BackgroundRole);
+    if (bgData.isValid()) {
+        painter->fillRect(option.rect, bgData.value<QBrush>());
+    }
+
+    QStyleOptionViewItem opt = option;
+    if (bgData.isValid()) {
+        opt.backgroundBrush = bgData.value<QBrush>();
+    }
+
+    QStyledItemDelegate::paint(painter, opt, index);
+}
+
 QWidget* CueTypeDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option,
                                        const QModelIndex& index) const {
     Q_UNUSED(option);
@@ -179,6 +209,21 @@ bool CueTypeDelegate::eventFilter(QObject* object, QEvent* event) {
 }
 
 CueTextDelegate::CueTextDelegate(QObject* parent) : QStyledItemDelegate(parent) {}
+
+void CueTextDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
+                            const QModelIndex& index) const {
+    QVariant bgData = index.data(Qt::BackgroundRole);
+    if (bgData.isValid()) {
+        painter->fillRect(option.rect, bgData.value<QBrush>());
+    }
+
+    QStyleOptionViewItem opt = option;
+    if (bgData.isValid()) {
+        opt.backgroundBrush = bgData.value<QBrush>();
+    }
+
+    QStyledItemDelegate::paint(painter, opt, index);
+}
 
 QWidget* CueTextDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option,
                                        const QModelIndex& index) const {

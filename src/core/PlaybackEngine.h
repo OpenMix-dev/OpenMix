@@ -59,6 +59,7 @@ class PlaybackEngine : public QObject {
     void goToNumber(double num);
     void previous();
     void next();
+    void setStandbyIndex(int index);
 
     void executeCue(int index);
     void executeCueById(const QString& id);
@@ -82,7 +83,6 @@ class PlaybackEngine : public QObject {
   private:
     void setState(PlaybackState state);
     void setCurrentIndex(int index);
-    void setStandbyIndex(int index);
     void advanceStandby();
     void executeCueInternal(const Cue& cue);
     void applyDCAOverrides(const Cue& cue, const QSet<int>& targetDCAs);
@@ -92,9 +92,10 @@ class PlaybackEngine : public QObject {
     void executeNextMacroChild();
     void handleAutoFollow(const Cue& cue);
 
-    // DCA filtering helper
-    QJsonObject filterParametersForDCAs(const QJsonObject& params,
-                                        const QSet<int>& targetDCAs) const;
+    // DCA filtering helpers
+    QList<int> getChannelsForDCA(const Cue& cue, int dca) const;
+    QList<int> getBusesForDCA(const Cue& cue, int dca) const;
+    QJsonObject filterParametersForDCAs(const Cue& cue, const QSet<int>& targetDCAs) const;
     QSet<int> allDCAs() const;
 
     CueList* m_cueList = nullptr;

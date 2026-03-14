@@ -1,5 +1,6 @@
 #include "DCAMappingPanel.h"
 #include "app/Application.h"
+#include "core/Cue.h"
 #include "core/DCAMapping.h"
 #include "core/ShortcutManager.h"
 #include "core/Show.h"
@@ -8,7 +9,7 @@
 #include "theme/Icons.h"
 #include "theme/Theme.h"
 
-#include <QComboBox>
+#include <QCheckBox>
 #include <QFileDialog>
 #include <QGridLayout>
 #include <QGroupBox>
@@ -47,6 +48,40 @@ void DCAMappingPanel::setupUi() {
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(8, 8, 8, 8);
     mainLayout->setSpacing(8);
+
+    m_contextHeader = new QWidget(this);
+    QHBoxLayout* contextLayout = new QHBoxLayout(m_contextHeader);
+    contextLayout->setContentsMargins(4, 4, 4, 4);
+    contextLayout->setSpacing(8);
+
+    m_contextLabel = new QLabel(tr("Show Level"), m_contextHeader);
+    m_contextLabel->setStyleSheet(
+        QString("font-weight: bold; color: %1;").arg(Theme::Colors::TextPrimary));
+    contextLayout->addWidget(m_contextLabel);
+
+    m_useCueMappingCheck = new QCheckBox(tr("Use Cue-Specific Mapping"), m_contextHeader);
+    m_useCueMappingCheck->setToolTip(tr("Enable to override show-level mapping for this cue only"));
+    m_useCueMappingCheck->setVisible(false);
+    connect(m_useCueMappingCheck, &QCheckBox::toggled, this,
+            &DCAMappingPanel::onUseCueMappingToggled);
+    contextLayout->addWidget(m_useCueMappingCheck);
+
+    m_copyFromShowButton = new QPushButton(tr("Copy from Show"), m_contextHeader);
+    m_copyFromShowButton->setToolTip(tr("Copy current show-level mapping to this cue"));
+    m_copyFromShowButton->setVisible(false);
+    connect(m_copyFromShowButton, &QPushButton::clicked, this,
+            &DCAMappingPanel::copyShowMappingToCue);
+    contextLayout->addWidget(m_copyFromShowButton);
+
+    m_clearCueMappingButton = new QPushButton(tr("Clear Cue Mapping"), m_contextHeader);
+    m_clearCueMappingButton->setToolTip(tr("Remove cue-specific mapping, revert to show-level"));
+    m_clearCueMappingButton->setVisible(false);
+    connect(m_clearCueMappingButton, &QPushButton::clicked, this,
+            &DCAMappingPanel::clearCueMapping);
+    contextLayout->addWidget(m_clearCueMappingButton);
+
+    contextLayout->addStretch();
+    mainLayout->addWidget(m_contextHeader);
 
     // create actions
     m_syncFromMixerAction = new QAction(Icons::refresh(), tr("Sync from Mixer"), this);
@@ -94,12 +129,12 @@ void DCAMappingPanel::setupUi() {
     connect(m_syncButton, &QPushButton::clicked, m_syncFromMixerAction, &QAction::trigger);
     toolbarLayout->addWidget(m_syncButton);
 
-    m_savePresetButton = new QPushButton(Icons::download(), tr("Save Preset"), this);
+    m_savePresetButton = new QPushButton(Icons::download(), tr("Export DCAs"), this);
     m_savePresetButton->setToolTip(m_savePresetAction->toolTip());
     connect(m_savePresetButton, &QPushButton::clicked, m_savePresetAction, &QAction::trigger);
     toolbarLayout->addWidget(m_savePresetButton);
 
-    m_loadPresetButton = new QPushButton(Icons::upload(), tr("Load Preset"), this);
+    m_loadPresetButton = new QPushButton(Icons::upload(), tr("Import DCAs"), this);
     m_loadPresetButton->setToolTip(m_loadPresetAction->toolTip());
     connect(m_loadPresetButton, &QPushButton::clicked, m_loadPresetAction, &QAction::trigger);
     toolbarLayout->addWidget(m_loadPresetButton);
@@ -169,7 +204,7 @@ void DCAMappingPanel::createChannelSection() {
         m_channelLayout->addWidget(label, row, colOffset);
         m_channelLabels.append(label);
 
-        QComboBox* combo = new QComboBox(m_channelGroup);
+        NoScrollComboBox* combo = new NoScrollComboBox(m_channelGroup);
         combo->addItem(tr("None"), -1);
         for (int d = 1; d <= m_dcaCount; ++d) {
             combo->addItem(tr("DCA %1").arg(d), d);
@@ -213,7 +248,7 @@ void DCAMappingPanel::createBusSection() {
         m_busLayout->addWidget(label, row, colOffset);
         m_busLabels.append(label);
 
-        QComboBox* combo = new QComboBox(m_busGroup);
+        NoScrollComboBox* combo = new NoScrollComboBox(m_busGroup);
         combo->addItem(tr("None"), -1);
         for (int d = 1; d <= m_dcaCount; ++d) {
             combo->addItem(tr("DCA %1").arg(d), d);
@@ -257,9 +292,38 @@ void DCAMappingPanel::populateFromMapping() {
 
     m_updatingUi = true;
 
+    QMap<int, QList<int>> channelMap;
+    QMap<int, QList<int>> busMap;
+
+    if (m_showingCueMapping && m_currentCue && m_currentCue->hasCustomDCAMapping()) {
+        channelMap = m_currentCue->dcaChannelMapping();
+        busMap = m_currentCue->dcaBusMapping();
+    } else {
+        channelMap = m_mapping->channelAssignments();
+        busMap = m_mapping->busAssignments();
+    }
+
+    // build reverse lookup from channel -> DCA
+    QMap<int, int> channelToDCA;
+    for (auto it = channelMap.constBegin(); it != channelMap.constEnd(); ++it) {
+        int dca = it.key();
+        for (int ch : it.value()) {
+            channelToDCA[ch] = dca;
+        }
+    }
+
+    // build reverse lookup from bus -> DCA
+    QMap<int, int> busToDCA;
+    for (auto it = busMap.constBegin(); it != busMap.constEnd(); ++it) {
+        int dca = it.key();
+        for (int bus : it.value()) {
+            busToDCA[bus] = dca;
+        }
+    }
+
     // set channel combos
     for (int ch = 1; ch <= m_channelCombos.size(); ++ch) {
-        int dca = m_mapping->dcaForChannel(ch);
+        int dca = channelToDCA.value(ch, -1);
         int index = 0;
         if (dca > 0 && dca <= m_dcaCount) {
             index = dca; // DCA 1 is at index 1, etc.
@@ -269,7 +333,7 @@ void DCAMappingPanel::populateFromMapping() {
 
     // set bus combos
     for (int bus = 1; bus <= m_busCombos.size(); ++bus) {
-        int dca = m_mapping->dcaForBus(bus);
+        int dca = busToDCA.value(bus, -1);
         int index = 0;
         if (dca > 0 && dca <= m_dcaCount) {
             index = dca;
@@ -286,19 +350,49 @@ void DCAMappingPanel::updateComboItemStates() {
     if (!m_mapping)
         return;
 
+    // determine which mapping to use
+    QMap<int, QList<int>> channelMap;
+    QMap<int, QList<int>> busMap;
+
+    if (m_showingCueMapping && m_currentCue && m_currentCue->hasCustomDCAMapping()) {
+        channelMap = m_currentCue->dcaChannelMapping();
+        busMap = m_currentCue->dcaBusMapping();
+    } else {
+        channelMap = m_mapping->channelAssignments();
+        busMap = m_mapping->busAssignments();
+    }
+
+    // build reverse lookup from channel -> DCA
+    QMap<int, int> channelToDCA;
+    for (auto it = channelMap.constBegin(); it != channelMap.constEnd(); ++it) {
+        int dca = it.key();
+        for (int ch : it.value()) {
+            channelToDCA[ch] = dca;
+        }
+    }
+
+    // build reverse lookup from bus -> DCA
+    QMap<int, int> busToDCA;
+    for (auto it = busMap.constBegin(); it != busMap.constEnd(); ++it) {
+        int dca = it.key();
+        for (int bus : it.value()) {
+            busToDCA[bus] = dca;
+        }
+    }
+
     // count assignments per DCA
     QMap<int, int> channelCounts;
     QMap<int, int> busCounts;
     for (int d = 1; d <= m_dcaCount; ++d) {
-        channelCounts[d] = m_mapping->channelsForDCA(d).size();
-        busCounts[d] = m_mapping->busesForDCA(d).size();
+        channelCounts[d] = channelMap.value(d).size();
+        busCounts[d] = busMap.value(d).size();
     }
 
     // update channel labels w/ assignment status
     const QString assignedStyle =
         QString("color: %1; font-weight: bold;").arg(Theme::Colors::AccentBlue);
     for (int ch = 1; ch <= m_channelLabels.size(); ++ch) {
-        int dca = m_mapping->dcaForChannel(ch);
+        int dca = channelToDCA.value(ch, -1);
         QLabel* label = m_channelLabels[ch - 1];
 
         if (dca > 0) {
@@ -314,7 +408,7 @@ void DCAMappingPanel::updateComboItemStates() {
 
     // update bus labels w/ assignment status
     for (int bus = 1; bus <= m_busLabels.size(); ++bus) {
-        int dca = m_mapping->dcaForBus(bus);
+        int dca = busToDCA.value(bus, -1);
         QLabel* label = m_busLabels[bus - 1];
 
         if (dca > 0) {
@@ -482,7 +576,7 @@ void DCAMappingPanel::saveMappingPreset() {
     QFile file(filePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         QMessageBox::warning(m_app->mainWindow(), tr("Error"),
-                             tr("Failed to save preset: %1").arg(file.errorString()));
+                             tr("Failed to export: %1").arg(file.errorString()));
         return;
     }
 
@@ -504,7 +598,7 @@ void DCAMappingPanel::loadMappingPreset() {
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QMessageBox::warning(m_app->mainWindow(), tr("Error"),
-                             tr("Failed to load preset: %1").arg(file.errorString()));
+                             tr("Failed to load: %1").arg(file.errorString()));
         return;
     }
 
@@ -531,27 +625,59 @@ void DCAMappingPanel::clearAllMappings() {
 }
 
 void DCAMappingPanel::onChannelDCAChanged(int channel, int dca) {
-    if (!m_mapping)
-        return;
+    if (m_showingCueMapping && m_currentCue) {
+        // editing cue-specific mapping
+        QMap<int, QList<int>> channelMap = m_currentCue->dcaChannelMapping();
 
-    if (dca < 0) {
-        m_mapping->clearChannelFromAllDCAs(channel);
-    } else {
-        m_mapping->assignChannelToDCA(channel, dca);
+        // remove from any existing DCA
+        for (auto it = channelMap.begin(); it != channelMap.end(); ++it) {
+            it.value().removeAll(channel);
+        }
+
+        // add to new DCA
+        if (dca > 0) {
+            channelMap[dca].append(channel);
+        }
+
+        m_currentCue->setDCAChannelMapping(channelMap);
+        m_app->show()->setModified(true);
+    } else if (m_mapping) {
+        // editing show-level mapping
+        if (dca < 0) {
+            m_mapping->clearChannelFromAllDCAs(channel);
+        } else {
+            m_mapping->assignChannelToDCA(channel, dca);
+        }
+        m_app->show()->setModified(true);
     }
-    m_app->show()->setModified(true);
 }
 
 void DCAMappingPanel::onBusDCAChanged(int bus, int dca) {
-    if (!m_mapping)
-        return;
+    if (m_showingCueMapping && m_currentCue) {
+        // editing cue-specific mapping
+        QMap<int, QList<int>> busMap = m_currentCue->dcaBusMapping();
 
-    if (dca < 0) {
-        m_mapping->clearBusFromAllDCAs(bus);
-    } else {
-        m_mapping->assignBusToDCA(bus, dca);
+        // remove from any existing DCA
+        for (auto it = busMap.begin(); it != busMap.end(); ++it) {
+            it.value().removeAll(bus);
+        }
+
+        // add to new DCA
+        if (dca > 0) {
+            busMap[dca].append(bus);
+        }
+
+        m_currentCue->setDCABusMapping(busMap);
+        m_app->show()->setModified(true);
+    } else if (m_mapping) {
+        // editing show-level mapping
+        if (dca < 0) {
+            m_mapping->clearBusFromAllDCAs(bus);
+        } else {
+            m_mapping->assignBusToDCA(bus, dca);
+        }
+        m_app->show()->setModified(true);
     }
-    m_app->show()->setModified(true);
 }
 
 void DCAMappingPanel::onMixerConnected() {
@@ -563,6 +689,93 @@ void DCAMappingPanel::onMixerConnected() {
 void DCAMappingPanel::onMixerDisconnected() {
     m_syncButton->setEnabled(false);
     m_syncFromMixerAction->setEnabled(false);
+}
+
+void DCAMappingPanel::setCurrentCue(Cue* cue) {
+    m_currentCue = cue;
+
+    if (cue) {
+        // check if cue has custom mapping
+        m_showingCueMapping = cue->hasCustomDCAMapping();
+        m_useCueMappingCheck->blockSignals(true);
+        m_useCueMappingCheck->setChecked(m_showingCueMapping);
+        m_useCueMappingCheck->blockSignals(false);
+    } else {
+        m_showingCueMapping = false;
+    }
+
+    updateContextHeader();
+    populateFromMapping();
+}
+
+void DCAMappingPanel::clearCurrentCue() {
+    m_currentCue = nullptr;
+    m_showingCueMapping = false;
+    updateContextHeader();
+    populateFromMapping();
+}
+
+void DCAMappingPanel::updateContextHeader() {
+    if (m_currentCue) {
+        // show cue context
+        QString cueText = QString("Cue %1").arg(m_currentCue->number(), 0, 'f', 1);
+        if (!m_currentCue->name().isEmpty()) {
+            cueText += QString(": %1").arg(m_currentCue->name());
+        }
+        m_contextLabel->setText(cueText);
+
+        m_useCueMappingCheck->setVisible(true);
+        m_copyFromShowButton->setVisible(m_showingCueMapping);
+        m_clearCueMappingButton->setVisible(m_showingCueMapping &&
+                                            m_currentCue->hasCustomDCAMapping());
+    } else {
+        // show-level context
+        m_contextLabel->setText(tr("Show Level"));
+        m_useCueMappingCheck->setVisible(false);
+        m_copyFromShowButton->setVisible(false);
+        m_clearCueMappingButton->setVisible(false);
+    }
+}
+
+void DCAMappingPanel::onUseCueMappingToggled(bool enabled) {
+    if (!m_currentCue)
+        return;
+
+    m_showingCueMapping = enabled;
+
+    if (enabled && !m_currentCue->hasCustomDCAMapping()) {
+        // copy show mapping as starting point
+        m_currentCue->copyDCAMappingFrom(m_mapping);
+        m_app->show()->setModified(true);
+    }
+
+    updateContextHeader();
+    populateFromMapping();
+}
+
+void DCAMappingPanel::copyShowMappingToCue() {
+    if (!m_currentCue || !m_mapping)
+        return;
+
+    m_currentCue->copyDCAMappingFrom(m_mapping);
+    m_app->show()->setModified(true);
+    populateFromMapping();
+}
+
+void DCAMappingPanel::clearCueMapping() {
+    if (!m_currentCue)
+        return;
+
+    m_currentCue->clearCustomDCAMapping();
+    m_showingCueMapping = false;
+
+    m_useCueMappingCheck->blockSignals(true);
+    m_useCueMappingCheck->setChecked(false);
+    m_useCueMappingCheck->blockSignals(false);
+
+    m_app->show()->setModified(true);
+    updateContextHeader();
+    populateFromMapping();
 }
 
 } // namespace OpenMix

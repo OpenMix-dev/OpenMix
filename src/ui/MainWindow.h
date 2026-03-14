@@ -74,6 +74,7 @@ class MainWindow : public QMainWindow {
     // settings dialogs
     void showMidiConfigDialog();
     void showKeyboardShortcutsDialog();
+    void showLogViewerDialog();
 
     // bubble bar interaction
     void onBubbleButtonClicked(const QString& id, bool checked);
@@ -155,6 +156,7 @@ class MainWindow : public QMainWindow {
     QAction* m_showConnectionAction;
     QAction* m_showMixerFeedbackAction;
     QAction* m_showDCAMappingAction;
+    QAction* m_showLogViewerAction;
 
     // settings actions
     QAction* m_keyboardShortcutsAction;
@@ -166,7 +168,8 @@ class MainWindow : public QMainWindow {
     // status bar
     QLabel* m_connectionStatusLabel;
     QLabel* m_cueStatusLabel;
-    QLabel* m_playbackStatusLabel;
+    QLabel* m_currentCueLabel;
+    QLabel* m_nextCueLabel;
 };
 
 } // namespace OpenMix

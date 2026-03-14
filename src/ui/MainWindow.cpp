@@ -6,9 +6,11 @@
 #include "CueListView.h"
 #include "CueTableModel.h"
 #include "DCAMappingPanel.h"
+#include "LogViewerDialog.h"
 #include "MixerFeedbackPanel.h"
 #include "PopOutWindow.h"
 #include "app/Application.h"
+#include "core/AppLogger.h"
 #include "core/CueList.h"
 #include "core/CueValidator.h"
 #include "core/PlaybackEngine.h"
@@ -186,6 +188,11 @@ void MainWindow::createActions() {
     m_showConnectionAction->setToolTip(tr("Show/hide connection panel (F7)"));
     connect(m_showConnectionAction, &QAction::triggered, this, &MainWindow::toggleConnectionPanel);
 
+    m_showLogViewerAction = new QAction(tr("Application &Log..."), this);
+    m_showLogViewerAction->setShortcut(Qt::Key_F8);
+    m_showLogViewerAction->setToolTip(tr("Show application log (F8)"));
+    connect(m_showLogViewerAction, &QAction::triggered, this, &MainWindow::showLogViewerDialog);
+
     // settings actions
     m_keyboardShortcutsAction = new QAction(tr("Keyboard Shortcuts..."), this);
     m_keyboardShortcutsAction->setToolTip(tr("Configure keyboard shortcuts"));
@@ -241,6 +248,7 @@ void MainWindow::registerShortcuts() {
     sm->registerAction("view.dcaMapping", m_showDCAMappingAction, QKeySequence(Qt::Key_F5));
     sm->registerAction("view.mixerFeedback", m_showMixerFeedbackAction, QKeySequence(Qt::Key_F6));
     sm->registerAction("view.connection", m_showConnectionAction, QKeySequence(Qt::Key_F7));
+    sm->registerAction("view.logViewer", m_showLogViewerAction, QKeySequence(Qt::Key_F8));
 
     // settings actions
     sm->registerAction("settings.keyboardShortcuts", m_keyboardShortcutsAction, QKeySequence());
@@ -285,6 +293,8 @@ void MainWindow::createMenus() {
     m_viewMenu->addAction(m_showDCAMappingAction);
     m_viewMenu->addAction(m_showMixerFeedbackAction);
     m_viewMenu->addAction(m_showConnectionAction);
+    m_viewMenu->addSeparator();
+    m_viewMenu->addAction(m_showLogViewerAction);
 
     m_settingsMenu = menuBar()->addMenu(tr("&Settings"));
     m_settingsMenu->addAction(m_keyboardShortcutsAction);
@@ -318,11 +328,13 @@ void MainWindow::createToolBars() {
 void MainWindow::createStatusBar() {
     m_connectionStatusLabel = new QLabel(tr("Disconnected"));
     m_cueStatusLabel = new QLabel(tr("No cues"));
-    m_playbackStatusLabel = new QLabel(tr("Stopped"));
+    m_currentCueLabel = new QLabel();
+    m_nextCueLabel = new QLabel();
 
     statusBar()->addWidget(m_connectionStatusLabel);
     statusBar()->addWidget(m_cueStatusLabel, 1);
-    statusBar()->addPermanentWidget(m_playbackStatusLabel);
+    statusBar()->addPermanentWidget(m_currentCueLabel);
+    statusBar()->addPermanentWidget(m_nextCueLabel);
 }
 
 void MainWindow::createPopOutWindows() {
@@ -404,6 +416,19 @@ void MainWindow::connectSignals() {
     connect(m_cueListView, &CueListView::cueSelected, m_cueEditor, &CueEditor::setCue);
     connect(m_cueListView, &CueListView::cueSelected, m_mixerFeedbackPanel,
             &MixerFeedbackPanel::onActiveCueChanged);
+    connect(m_cueListView, &CueListView::cueSelected, this, [this](int index) {
+        if (m_app->playbackEngine()->state() == PlaybackState::Stopped) {
+            m_app->playbackEngine()->setStandbyIndex(index);
+        }
+    });
+    connect(m_cueListView, &CueListView::cueSelected, this, [this](int index) {
+        CueList* cueList = m_app->show()->cueList();
+        if (index >= 0 && index < cueList->count()) {
+            m_dcaMappingPanel->setCurrentCue(&(*cueList)[index]);
+        } else {
+            m_dcaMappingPanel->clearCurrentCue();
+        }
+    });
 
     connect(m_cueListView, &CueListView::cueDoubleClicked,
             [this](int index) { m_app->playbackEngine()->executeCue(index); });
@@ -637,15 +662,24 @@ void MainWindow::updateStatusBar() {
     int count = m_app->show()->cueList()->count();
     m_cueStatusLabel->setText(tr("%n cue(s)", "", count));
 
+    int currentIdx = m_app->playbackEngine()->currentCueIndex();
+    if (currentIdx >= 0) {
+        const Cue* cue = m_app->playbackEngine()->currentCue();
+        m_currentCueLabel->setText(tr("Current: %1 - %2")
+                                       .arg(cue->number(), 0, 'f', 1)
+                                       .arg(cue->name().isEmpty() ? tr("(unnamed)") : cue->name()));
+    } else {
+        m_currentCueLabel->setText(tr("Current: --"));
+    }
+
     int standbyIdx = m_app->playbackEngine()->standbyCueIndex();
     if (standbyIdx >= 0) {
         const Cue* cue = m_app->playbackEngine()->standbyCue();
-        m_playbackStatusLabel->setText(
-            tr("Next: %1 - %2")
-                .arg(cue->number(), 0, 'f', 1)
-                .arg(cue->name().isEmpty() ? tr("(unnamed)") : cue->name()));
+        m_nextCueLabel->setText(tr("Next: %1 - %2")
+                                    .arg(cue->number(), 0, 'f', 1)
+                                    .arg(cue->name().isEmpty() ? tr("(unnamed)") : cue->name()));
     } else {
-        m_playbackStatusLabel->setText(tr("End of list"));
+        m_nextCueLabel->setText(tr("Next: --"));
     }
 
     updateActions();
@@ -770,6 +804,11 @@ void MainWindow::showMidiConfigDialog() {
 
 void MainWindow::showKeyboardShortcutsDialog() {
     KeyboardShortcutsDialog dialog(m_app->shortcutManager(), this);
+    dialog.exec();
+}
+
+void MainWindow::showLogViewerDialog() {
+    LogViewerDialog dialog(m_app->appLogger(), this);
     dialog.exec();
 }
 

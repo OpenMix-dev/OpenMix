@@ -195,8 +195,8 @@ void PlaybackEngine::executeCueInternal(const Cue& cue) {
 
     switch (cue.type()) {
     case CueType::Snapshot: {
-        // filter params based on DCA targeting
-        QJsonObject filteredParams = filterParametersForDCAs(cue.parameters(), targetDCAs);
+        // filter params based on DCA targeting (uses cue-specific or show-level mapping)
+        QJsonObject filteredParams = filterParametersForDCAs(cue, targetDCAs);
 
         // instant recall of filtered params
         Cue filteredCue = cue;
@@ -260,12 +260,37 @@ void PlaybackEngine::applyDCAOverrides(const Cue& cue, const QSet<int>& targetDC
     }
 }
 
-QJsonObject PlaybackEngine::filterParametersForDCAs(const QJsonObject& params,
+QList<int> PlaybackEngine::getChannelsForDCA(const Cue& cue, int dca) const {
+    // check cue-specific mapping first
+    if (cue.hasCustomDCAMapping()) {
+        return cue.dcaChannelMapping().value(dca);
+    }
+    // fall back to show-level mapping
+    if (m_dcaMapping) {
+        return m_dcaMapping->channelsForDCA(dca);
+    }
+    return {};
+}
+
+QList<int> PlaybackEngine::getBusesForDCA(const Cue& cue, int dca) const {
+    // check cue-specific mapping first
+    if (cue.hasCustomDCAMapping()) {
+        return cue.dcaBusMapping().value(dca);
+    }
+    // fall back to show-level mapping
+    if (m_dcaMapping) {
+        return m_dcaMapping->busesForDCA(dca);
+    }
+    return {};
+}
+
+QJsonObject PlaybackEngine::filterParametersForDCAs(const Cue& cue,
                                                     const QSet<int>& targetDCAs) const {
-    if (!m_dcaMapping || targetDCAs.isEmpty()) {
+    bool hasMapping = cue.hasCustomDCAMapping() || m_dcaMapping;
+    if (!hasMapping || targetDCAs.isEmpty()) {
         QJsonObject filtered;
         static QRegularExpression dcaFaderRegex("^/dca/\\d+/fader$");
-        for (auto it = params.begin(); it != params.end(); ++it) {
+        for (auto it = cue.parameters().begin(); it != cue.parameters().end(); ++it) {
             if (!dcaFaderRegex.match(it.key()).hasMatch()) {
                 filtered[it.key()] = it.value();
             }
@@ -277,11 +302,11 @@ QJsonObject PlaybackEngine::filterParametersForDCAs(const QJsonObject& params,
     QSet<int> targetChannels;
     QSet<int> targetBuses;
     for (int dca : targetDCAs) {
-        QList<int> channels = m_dcaMapping->channelsForDCA(dca);
+        QList<int> channels = getChannelsForDCA(cue, dca);
         for (int ch : channels) {
             targetChannels.insert(ch);
         }
-        QList<int> buses = m_dcaMapping->busesForDCA(dca);
+        QList<int> buses = getBusesForDCA(cue, dca);
         for (int bus : buses) {
             targetBuses.insert(bus);
         }
@@ -293,6 +318,7 @@ QJsonObject PlaybackEngine::filterParametersForDCAs(const QJsonObject& params,
     static QRegularExpression busRegex("^/bus/(\\d+)/");
     static QRegularExpression dcaFaderRegex("^/dca/\\d+/fader$");
 
+    const QJsonObject& params = cue.parameters();
     for (auto it = params.begin(); it != params.end(); ++it) {
         const QString& path = it.key();
 

@@ -61,7 +61,7 @@ void CueListView::setupUi() {
     m_tableView->setModel(m_proxyModel);
 
     // selection & editing
-    m_tableView->setSelectionBehavior(QAbstractItemView::SelectItems);
+    m_tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_tableView->setSelectionMode(QAbstractItemView::SingleSelection);
     m_tableView->setEditTriggers(QAbstractItemView::DoubleClicked |
                                  QAbstractItemView::EditKeyPressed |
@@ -179,6 +179,15 @@ void CueListView::setCurrentCueHighlight(int index) {
 void CueListView::setStandbyCueHighlight(int index) {
     m_standbyCueIndex = index;
     m_model->setStandbyCueIndex(index);
+
+    if (m_app->playbackEngine()->state() == PlaybackState::Stopped && index >= 0) {
+        QModelIndex sourceIndex = m_model->index(index, 0);
+        QModelIndex proxyIndex = m_proxyModel->mapFromSource(sourceIndex);
+        if (proxyIndex.isValid()) {
+            m_tableView->selectRow(proxyIndex.row());
+            m_tableView->scrollTo(proxyIndex, QAbstractItemView::EnsureVisible);
+        }
+    }
 }
 
 void CueListView::refreshAll() {

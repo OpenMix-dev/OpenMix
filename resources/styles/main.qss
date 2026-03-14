@@ -720,13 +720,13 @@ QLabel[role="warning"] {
     color: #f59e0b;
 }
 
-QFrame[frameShape="4"] { /* HLine */
+QFrame[frameShape="4"] {
     background-color: #2e323b;
     max-height: 1px;
     border: none;
 }
 
-QFrame[frameShape="5"] { /* VLine */
+QFrame[frameShape="5"] {
     background-color: #2e323b;
     max-width: 1px;
     border: none;
@@ -761,13 +761,13 @@ QListView::item:hover {
 QTableView::item:selected,
 QTreeView::item:selected,
 QListView::item:selected {
-    background-color: rgba(59, 130, 246, 0.2);
+    background-color: rgba(59, 130, 246, 0.4);
 }
 
 QTableView::item:selected:hover,
 QTreeView::item:selected:hover,
 QListView::item:selected:hover {
-    background-color: rgba(59, 130, 246, 0.25);
+    background-color: rgba(59, 130, 246, 0.45);
 }
 
 QHeaderView {
@@ -1168,4 +1168,25 @@ QTableView:focus {
 
 QPushButton:focus {
     border-color: #3b82f6;
+}
+
+QListView#LogListView {
+    background-color: #131416;
+    border: 1px solid #2e323b;
+    border-radius: 6px;
+    font-family: "JetBrains Mono", "Cascadia Code", "SF Mono", "Consolas", monospace;
+    font-size: 11px;
+}
+
+QListView#LogListView::item {
+    padding: 4px 0;
+    border-bottom: 1px solid #1e2024;
+}
+
+QListView#LogListView::item:hover {
+    background-color: #22252a;
+}
+
+QListView#LogListView::item:selected {
+    background-color: rgba(59, 130, 246, 0.4);
 }
