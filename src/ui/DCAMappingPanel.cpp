@@ -16,7 +16,9 @@
 #include <QHBoxLayout>
 #include <QJsonDocument>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QPointer>
 #include <QPushButton>
 #include <QScrollArea>
@@ -232,6 +234,7 @@ void DCAMappingPanel::createBusSection() {
     }
     m_busCombos.clear();
     m_busLabels.clear();
+    m_busNameEdits.clear();
 
     // header
     m_busLayout->addWidget(new QLabel(tr("Bus"), m_busGroup), 0, 0);
@@ -243,10 +246,30 @@ void DCAMappingPanel::createBusSection() {
         int row = ((bus - 1) % 8) + 1;
         colOffset = ((bus - 1) / 8) * 3;
 
-        QLabel* label = new QLabel(tr("Bus %1").arg(bus), m_busGroup);
-        label->setMinimumWidth(60);
-        m_busLayout->addWidget(label, row, colOffset);
+        // stacked label + line edit in a container
+        QWidget* nameContainer = new QWidget(m_busGroup);
+        QVBoxLayout* nameLayout = new QVBoxLayout(nameContainer);
+        nameLayout->setContentsMargins(0, 0, 0, 0);
+        nameLayout->setSpacing(0);
+
+        QLabel* label = new QLabel(busDisplayName(bus), nameContainer);
+        label->setMinimumWidth(80);
+        label->setProperty("busIndex", bus);
+        label->installEventFilter(this);
+        label->setToolTip(tr("Double-click to rename"));
+        nameLayout->addWidget(label);
         m_busLabels.append(label);
+
+        QLineEdit* edit = new QLineEdit(nameContainer);
+        edit->setVisible(false);
+        edit->setProperty("busIndex", bus);
+        edit->installEventFilter(this);
+        nameLayout->addWidget(edit);
+        m_busNameEdits.append(edit);
+
+        connect(edit, &QLineEdit::returnPressed, [this, bus]() { finishBusNameEdit(bus); });
+
+        m_busLayout->addWidget(nameContainer, row, colOffset);
 
         NoScrollComboBox* combo = new NoScrollComboBox(m_busGroup);
         combo->addItem(tr("None"), -1);
@@ -412,13 +435,13 @@ void DCAMappingPanel::updateComboItemStates() {
         QLabel* label = m_busLabels[bus - 1];
 
         if (dca > 0) {
-            label->setText(tr("Bus %1 [%2]").arg(bus).arg(dca));
+            label->setText(tr("%1 [%2]").arg(busDisplayName(bus)).arg(dca));
             label->setStyleSheet(assignedStyle);
-            label->setToolTip(tr("Assigned to DCA %1 - locked from other DCAs").arg(dca));
+            label->setToolTip(tr("Assigned to DCA %1 — double-click to rename").arg(dca));
         } else {
-            label->setText(tr("Bus %1").arg(bus));
+            label->setText(busDisplayName(bus));
             label->setStyleSheet("");
-            label->setToolTip(tr("Not assigned to any DCA"));
+            label->setToolTip(tr("Double-click to rename"));
         }
     }
 
@@ -776,6 +799,88 @@ void DCAMappingPanel::clearCueMapping() {
     m_app->show()->setModified(true);
     updateContextHeader();
     populateFromMapping();
+}
+
+QString DCAMappingPanel::busDisplayName(int bus) const {
+    if (m_mapping) {
+        QString name = m_mapping->busName(bus);
+        if (!name.isEmpty())
+            return name;
+    }
+    return tr("Bus %1").arg(bus);
+}
+
+bool DCAMappingPanel::eventFilter(QObject* obj, QEvent* event) {
+    if (event->type() == QEvent::MouseButtonDblClick) {
+        QLabel* label = qobject_cast<QLabel*>(obj);
+        if (label && label->property("busIndex").isValid()) {
+            int bus = label->property("busIndex").toInt();
+            startBusNameEdit(bus);
+            return true;
+        }
+    }
+    if (event->type() == QEvent::KeyPress) {
+        QLineEdit* edit = qobject_cast<QLineEdit*>(obj);
+        if (edit && edit->property("busIndex").isValid()) {
+            QKeyEvent* ke = static_cast<QKeyEvent*>(event);
+            if (ke->key() == Qt::Key_Escape) {
+                int bus = edit->property("busIndex").toInt();
+                cancelBusNameEdit(bus);
+                return true;
+            }
+        }
+    }
+    if (event->type() == QEvent::FocusOut) {
+        QLineEdit* edit = qobject_cast<QLineEdit*>(obj);
+        if (edit && edit->property("busIndex").isValid()) {
+            int bus = edit->property("busIndex").toInt();
+            finishBusNameEdit(bus);
+            return false;
+        }
+    }
+    return QWidget::eventFilter(obj, event);
+}
+
+void DCAMappingPanel::startBusNameEdit(int bus) {
+    if (bus < 1 || bus > m_busLabels.size())
+        return;
+
+    QLabel* label = m_busLabels[bus - 1];
+    QLineEdit* edit = m_busNameEdits[bus - 1];
+
+    label->setVisible(false);
+    edit->setVisible(true);
+    edit->setText(m_mapping ? m_mapping->busName(bus) : QString());
+    edit->setPlaceholderText(tr("Bus %1").arg(bus));
+    edit->setFocus();
+    edit->selectAll();
+}
+
+void DCAMappingPanel::finishBusNameEdit(int bus) {
+    if (bus < 1 || bus > m_busNameEdits.size())
+        return;
+
+    QLineEdit* edit = m_busNameEdits[bus - 1];
+    if (!edit->isVisible())
+        return;
+    QString name = edit->text().trimmed();
+
+    if (m_mapping) {
+        m_mapping->setBusName(bus, name);
+        m_app->show()->setModified(true);
+    }
+
+    edit->setVisible(false);
+    m_busLabels[bus - 1]->setVisible(true);
+    updateComboItemStates();
+}
+
+void DCAMappingPanel::cancelBusNameEdit(int bus) {
+    if (bus < 1 || bus > m_busNameEdits.size())
+        return;
+
+    m_busNameEdits[bus - 1]->setVisible(false);
+    m_busLabels[bus - 1]->setVisible(true);
 }
 
 } // namespace OpenMix

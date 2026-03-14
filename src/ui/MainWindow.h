@@ -29,6 +29,8 @@ class MainWindow : public QMainWindow {
     explicit MainWindow(Application* app, QWidget* parent = nullptr);
     ~MainWindow() override;
 
+    void openConnectionPanel();
+
   protected:
     void closeEvent(QCloseEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;

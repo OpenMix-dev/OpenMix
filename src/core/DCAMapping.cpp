@@ -95,6 +95,17 @@ int DCAMapping::dcaForBus(int bus) const {
 
 bool DCAMapping::isBusAssigned(int bus) const { return dcaForBus(bus) >= 0; }
 
+void DCAMapping::setBusName(int bus, const QString& name) {
+    if (name.isEmpty()) {
+        m_busNames.remove(bus);
+    } else {
+        m_busNames[bus] = name;
+    }
+    emit busNameChanged(bus, name);
+}
+
+QString DCAMapping::busName(int bus) const { return m_busNames.value(bus, QString()); }
+
 void DCAMapping::clear() {
     m_channelAssignments.clear();
     m_busAssignments.clear();
@@ -147,6 +158,14 @@ QJsonObject DCAMapping::toJson() const {
     }
     json["buses"] = busesObj;
 
+    if (!m_busNames.isEmpty()) {
+        QJsonObject busNamesObj;
+        for (auto it = m_busNames.constBegin(); it != m_busNames.constEnd(); ++it) {
+            busNamesObj[QString::number(it.key())] = it.value();
+        }
+        json["busNames"] = busNamesObj;
+    }
+
     return json;
 }
 
@@ -159,6 +178,7 @@ DCAMapping* DCAMapping::fromJson(const QJsonObject& json, QObject* parent) {
 void DCAMapping::loadFromJson(const QJsonObject& json) {
     m_channelAssignments.clear();
     m_busAssignments.clear();
+    m_busNames.clear();
 
     QJsonObject channelsObj = json["channels"].toObject();
     for (auto it = channelsObj.constBegin(); it != channelsObj.constEnd(); ++it) {
@@ -183,6 +203,15 @@ void DCAMapping::loadFromJson(const QJsonObject& json) {
         }
         if (!busList.isEmpty()) {
             m_busAssignments[dca] = busList;
+        }
+    }
+
+    QJsonObject busNamesObj = json["busNames"].toObject();
+    for (auto it = busNamesObj.constBegin(); it != busNamesObj.constEnd(); ++it) {
+        int bus = it.key().toInt();
+        QString name = it.value().toString();
+        if (bus > 0 && !name.isEmpty()) {
+            m_busNames[bus] = name;
         }
     }
 }

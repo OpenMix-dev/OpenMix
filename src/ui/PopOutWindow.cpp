@@ -13,7 +13,7 @@ namespace OpenMix {
 
 PopOutWindow::PopOutWindow(const QString& settingsKey, const QString& title, QWidget* parent)
     : QDialog(parent,
-              Qt::Tool | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint),
+              Qt::Window | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint),
       m_settingsKey(settingsKey) {
     setObjectName(Theme::ObjectNames::PopOutWindow);
     setAttribute(Qt::WA_DeleteOnClose, false);

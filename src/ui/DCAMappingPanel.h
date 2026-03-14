@@ -2,7 +2,9 @@
 
 #include <QAction>
 #include <QComboBox>
+#include <QEvent>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QTimer>
 #include <QWheelEvent>
 #include <QWidget>
@@ -80,6 +82,14 @@ class DCAMappingPanel : public QWidget {
     void copyShowMappingToCue();
     void clearCueMapping();
 
+    // bus name editing
+    void startBusNameEdit(int bus);
+    void finishBusNameEdit(int bus);
+    void cancelBusNameEdit(int bus);
+
+  protected:
+    bool eventFilter(QObject* obj, QEvent* event) override;
+
   private:
     void setupUi();
     void createChannelSection();
@@ -88,6 +98,7 @@ class DCAMappingPanel : public QWidget {
     void populateFromMapping();
     void updateComboItemStates();
     void updateContextHeader();
+    QString busDisplayName(int bus) const;
 
     Application* m_app;
     DCAMapping* m_mapping;
@@ -115,6 +126,7 @@ class DCAMappingPanel : public QWidget {
     QGridLayout* m_busLayout;
     QVector<QComboBox*> m_busCombos;
     QVector<QLabel*> m_busLabels;
+    QVector<QLineEdit*> m_busNameEdits;
 
     QPushButton* m_syncButton;
     QPushButton* m_savePresetButton;

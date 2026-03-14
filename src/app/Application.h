@@ -75,6 +75,9 @@ class Application : public QObject {
     // initialization
     void initialize();
 
+    // startup auto-connect
+    void startupScan();
+
   signals:
     void mixerConnected();
     void mixerDisconnected();

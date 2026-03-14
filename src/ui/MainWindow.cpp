@@ -617,6 +617,12 @@ void MainWindow::go() { m_app->playbackEngine()->go(); }
 
 void MainWindow::stopPlayback() { m_app->playbackEngine()->stop(); }
 
+void MainWindow::openConnectionPanel() {
+    if (!m_connectionPopOut->isVisible()) {
+        m_connectionPopOut->showAndRestore();
+    }
+}
+
 void MainWindow::toggleConnectionPanel() {
     if (m_connectionPopOut->isVisible()) {
         m_connectionPopOut->hide();

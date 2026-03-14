@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QPalette>
 #include <QStyleFactory>
+#include <QTimer>
 #include <oclero/qlementine/icons/QlementineIcons.hpp>
 
 int main(int argc, char* argv[]) {
@@ -50,6 +51,8 @@ int main(int argc, char* argv[]) {
     OpenMix::MainWindow mainWindow(&app);
     app.setMainWindow(&mainWindow);
     mainWindow.show();
+    QTimer::singleShot(0, &mainWindow, &OpenMix::MainWindow::openConnectionPanel);
+    QTimer::singleShot(500, &app, &OpenMix::Application::startupScan);
 
     return qtApp.exec();
 }

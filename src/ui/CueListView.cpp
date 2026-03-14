@@ -143,7 +143,7 @@ void CueListView::createActions() {
 
     // register with shortcut manager
     ShortcutManager* sm = m_app->shortcutManager();
-    sm->registerAction("edit.duplicateCue", m_duplicateCueAction, QKeySequence());
+    sm->registerAction("edit.duplicateCue", m_duplicateCueAction, QKeySequence(Qt::CTRL | Qt::Key_D));
 
     // register filter bar clear action
     QAction* clearAction = m_filterBar->clearFiltersAction();
