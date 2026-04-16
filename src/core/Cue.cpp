@@ -1,4 +1,5 @@
 #include "Cue.h"
+#include "DCAMapping.h"
 #include <QJsonValue>
 
 namespace OpenMix {
@@ -124,6 +125,8 @@ Cue::Cue(double number, const QString& name)
       m_autoFollowCondition(AutoFollowCondition::Always),
       m_macroExecutionMode(MacroExecutionMode::Sequential), m_gotoAutoExecute(false) {}
 
+void Cue::regenerateId() { m_id = QUuid::createUuid().toString(QUuid::WithoutBraces); }
+
 void Cue::setParameter(const QString& path, const QVariant& value) {
     m_parameters[path] = QJsonValue::fromVariant(value);
 }
@@ -146,6 +149,36 @@ void Cue::setDCAOverride(int dca, const DCAOverride& override) {
 DCAOverride Cue::dcaOverride(int dca) const { return m_dcaOverrides.value(dca); }
 
 void Cue::clearDCAOverride(int dca) { m_dcaOverrides.remove(dca); }
+
+bool Cue::hasCustomDCAMapping() const {
+    return m_dcaChannelMapping.has_value() || m_dcaBusMapping.has_value();
+}
+
+void Cue::setDCAChannelMapping(const QMap<int, QList<int>>& mapping) {
+    m_dcaChannelMapping = mapping;
+}
+
+void Cue::setDCABusMapping(const QMap<int, QList<int>>& mapping) { m_dcaBusMapping = mapping; }
+
+QMap<int, QList<int>> Cue::dcaChannelMapping() const {
+    return m_dcaChannelMapping.value_or(QMap<int, QList<int>>());
+}
+
+QMap<int, QList<int>> Cue::dcaBusMapping() const {
+    return m_dcaBusMapping.value_or(QMap<int, QList<int>>());
+}
+
+void Cue::clearCustomDCAMapping() {
+    m_dcaChannelMapping.reset();
+    m_dcaBusMapping.reset();
+}
+
+void Cue::copyDCAMappingFrom(const DCAMapping* showMapping) {
+    if (showMapping) {
+        m_dcaChannelMapping = showMapping->channelAssignments();
+        m_dcaBusMapping = showMapping->busAssignments();
+    }
+}
 
 QJsonObject Cue::toJson() const {
     QJsonObject json;
@@ -175,6 +208,35 @@ QJsonObject Cue::toJson() const {
             overridesObj[QString::number(it.key())] = it.value().toJson();
         }
         json["dcaOverrides"] = overridesObj;
+    }
+
+    // per-cue DCA mapping
+    if (hasCustomDCAMapping()) {
+        QJsonObject dcaMappingObj;
+        if (m_dcaChannelMapping.has_value()) {
+            QJsonObject channelsObj;
+            for (auto it = m_dcaChannelMapping->constBegin(); it != m_dcaChannelMapping->constEnd();
+                 ++it) {
+                QJsonArray arr;
+                for (int ch : it.value()) {
+                    arr.append(ch);
+                }
+                channelsObj[QString::number(it.key())] = arr;
+            }
+            dcaMappingObj["channels"] = channelsObj;
+        }
+        if (m_dcaBusMapping.has_value()) {
+            QJsonObject busesObj;
+            for (auto it = m_dcaBusMapping->constBegin(); it != m_dcaBusMapping->constEnd(); ++it) {
+                QJsonArray arr;
+                for (int bus : it.value()) {
+                    arr.append(bus);
+                }
+                busesObj[QString::number(it.key())] = arr;
+            }
+            dcaMappingObj["buses"] = busesObj;
+        }
+        json["dcaMapping"] = dcaMappingObj;
     }
 
     if (!m_childCueIds.isEmpty()) {
@@ -236,6 +298,37 @@ Cue Cue::fromJson(const QJsonObject& json) {
         for (auto it = overridesObj.constBegin(); it != overridesObj.constEnd(); ++it) {
             int dca = it.key().toInt();
             cue.m_dcaOverrides[dca] = DCAOverride::fromJson(it.value().toObject());
+        }
+    }
+
+    // per-cue DCA mapping
+    if (json.contains("dcaMapping")) {
+        QJsonObject dcaMappingObj = json["dcaMapping"].toObject();
+        if (dcaMappingObj.contains("channels")) {
+            QMap<int, QList<int>> channelMapping;
+            QJsonObject channelsObj = dcaMappingObj["channels"].toObject();
+            for (auto it = channelsObj.constBegin(); it != channelsObj.constEnd(); ++it) {
+                int dca = it.key().toInt();
+                QList<int> channels;
+                for (const QJsonValue& val : it.value().toArray()) {
+                    channels.append(val.toInt());
+                }
+                channelMapping[dca] = channels;
+            }
+            cue.m_dcaChannelMapping = channelMapping;
+        }
+        if (dcaMappingObj.contains("buses")) {
+            QMap<int, QList<int>> busMapping;
+            QJsonObject busesObj = dcaMappingObj["buses"].toObject();
+            for (auto it = busesObj.constBegin(); it != busesObj.constEnd(); ++it) {
+                int dca = it.key().toInt();
+                QList<int> buses;
+                for (const QJsonValue& val : it.value().toArray()) {
+                    buses.append(val.toInt());
+                }
+                busMapping[dca] = buses;
+            }
+            cue.m_dcaBusMapping = busMapping;
         }
     }
 

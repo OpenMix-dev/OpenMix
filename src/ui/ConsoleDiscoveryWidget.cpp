@@ -62,7 +62,7 @@ void ConsoleDiscoveryWidget::setupUi() {
     // status label
     m_statusLabel = new QLabel(this);
     m_statusLabel->setStyleSheet("color: gray; font-style: italic;");
-    m_statusLabel->setText(tr("Click 'Scan Network' to find mixers"));
+    m_statusLabel->setText(tr("Click 'Scan Network' to find OSC-enabled mixers"));
     layout->addWidget(m_statusLabel);
 }
 

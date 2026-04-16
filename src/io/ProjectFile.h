@@ -10,7 +10,7 @@ class Show;
 class ProjectFile {
   public:
     static constexpr const char* FILE_EXTENSION = ".omproj";
-    static constexpr const char* FILE_FILTER = "OpenMix Projects (*.omproj);;All Files (*)";
+    static constexpr const char* FILE_FILTER = "OpenMix Project (*.omproj);;All Files (*)";
 
     static bool save(const Show* show, const QString& filePath, QString* errorMsg = nullptr);
     static bool load(Show* show, const QString& filePath, QString* errorMsg = nullptr);

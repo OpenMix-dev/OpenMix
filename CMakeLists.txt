@@ -59,6 +59,8 @@ set(SOURCES
     src/core/ShortcutManager.cpp
     src/core/OperationMode.cpp
     src/core/DCAMapping.cpp
+    src/core/AppLogger.cpp
+    src/core/ConnectionLogBridge.cpp
     src/ui/MainWindow.cpp
     src/ui/CueListView.cpp
     src/ui/CueEditor.cpp
@@ -117,6 +119,9 @@ set(SOURCES
     src/midi/MidiInputManager.cpp
     src/ui/MidiConfigDialog.cpp
     src/ui/KeyboardShortcutsDialog.cpp
+    src/ui/LogViewerDialog.cpp
+    src/ui/LogListModel.cpp
+    src/ui/LogItemDelegate.cpp
 )
 
 # header files
@@ -134,6 +139,8 @@ set(HEADERS
     src/core/ShortcutManager.h
     src/core/OperationMode.h
     src/core/DCAMapping.h
+    src/core/AppLogger.h
+    src/core/ConnectionLogBridge.h
     src/ui/MainWindow.h
     src/ui/CueListView.h
     src/ui/CueEditor.h
@@ -193,6 +200,9 @@ set(HEADERS
     src/midi/MidiInputManager.h
     src/ui/MidiConfigDialog.h
     src/ui/KeyboardShortcutsDialog.h
+    src/ui/LogViewerDialog.h
+    src/ui/LogListModel.h
+    src/ui/LogItemDelegate.h
 )
 
 # Qt resources

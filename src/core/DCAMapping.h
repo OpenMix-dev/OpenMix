@@ -30,6 +30,11 @@ class DCAMapping : public QObject {
     int dcaForBus(int bus) const; // -1 = unassigned
     bool isBusAssigned(int bus) const;
 
+    // bus names
+    void setBusName(int bus, const QString& name);
+    QString busName(int bus) const;
+    QMap<int, QString> busNames() const { return m_busNames; }
+
     // bulk operations
     void clear();
     void setChannelAssignments(const QMap<int, QList<int>>& assignments);
@@ -47,6 +52,7 @@ class DCAMapping : public QObject {
   signals:
     void channelAssignmentChanged(int channel, int dca);
     void busAssignmentChanged(int bus, int dca);
+    void busNameChanged(int bus, const QString& name);
     void mappingCleared();
 
   private:
@@ -54,6 +60,8 @@ class DCAMapping : public QObject {
     QMap<int, QList<int>> m_channelAssignments;
     // DCA# -> [bus#, ...]
     QMap<int, QList<int>> m_busAssignments;
+    // bus# -> user-defined name
+    QMap<int, QString> m_busNames;
 };
 
 } // namespace OpenMix

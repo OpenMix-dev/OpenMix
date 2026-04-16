@@ -66,9 +66,7 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
 
     if (role == Qt::BackgroundRole) {
         if (row == m_currentIndex) {
-            return QBrush(Theme::withAlpha(Theme::Colors::AccentGreen, 45));
-        } else if (row == m_standbyIndex) {
-            return QBrush(Theme::withAlpha(Theme::Colors::AccentAmber, 40));
+            return QBrush(QColor(34, 197, 94, 160));
         }
     }
 

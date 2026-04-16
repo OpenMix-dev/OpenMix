@@ -1,4 +1,6 @@
 #include "Application.h"
+#include "core/AppLogger.h"
+#include "core/ConnectionLogBridge.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
 #include "core/CueValidator.h"
@@ -20,6 +22,9 @@
 #include "protocol/discovery/probes/BehringerWingProbeStrategy.h"
 #include "protocol/discovery/probes/BehringerX32ProbeStrategy.h"
 #include "protocol/discovery/probes/YamahaOscProbeStrategy.h"
+#include <QDir>
+#include <QSettings>
+#include <QStandardPaths>
 
 namespace OpenMix {
 
@@ -51,6 +56,15 @@ Application::Application(QObject* parent) : QObject(parent) {
     m_discoveryService->registerStrategy(std::make_shared<BehringerX32ProbeStrategy>());
     m_discoveryService->registerStrategy(std::make_shared<BehringerWingProbeStrategy>());
     m_discoveryService->registerStrategy(std::make_shared<YamahaOscProbeStrategy>());
+
+    // application logging
+    m_appLogger = new AppLogger(this);
+    m_connectionLogBridge = new ConnectionLogBridge(m_appLogger, this);
+
+    // setup log file
+    QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(logDir);
+    m_appLogger->setLogFile(logDir + "/application.log");
 }
 
 Application::~Application() {
@@ -128,10 +142,22 @@ void Application::connectToMixer(const QString& type, const QString& host, int p
 
     m_playbackEngine->setMixer(m_mixer);
 
+    // setup connection logging
+    m_connectionLogBridge->setConnectionContext(type, host, port);
+    m_connectionLogBridge->attachToMixer(m_mixer);
+    m_appLogger->logConnectionAttempt(type, host, port);
+
     connect(m_mixer, &MixerProtocol::connected, this, [this]() { emit mixerConnected(); });
     connect(m_mixer, &MixerProtocol::disconnected, this, [this]() { emit mixerDisconnected(); });
 
     m_mixer->connect(host, port);
+
+    QSettings settings;
+    settings.beginGroup("LastMixer");
+    settings.setValue("host", host);
+    settings.setValue("type", type);
+    settings.setValue("port", port);
+    settings.endGroup();
 }
 
 void Application::connectToDiscoveredConsole(const DiscoveredConsole& console) {
@@ -148,19 +174,59 @@ void Application::connectToDiscoveredConsole(const DiscoveredConsole& console) {
 
     m_playbackEngine->setMixer(m_mixer);
 
+    // setup connection logging
+    QString host = console.address.toString();
+    QString protocol = console.modelName;
+    m_connectionLogBridge->setConnectionContext(protocol, host, console.port);
+    m_connectionLogBridge->attachToMixer(m_mixer);
+    m_appLogger->logConnectionAttempt(protocol, host, console.port);
+
     connect(m_mixer, &MixerProtocol::connected, this, [this]() { emit mixerConnected(); });
     connect(m_mixer, &MixerProtocol::disconnected, this, [this]() { emit mixerDisconnected(); });
 
-    m_mixer->connect(console.address.toString(), console.port);
+    m_mixer->connect(host, console.port);
+
+    QSettings settings;
+    settings.beginGroup("LastMixer");
+    settings.setValue("host", host);
+    settings.setValue("type", console.toCapabilities().protocolId);
+    settings.setValue("port", console.port);
+    settings.endGroup();
 }
 
 void Application::disconnectFromMixer() {
     if (m_mixer) {
+        m_connectionLogBridge->detachFromMixer();
         m_mixer->disconnect();
         m_playbackEngine->setMixer(nullptr);
         delete m_mixer;
         m_mixer = nullptr;
     }
+}
+
+void Application::startupScan() {
+    QSettings settings;
+    settings.beginGroup("LastMixer");
+    QString savedHost = settings.value("host").toString();
+    settings.endGroup();
+
+    if (!savedHost.isEmpty()) {
+        auto conn = std::make_shared<QMetaObject::Connection>();
+        *conn = connect(m_discoveryService, &ConsoleDiscoveryService::consoleDiscovered,
+                        this, [this, savedHost, conn](const DiscoveredConsole& console) {
+                            if (m_mixer == nullptr && console.address.toString() == savedHost) {
+                                QObject::disconnect(*conn);
+                                connectToDiscoveredConsole(console);
+                            }
+                        });
+
+        connect(m_discoveryService, &ConsoleDiscoveryService::scanFinished,
+                this, [conn]() {
+                    QObject::disconnect(*conn);
+                }, Qt::SingleShotConnection);
+    }
+
+    m_discoveryService->startScan(3000);
 }
 
 } // namespace OpenMix

@@ -53,6 +53,8 @@ class Cue {
     explicit Cue(double number, const QString& name = QString());
 
     QString id() const { return m_id; }
+    void regenerateId();
+
     double number() const { return m_number; }
     void setNumber(double number) { m_number = number; }
 
@@ -94,6 +96,15 @@ class Cue {
     DCAOverride dcaOverride(int dca) const;
     void clearDCAOverride(int dca);
     void clearAllDCAOverrides() { m_dcaOverrides.clear(); }
+
+    // per-cue DCA mapping (overrides show-level mapping during playback)
+    bool hasCustomDCAMapping() const;
+    void setDCAChannelMapping(const QMap<int, QList<int>>& mapping);
+    void setDCABusMapping(const QMap<int, QList<int>>& mapping);
+    QMap<int, QList<int>> dcaChannelMapping() const;
+    QMap<int, QList<int>> dcaBusMapping() const;
+    void clearCustomDCAMapping();
+    void copyDCAMappingFrom(const class DCAMapping* showMapping);
 
     bool isMacro() const { return m_type == CueType::Macro; }
     QStringList childCueIds() const { return m_childCueIds; }
@@ -151,6 +162,10 @@ class Cue {
     // DCA targeting
     QSet<int> m_targetedDCAs;              // empty = all DCAs
     QMap<int, DCAOverride> m_dcaOverrides; // per-DCA mute/label overrides
+
+    // per-cue DCA mapping (overrides show-level mapping during playback)
+    std::optional<QMap<int, QList<int>>> m_dcaChannelMapping; // DCA# -> [channel#, ...]
+    std::optional<QMap<int, QList<int>>> m_dcaBusMapping;     // DCA# -> [bus#, ...]
 
     QStringList m_childCueIds;
     MacroExecutionMode m_macroExecutionMode;

@@ -20,6 +20,8 @@ class OperationModeManager;
 class CrashRecovery;
 class MidiInputManager;
 class ConsoleDiscoveryService;
+class AppLogger;
+class ConnectionLogBridge;
 struct DiscoveredConsole;
 
 class Application : public QObject {
@@ -58,6 +60,9 @@ class Application : public QObject {
     // console discovery
     ConsoleDiscoveryService* discoveryService() { return m_discoveryService; }
 
+    // application logging
+    AppLogger* appLogger() { return m_appLogger; }
+
     // mixer connection
     void connectToMixer(const QString& type, const QString& host, int port);
     void connectToDiscoveredConsole(const DiscoveredConsole& console);
@@ -69,6 +74,9 @@ class Application : public QObject {
 
     // initialization
     void initialize();
+
+    // startup auto-connect
+    void startupScan();
 
   signals:
     void mixerConnected();
@@ -102,6 +110,10 @@ class Application : public QObject {
 
     // console discovery
     ConsoleDiscoveryService* m_discoveryService;
+
+    // application logging
+    AppLogger* m_appLogger;
+    ConnectionLogBridge* m_connectionLogBridge;
 };
 
 } // namespace OpenMix
