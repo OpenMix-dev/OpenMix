@@ -132,17 +132,9 @@ void Application::initialize() {
     m_midiInputManager->loadFromSettings();
 }
 
-void Application::connectToMixer(const QString& type, const QString& host, int port) {
-    disconnectFromMixer();
-
-    m_mixer = ProtocolFactory::create(type, this);
-    if (!m_mixer) {
-        return;
-    }
-
+void Application::setupMixerConnection(const QString& type, const QString& host, int port) {
     m_playbackEngine->setMixer(m_mixer);
 
-    // setup connection logging
     m_connectionLogBridge->setConnectionContext(type, host, port);
     m_connectionLogBridge->attachToMixer(m_mixer);
     m_appLogger->logConnectionAttempt(type, host, port);
@@ -160,38 +152,29 @@ void Application::connectToMixer(const QString& type, const QString& host, int p
     settings.endGroup();
 }
 
-void Application::connectToDiscoveredConsole(const DiscoveredConsole& console) {
-    if (!console.isValid()) {
+void Application::connectToMixer(const QString& type, const QString& host, int port) {
+    disconnectFromMixer();
+
+    m_mixer = ProtocolFactory::create(type, this);
+    if (!m_mixer)
         return;
-    }
+
+    setupMixerConnection(type, host, port);
+}
+
+void Application::connectToDiscoveredConsole(const DiscoveredConsole& console) {
+    if (!console.isValid())
+        return;
 
     disconnectFromMixer();
 
     m_mixer = ProtocolFactory::create(console, this);
-    if (!m_mixer) {
+    if (!m_mixer)
         return;
-    }
 
-    m_playbackEngine->setMixer(m_mixer);
-
-    // setup connection logging
-    QString host = console.address.toString();
-    QString protocol = console.modelName;
-    m_connectionLogBridge->setConnectionContext(protocol, host, console.port);
-    m_connectionLogBridge->attachToMixer(m_mixer);
-    m_appLogger->logConnectionAttempt(protocol, host, console.port);
-
-    connect(m_mixer, &MixerProtocol::connected, this, [this]() { emit mixerConnected(); });
-    connect(m_mixer, &MixerProtocol::disconnected, this, [this]() { emit mixerDisconnected(); });
-
-    m_mixer->connect(host, console.port);
-
-    QSettings settings;
-    settings.beginGroup("LastMixer");
-    settings.setValue("host", host);
-    settings.setValue("type", console.toCapabilities().protocolId);
-    settings.setValue("port", console.port);
-    settings.endGroup();
+    setupMixerConnection(console.toCapabilities().protocolId,
+                         console.address.toString(),
+                         console.port);
 }
 
 void Application::disconnectFromMixer() {

@@ -24,61 +24,21 @@ QString OperationModeManager::modeString(AppMode mode) {
     return tr("Unknown");
 }
 
-bool OperationModeManager::canEditCues() const {
+bool OperationModeManager::requiresProgrammerMode(const QString& operation) {
     if (m_mode != AppMode::Programmer) {
-        emit const_cast<OperationModeManager*>(this)->operationBlocked(tr("Edit cues"));
+        emit operationBlocked(operation);
         return false;
     }
     return true;
 }
 
-bool OperationModeManager::canDeleteCues() const {
-    if (m_mode != AppMode::Programmer) {
-        emit const_cast<OperationModeManager*>(this)->operationBlocked(tr("Delete cues"));
-        return false;
-    }
-    return true;
-}
-
-bool OperationModeManager::canModifyShow() const {
-    if (m_mode != AppMode::Programmer) {
-        emit const_cast<OperationModeManager*>(this)->operationBlocked(tr("Modify show"));
-        return false;
-    }
-    return true;
-}
-
-bool OperationModeManager::canAddCues() const {
-    if (m_mode != AppMode::Programmer) {
-        emit const_cast<OperationModeManager*>(this)->operationBlocked(tr("Add cues"));
-        return false;
-    }
-    return true;
-}
-
-bool OperationModeManager::canRenumberCues() const {
-    if (m_mode != AppMode::Programmer) {
-        emit const_cast<OperationModeManager*>(this)->operationBlocked(tr("Renumber cues"));
-        return false;
-    }
-    return true;
-}
-
-bool OperationModeManager::canOpenShow() const {
-    if (m_mode != AppMode::Programmer) {
-        emit const_cast<OperationModeManager*>(this)->operationBlocked(tr("Open show"));
-        return false;
-    }
-    return true;
-}
-
-bool OperationModeManager::canNewShow() const {
-    if (m_mode != AppMode::Programmer) {
-        emit const_cast<OperationModeManager*>(this)->operationBlocked(tr("New show"));
-        return false;
-    }
-    return true;
-}
+bool OperationModeManager::canEditCues()     { return requiresProgrammerMode(tr("Edit cues")); }
+bool OperationModeManager::canDeleteCues()   { return requiresProgrammerMode(tr("Delete cues")); }
+bool OperationModeManager::canModifyShow()   { return requiresProgrammerMode(tr("Modify show")); }
+bool OperationModeManager::canAddCues()      { return requiresProgrammerMode(tr("Add cues")); }
+bool OperationModeManager::canRenumberCues() { return requiresProgrammerMode(tr("Renumber cues")); }
+bool OperationModeManager::canOpenShow()     { return requiresProgrammerMode(tr("Open show")); }
+bool OperationModeManager::canNewShow()      { return requiresProgrammerMode(tr("New show")); }
 
 bool OperationModeManager::canSaveShow() const { return true; }
 

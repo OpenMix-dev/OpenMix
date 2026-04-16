@@ -83,6 +83,8 @@ class Application : public QObject {
     void mixerDisconnected();
 
   private:
+    void setupMixerConnection(const QString& type, const QString& host, int port);
+
     static Application* s_instance;
 
     Show* m_show;

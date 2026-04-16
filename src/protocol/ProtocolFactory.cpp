@@ -117,8 +117,4 @@ MixerCapabilities ProtocolFactory::capabilities(const QString& type) {
     return MixerCapabilities::forProtocolId(type);
 }
 
-MixerProtocol* createMixerProtocol(const QString& type, QObject* parent) {
-    return ProtocolFactory::create(type, parent);
-}
-
 } // namespace OpenMix

@@ -23,13 +23,13 @@ class OperationModeManager : public QObject {
     QString modeString() const;
     static QString modeString(AppMode mode);
 
-    bool canEditCues() const;          // programmer only
-    bool canDeleteCues() const;        // programmer only
-    bool canModifyShow() const;        // programmer only
-    bool canAddCues() const;           // programmer only
-    bool canRenumberCues() const;      // programmer only
-    bool canOpenShow() const;          // programmer only
-    bool canNewShow() const;           // programmer only
+    bool canEditCues();          // programmer only
+    bool canDeleteCues();        // programmer only
+    bool canModifyShow();        // programmer only
+    bool canAddCues();           // programmer only
+    bool canRenumberCues();      // programmer only
+    bool canOpenShow();          // programmer only
+    bool canNewShow();           // programmer only
     bool canSaveShow() const;          // always (emergency save)
     bool canGo() const;                // always
     bool canStop() const;              // always
@@ -58,6 +58,7 @@ class OperationModeManager : public QObject {
     void passwordRequired();
 
   private:
+    bool requiresProgrammerMode(const QString& operation);
     QString hashPassword(const QString& password) const;
 
     AppMode m_mode = AppMode::Programmer;

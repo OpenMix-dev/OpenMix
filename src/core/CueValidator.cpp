@@ -7,7 +7,7 @@ namespace OpenMix {
 
 CueValidator::CueValidator(QObject* parent) : QObject(parent) {}
 
-ValidationResult CueValidator::validate(const Cue& cue, const CueList* cueList) const {
+ValidationResult CueValidator::validate(const Cue& cue, const CueList* cueList) {
     ValidationResult result;
     result.valid = true;
 
@@ -21,8 +21,7 @@ ValidationResult CueValidator::validate(const Cue& cue, const CueList* cueList) 
         }
 
         if (cue.macroExecutionMode() == MacroExecutionMode::Parallel) {
-            if (!detectConflictingFadeTargets(cue, cueList, result.issues)) {
-            }
+            detectConflictingFadeTargets(cue, cueList, result.issues);
         }
     }
 
@@ -30,11 +29,11 @@ ValidationResult CueValidator::validate(const Cue& cue, const CueList* cueList) 
         result.valid = false;
     }
 
-    emit const_cast<CueValidator*>(this)->validationCompleted(result);
+    emit validationCompleted(result);
     return result;
 }
 
-ValidationResult CueValidator::validateAll(const CueList* cueList) const {
+ValidationResult CueValidator::validateAll(const CueList* cueList) {
     ValidationResult result;
     result.valid = true;
 
@@ -61,7 +60,7 @@ ValidationResult CueValidator::validateAll(const CueList* cueList) const {
         }
     }
 
-    emit const_cast<CueValidator*>(this)->validationCompleted(result);
+    emit validationCompleted(result);
     return result;
 }
 
