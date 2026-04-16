@@ -4,6 +4,7 @@
 
 #include <QObject>
 #include <QTimer>
+#include <memory>
 
 class RtMidiIn;
 
@@ -80,7 +81,7 @@ class MidiInputManager : public QObject {
 
     static void midiCallback(double timeStamp, std::vector<unsigned char>* message, void* userData);
 
-    RtMidiIn* m_midiIn = nullptr;
+    std::unique_ptr<RtMidiIn> m_midiIn;
     bool m_deviceOpen = false;
     QString m_currentDeviceName;
     QString m_savedDeviceName;

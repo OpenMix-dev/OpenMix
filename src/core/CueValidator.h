@@ -2,6 +2,7 @@
 
 #include <QList>
 #include <QObject>
+#include <algorithm>
 #include <QSet>
 #include <QString>
 
@@ -25,37 +26,23 @@ struct ValidationResult {
     QList<ValidationIssue> issues;
 
     bool hasErrors() const {
-        for (const auto& issue : issues) {
-            if (issue.isError())
-                return true;
-        }
-        return false;
+        return std::any_of(issues.begin(), issues.end(),
+                           [](const ValidationIssue& i) { return i.isError(); });
     }
 
     bool hasWarnings() const {
-        for (const auto& issue : issues) {
-            if (issue.isWarning())
-                return true;
-        }
-        return false;
+        return std::any_of(issues.begin(), issues.end(),
+                           [](const ValidationIssue& i) { return i.isWarning(); });
     }
 
     int errorCount() const {
-        int count = 0;
-        for (const auto& issue : issues) {
-            if (issue.isError())
-                count++;
-        }
-        return count;
+        return static_cast<int>(std::count_if(issues.begin(), issues.end(),
+                                              [](const ValidationIssue& i) { return i.isError(); }));
     }
 
     int warningCount() const {
-        int count = 0;
-        for (const auto& issue : issues) {
-            if (issue.isWarning())
-                count++;
-        }
-        return count;
+        return static_cast<int>(std::count_if(issues.begin(), issues.end(),
+                                              [](const ValidationIssue& i) { return i.isWarning(); }));
     }
 };
 
@@ -65,9 +52,13 @@ class CueValidator : public QObject {
   public:
     explicit CueValidator(QObject* parent = nullptr);
 
-    ValidationResult validate(const Cue& cue, const CueList* cueList) const;
-    ValidationResult validateAll(const CueList* cueList) const;
+    ValidationResult validate(const Cue& cue, const CueList* cueList);
+    ValidationResult validateAll(const CueList* cueList);
 
+  signals:
+    void validationCompleted(const ValidationResult& result);
+
+  private:
     bool validateMacroIds(const Cue& cue, const CueList* cueList,
                           QList<ValidationIssue>& issues) const;
     bool validateParameters(const Cue& cue, QList<ValidationIssue>& issues) const;
@@ -75,11 +66,6 @@ class CueValidator : public QObject {
                                        QList<ValidationIssue>& issues) const;
     bool detectConflictingFadeTargets(const Cue& cue, const CueList* cueList,
                                       QList<ValidationIssue>& issues) const;
-
-  signals:
-    void validationCompleted(const ValidationResult& result);
-
-  private:
     bool hasCircularReference(const QString& cueId, const CueList* cueList, QSet<QString>& visited,
                               QSet<QString>& recursionStack) const;
     QSet<QString> collectMacroParameters(const Cue& cue, const CueList* cueList) const;

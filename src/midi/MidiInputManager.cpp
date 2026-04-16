@@ -11,7 +11,7 @@ namespace OpenMix {
 
 MidiInputManager::MidiInputManager(QObject* parent) : QObject(parent) {
     try {
-        m_midiIn = new RtMidiIn();
+        m_midiIn = std::make_unique<RtMidiIn>();
     } catch (RtMidiError& error) {
         qWarning() << "RtMidi initialization error:" << QString::fromStdString(error.getMessage());
     }
@@ -24,7 +24,6 @@ MidiInputManager::MidiInputManager(QObject* parent) : QObject(parent) {
 
 MidiInputManager::~MidiInputManager() {
     closeDevice();
-    delete m_midiIn;
 }
 
 QVector<MidiDeviceInfo> MidiInputManager::availableDevices() const {

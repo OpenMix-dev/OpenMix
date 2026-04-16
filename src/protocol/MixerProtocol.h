@@ -56,6 +56,4 @@ class MixerProtocol : public QObject {
     void sceneChanged(int sceneNumber);
 };
 
-MixerProtocol* createMixerProtocol(const QString& type, QObject* parent = nullptr);
-
 } // namespace OpenMix
