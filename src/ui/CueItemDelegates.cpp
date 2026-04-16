@@ -18,13 +18,13 @@ CueNumberDelegate::CueNumberDelegate(CueList* cueList, QObject* parent)
 
 void CueNumberDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                               const QModelIndex& index) const {
+    QStyleOptionViewItem opt = option;
+    opt.state &= ~QStyle::State_HasFocus;
+
     QVariant bgData = index.data(Qt::BackgroundRole);
     if (bgData.isValid()) {
-        painter->fillRect(option.rect, bgData.value<QBrush>());
-    }
-
-    QStyleOptionViewItem opt = option;
-    if (bgData.isValid()) {
+        opt.state &= ~QStyle::State_Selected;
+        painter->fillRect(opt.rect, bgData.value<QBrush>());
         opt.backgroundBrush = bgData.value<QBrush>();
     }
 
@@ -119,13 +119,13 @@ CueTypeDelegate::CueTypeDelegate(QObject* parent) : QStyledItemDelegate(parent) 
 
 void CueTypeDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                             const QModelIndex& index) const {
+    QStyleOptionViewItem opt = option;
+    opt.state &= ~QStyle::State_HasFocus;
+
     QVariant bgData = index.data(Qt::BackgroundRole);
     if (bgData.isValid()) {
-        painter->fillRect(option.rect, bgData.value<QBrush>());
-    }
-
-    QStyleOptionViewItem opt = option;
-    if (bgData.isValid()) {
+        opt.state &= ~QStyle::State_Selected;
+        painter->fillRect(opt.rect, bgData.value<QBrush>());
         opt.backgroundBrush = bgData.value<QBrush>();
     }
 
@@ -212,13 +212,13 @@ CueTextDelegate::CueTextDelegate(QObject* parent) : QStyledItemDelegate(parent) 
 
 void CueTextDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                             const QModelIndex& index) const {
+    QStyleOptionViewItem opt = option;
+    opt.state &= ~QStyle::State_HasFocus;
+
     QVariant bgData = index.data(Qt::BackgroundRole);
     if (bgData.isValid()) {
-        painter->fillRect(option.rect, bgData.value<QBrush>());
-    }
-
-    QStyleOptionViewItem opt = option;
-    if (bgData.isValid()) {
+        opt.state &= ~QStyle::State_Selected;
+        painter->fillRect(opt.rect, bgData.value<QBrush>());
         opt.backgroundBrush = bgData.value<QBrush>();
     }
 
