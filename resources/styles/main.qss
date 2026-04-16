@@ -739,7 +739,7 @@ QListView {
     border: 1px solid #2e323b;
     border-radius: 6px;
     alternate-background-color: #1a1c20;
-    selection-background-color: rgba(59, 130, 246, 0.15);
+    selection-background-color: rgba(59, 130, 246, 160);
     selection-color: #f0f1f3;
     gridline-color: #262931;
     outline: none;
@@ -761,13 +761,15 @@ QListView::item:hover {
 QTableView::item:selected,
 QTreeView::item:selected,
 QListView::item:selected {
-    background-color: rgba(59, 130, 246, 0.4);
+    background-color: rgba(59, 130, 246, 160);
+    color: #f0f1f3;
 }
 
 QTableView::item:selected:hover,
 QTreeView::item:selected:hover,
 QListView::item:selected:hover {
-    background-color: rgba(59, 130, 246, 0.45);
+    background-color: rgba(59, 130, 246, 180);
+    color: #f0f1f3;
 }
 
 QHeaderView {
@@ -1188,5 +1190,6 @@ QListView#LogListView::item:hover {
 }
 
 QListView#LogListView::item:selected {
-    background-color: rgba(59, 130, 246, 0.4);
+    background-color: rgba(59, 130, 246, 160);
+    color: #f0f1f3;
 }
