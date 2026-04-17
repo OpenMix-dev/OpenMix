@@ -50,7 +50,7 @@ class YamahaProtocol : public MixerProtocol {
     virtual void initializeSnapshotParams();
     void rebuildSnapshotParams();
 
-    // Appends per-channel fader/on, EQ, and effect-send snapshot parameters for
+    // appends per-channel fader/on, EQ, and effect-send snapshot parameters for
     // `channelCount` channels.  `channelPrefix` is the path stem (e.g. "/ch/"),
     // `channelFieldWidth` controls zero-padding (2 for CL/QL/TF, 3 for DM7), and
     // `maxEffectSends` is the model-specific send-bus ceiling applied on top of
@@ -80,10 +80,6 @@ class YamahaProtocol : public MixerProtocol {
     void sendOscMessage(const QString& path, const QString& value);
     void parseOscMessage(const QByteArray& data);
     QVariant parseOscArgument(const QByteArray& data, int& offset, char type);
-    QByteArray buildOscMessage(const QString& path);
-    QByteArray buildOscMessage(const QString& path, float value);
-    QByteArray buildOscMessage(const QString& path, int value);
-    QByteArray buildOscMessage(const QString& path, const QString& value);
 
     void processResponse(const QString& path, const QVariant& value);
     void handleModelResponse(const QVariant& value);

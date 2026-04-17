@@ -95,7 +95,6 @@ class MainWindow : public QMainWindow {
     void saveSettings();
     bool maybeSave();
     void updateRecentProjectsMenu();
-    void updateBubbleBarPosition();
 
     Application* m_app;
 

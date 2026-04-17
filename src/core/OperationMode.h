@@ -23,13 +23,13 @@ class OperationModeManager : public QObject {
     [[nodiscard]] QString modeString() const;
     [[nodiscard]] static QString modeString(AppMode mode);
 
-    [[nodiscard]] bool canEditCues();          // programmer only
-    [[nodiscard]] bool canDeleteCues();        // programmer only
-    [[nodiscard]] bool canModifyShow();        // programmer only
-    [[nodiscard]] bool canAddCues();           // programmer only
-    [[nodiscard]] bool canRenumberCues();      // programmer only
-    [[nodiscard]] bool canOpenShow();          // programmer only
-    [[nodiscard]] bool canNewShow();           // programmer only
+    [[nodiscard]] bool canEditCues();                // programmer only
+    [[nodiscard]] bool canDeleteCues();              // programmer only
+    [[nodiscard]] bool canModifyShow();              // programmer only
+    [[nodiscard]] bool canAddCues();                 // programmer only
+    [[nodiscard]] bool canRenumberCues();            // programmer only
+    [[nodiscard]] bool canOpenShow();                // programmer only
+    [[nodiscard]] bool canNewShow();                 // programmer only
     [[nodiscard]] bool canSaveShow() const;          // always (emergency save)
     [[nodiscard]] bool canGo() const;                // always
     [[nodiscard]] bool canStop() const;              // always
