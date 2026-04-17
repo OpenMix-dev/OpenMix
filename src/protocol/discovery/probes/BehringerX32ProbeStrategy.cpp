@@ -2,12 +2,10 @@
 
 namespace OpenMix {
 
-DiscoveredConsole BehringerX32ProbeStrategy::parseResponse(const QString& path,
+DiscoveredConsole BehringerX32ProbeStrategy::parseResponse([[maybe_unused]] const QString& path,
                                                            const QVariant& value,
                                                            const QHostAddress& sender,
-                                                           int senderPort) {
-    Q_UNUSED(path);
-    Q_UNUSED(senderPort);
+                                                           [[maybe_unused]] int senderPort) {
 
     DiscoveredConsole console;
     console.address = sender;

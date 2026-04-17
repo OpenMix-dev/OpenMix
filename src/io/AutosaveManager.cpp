@@ -35,14 +35,14 @@ void AutosaveManager::setEnabled(bool enabled) {
 }
 
 void AutosaveManager::setIntervalMinutes(int minutes) {
-    m_intervalMinutes = qMax(1, minutes);
+    m_intervalMinutes = std::max(1, minutes);
     if (m_enabled) {
         m_timer.start(m_intervalMinutes * 60 * 1000);
     }
 }
 
 void AutosaveManager::setMaxBackups(int count) {
-    m_maxBackups = qMax(1, count);
+    m_maxBackups = std::max(1, count);
     cleanupOldBackups();
 }
 
@@ -56,54 +56,39 @@ QString AutosaveManager::backupDir() {
     return dir + "/backups";
 }
 
-QString AutosaveManager::autosavePath() const {
+QString AutosaveManager::showBaseName() const {
     if (!m_app || !m_app->show())
         return QString();
 
     Show* show = m_app->show();
-    QString filename;
-
     if (!show->filePath().isEmpty()) {
         QFileInfo fi(show->filePath());
-        filename = fi.completeBaseName();
-    } else {
-        filename = "untitled";
+        return fi.completeBaseName();
     }
+    return QStringLiteral("untitled");
+}
+
+QString AutosaveManager::autosavePath() const {
+    QString filename = showBaseName();
+    if (filename.isEmpty())
+        return QString();
 
     return autosaveDir() + "/" + filename + "_autosave.omproj";
 }
 
 QString AutosaveManager::generateBackupFilename() const {
-    if (!m_app || !m_app->show())
+    QString baseName = showBaseName();
+    if (baseName.isEmpty())
         return QString();
-
-    Show* show = m_app->show();
-    QString baseName;
-
-    if (!show->filePath().isEmpty()) {
-        QFileInfo fi(show->filePath());
-        baseName = fi.completeBaseName();
-    } else {
-        baseName = "untitled";
-    }
 
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
     return QString("%1_%2.omproj.bak").arg(baseName, timestamp);
 }
 
 QString AutosaveManager::generateAutosaveFilename() const {
-    if (!m_app || !m_app->show())
+    QString baseName = showBaseName();
+    if (baseName.isEmpty())
         return QString();
-
-    Show* show = m_app->show();
-    QString baseName;
-
-    if (!show->filePath().isEmpty()) {
-        QFileInfo fi(show->filePath());
-        baseName = fi.completeBaseName();
-    } else {
-        baseName = "untitled";
-    }
 
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
     return QString("%1_autosave_%2.omproj").arg(baseName, timestamp);
@@ -244,34 +229,27 @@ QString AutosaveManager::recoverableAutosavePath() const {
     return path;
 }
 
-void AutosaveManager::cleanupOldBackups() {
-    QDir dir(backupDir());
+void AutosaveManager::cleanupOldFiles(const QString& dirPath, const QString& nameFilter,
+                                       int maxCount) {
+    QDir dir(dirPath);
     if (!dir.exists())
         return;
 
-    // get all backup files sorted by modification time (newest first)
-    QFileInfoList files =
-        dir.entryInfoList(QStringList() << "*.omproj.bak", QDir::Files, QDir::Time);
+    // get all matching files sorted by modification time (newest first)
+    QFileInfoList files = dir.entryInfoList(QStringList() << nameFilter, QDir::Files, QDir::Time);
 
     // remove files beyond max count
-    for (int i = m_maxBackups; i < files.size(); ++i) {
+    for (int i = maxCount; i < files.size(); ++i) {
         QFile::remove(files[i].absoluteFilePath());
     }
 }
 
+void AutosaveManager::cleanupOldBackups() {
+    cleanupOldFiles(backupDir(), "*.omproj.bak", m_maxBackups);
+}
+
 void AutosaveManager::cleanupOldAutosaves() {
-    QDir dir(autosaveDir());
-    if (!dir.exists())
-        return;
-
-    // get all autosave files sorted by modification time (newest first)
-    QFileInfoList files =
-        dir.entryInfoList(QStringList() << "*_autosave*.omproj", QDir::Files, QDir::Time);
-
-    // remove files beyond max count
-    for (int i = m_maxAutosaves; i < files.size(); ++i) {
-        QFile::remove(files[i].absoluteFilePath());
-    }
+    cleanupOldFiles(autosaveDir(), "*_autosave*.omproj", m_maxAutosaves);
 }
 
 } // namespace OpenMix

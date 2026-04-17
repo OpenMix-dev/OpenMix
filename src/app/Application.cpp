@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "ui/MainWindow.h"
 #include "core/AppLogger.h"
 #include "core/ConnectionLogBridge.h"
 #include "core/Cue.h"
@@ -211,5 +212,9 @@ void Application::startupScan() {
 
     m_discoveryService->startScan(3000);
 }
+
+void Application::setMainWindow(MainWindow* window) { m_mainWindow = window; }
+
+MainWindow* Application::mainWindow() { return m_mainWindow; }
 
 } // namespace OpenMix

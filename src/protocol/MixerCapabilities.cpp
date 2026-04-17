@@ -67,6 +67,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.supportsEffectSends = true;
         break;
 
+    // Allen & Heath
     case ConsoleType::SQ5:
         caps.manufacturer = Manufacturer::AllenHeath;
         caps.protocol = ProtocolType::MidiTcp;
@@ -207,6 +208,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.supportsEffectSends = true;
         break;
 
+    // Yamaha
     case ConsoleType::TF1:
         caps.manufacturer = Manufacturer::Yamaha;
         caps.protocol = ProtocolType::OscUdp;
@@ -380,6 +382,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.supportsEffectSends = true;
         break;
 
+    // Loopback
     case ConsoleType::Loopback:
         caps.manufacturer = Manufacturer::Unknown;
         caps.protocol = ProtocolType::Internal;
@@ -420,6 +423,7 @@ MixerCapabilities MixerCapabilities::forProtocolId(const QString& protocolId) {
     if (id == "wing")
         return forConsole(ConsoleType::Wing);
 
+    // Allen & Heath SQ
     if (id == "sq5" || id == "sq-5")
         return forConsole(ConsoleType::SQ5);
     if (id == "sq6" || id == "sq-6")
@@ -427,16 +431,19 @@ MixerCapabilities MixerCapabilities::forProtocolId(const QString& protocolId) {
     if (id == "sq7" || id == "sq-7" || id == "sq")
         return forConsole(ConsoleType::SQ7);
 
+    // Allen & Heath GLD
     if (id == "gld80" || id == "gld-80")
         return forConsole(ConsoleType::GLD80);
     if (id == "gld112" || id == "gld-112" || id == "gld")
         return forConsole(ConsoleType::GLD112);
 
+    // Allen & Heath Avantis/dLive
     if (id == "avantis")
         return forConsole(ConsoleType::Avantis);
     if (id == "dlive" || id == "d-live")
         return forConsole(ConsoleType::DLive);
 
+    // Yamaha TF
     if (id == "tf1")
         return forConsole(ConsoleType::TF1);
     if (id == "tf3")
@@ -444,11 +451,13 @@ MixerCapabilities MixerCapabilities::forProtocolId(const QString& protocolId) {
     if (id == "tf5" || id == "tf")
         return forConsole(ConsoleType::TF5);
 
+    // Yamaha QL
     if (id == "ql1")
         return forConsole(ConsoleType::QL1);
     if (id == "ql5" || id == "ql")
         return forConsole(ConsoleType::QL5);
 
+    // Yamaha CL
     if (id == "cl1")
         return forConsole(ConsoleType::CL1);
     if (id == "cl3")
@@ -456,9 +465,11 @@ MixerCapabilities MixerCapabilities::forProtocolId(const QString& protocolId) {
     if (id == "cl5" || id == "cl")
         return forConsole(ConsoleType::CL5);
 
+    // Yamaha DM7
     if (id == "dm7")
         return forConsole(ConsoleType::DM7);
 
+    // Loopback
     if (id == "loopback" || id == "test")
         return forConsole(ConsoleType::Loopback);
 
@@ -472,6 +483,7 @@ QVector<MixerCapabilities> MixerCapabilities::allSupported() {
     all.append(forConsole(ConsoleType::M32));
     all.append(forConsole(ConsoleType::Wing));
 
+    // Allen & Heath
     all.append(forConsole(ConsoleType::SQ5));
     all.append(forConsole(ConsoleType::SQ6));
     all.append(forConsole(ConsoleType::SQ7));
@@ -481,6 +493,7 @@ QVector<MixerCapabilities> MixerCapabilities::allSupported() {
     all.append(forConsole(ConsoleType::Avantis));
     all.append(forConsole(ConsoleType::DLive));
 
+    // Yamaha
     all.append(forConsole(ConsoleType::TF1));
     all.append(forConsole(ConsoleType::TF3));
     all.append(forConsole(ConsoleType::TF5));

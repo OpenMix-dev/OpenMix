@@ -4,6 +4,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QStyle>
+#include <algorithm>
 
 namespace OpenMix {
 
@@ -77,7 +78,7 @@ void BubbleButton::paintEvent(QPaintEvent* event) {
 
         QFontMetrics fm(badgeFont);
         int textWidth = fm.horizontalAdvance(m_badgeText);
-        int badgeWidth = qMax(14, textWidth + 6);
+        int badgeWidth = std::max(14, textWidth + 6);
         int badgeHeight = 14;
 
         int x = width() - badgeWidth - 2;

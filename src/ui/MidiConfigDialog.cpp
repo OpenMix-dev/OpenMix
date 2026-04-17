@@ -63,13 +63,13 @@ void MidiConfigDialog::setupUi() {
     QHBoxLayout* optionsLayout = new QHBoxLayout();
     m_enabledCheck = new QCheckBox(tr("Enable MIDI input"), this);
     m_enabledCheck->setChecked(m_pendingEnabled);
-    connect(m_enabledCheck, &QCheckBox::stateChanged, this, &MidiConfigDialog::onEnabledChanged);
+    connect(m_enabledCheck, &QCheckBox::checkStateChanged, this, &MidiConfigDialog::onEnabledChanged);
     optionsLayout->addWidget(m_enabledCheck);
 
     m_autoReconnectCheck = new QCheckBox(tr("Auto-reconnect"), this);
     m_autoReconnectCheck->setChecked(m_pendingAutoReconnect);
     m_autoReconnectCheck->setToolTip(tr("Automatically reconnect when device is plugged in"));
-    connect(m_autoReconnectCheck, &QCheckBox::stateChanged, this,
+    connect(m_autoReconnectCheck, &QCheckBox::checkStateChanged, this,
             &MidiConfigDialog::onAutoReconnectChanged);
     optionsLayout->addWidget(m_autoReconnectCheck);
     optionsLayout->addStretch();
@@ -212,9 +212,9 @@ void MidiConfigDialog::onDeviceChanged(int index) {
 
 void MidiConfigDialog::onRefreshDevicesClicked() { populateDeviceList(); }
 
-void MidiConfigDialog::onEnabledChanged(int state) { m_pendingEnabled = (state == Qt::Checked); }
+void MidiConfigDialog::onEnabledChanged(Qt::CheckState state) { m_pendingEnabled = (state == Qt::Checked); }
 
-void MidiConfigDialog::onAutoReconnectChanged(int state) {
+void MidiConfigDialog::onAutoReconnectChanged(Qt::CheckState state) {
     m_pendingAutoReconnect = (state == Qt::Checked);
 }
 

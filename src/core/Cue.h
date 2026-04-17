@@ -22,10 +22,10 @@ struct DCAOverride {
     std::optional<bool> mute;     // mute state override (nullopt = don't change)
     std::optional<QString> label; // label override (nullopt = don't change)
 
-    bool hasOverrides() const { return mute.has_value() || label.has_value(); }
+    [[nodiscard]] bool hasOverrides() const noexcept { return mute.has_value() || label.has_value(); }
 
     QJsonObject toJson() const;
-    static DCAOverride fromJson(const QJsonObject& json);
+    [[nodiscard]] static DCAOverride fromJson(const QJsonObject& json);
 };
 
 enum class MacroExecutionMode {
@@ -52,83 +52,87 @@ class Cue {
     Cue();
     explicit Cue(double number, const QString& name = QString());
 
-    QString id() const { return m_id; }
+    [[nodiscard]] QString id() const { return m_id; }
     void regenerateId();
 
-    double number() const { return m_number; }
+    [[nodiscard]] double number() const noexcept { return m_number; }
     void setNumber(double number) { m_number = number; }
 
-    QString name() const { return m_name; }
+    [[nodiscard]] QString name() const { return m_name; }
     void setName(const QString& name) { m_name = name; }
 
-    QString notes() const { return m_notes; }
+    [[nodiscard]] QString notes() const { return m_notes; }
     void setNotes(const QString& notes) { m_notes = notes; }
 
-    CueType type() const { return m_type; }
+    [[nodiscard]] CueType type() const noexcept { return m_type; }
     void setType(CueType type) { m_type = type; }
 
-    bool autoFollow() const { return m_autoFollow; }
+    [[nodiscard]] bool autoFollow() const noexcept { return m_autoFollow; }
     void setAutoFollow(bool autoFollow) { m_autoFollow = autoFollow; }
 
-    double autoFollowDelay() const { return m_autoFollowDelay; }
+    [[nodiscard]] double autoFollowDelay() const noexcept { return m_autoFollowDelay; }
     void setAutoFollowDelay(double seconds) { m_autoFollowDelay = seconds; }
 
-    AutoFollowCondition autoFollowCondition() const { return m_autoFollowCondition; }
+    [[nodiscard]] AutoFollowCondition autoFollowCondition() const noexcept {
+        return m_autoFollowCondition;
+    }
     void setAutoFollowCondition(AutoFollowCondition condition) {
         m_autoFollowCondition = condition;
     }
 
     // DCA targeting
-    QSet<int> targetedDCAs() const { return m_targetedDCAs; }
+    [[nodiscard]] QSet<int> targetedDCAs() const { return m_targetedDCAs; }
     void setTargetedDCAs(const QSet<int>& dcas) { m_targetedDCAs = dcas; }
     void addTargetedDCA(int dca) { m_targetedDCAs.insert(dca); }
     void removeTargetedDCA(int dca) { m_targetedDCAs.remove(dca); }
     void clearTargetedDCAs() { m_targetedDCAs.clear(); }
-    bool targetsAllDCAs() const { return m_targetedDCAs.isEmpty(); }
-    bool targetsDCA(int dca) const {
+    [[nodiscard]] bool targetsAllDCAs() const noexcept { return m_targetedDCAs.isEmpty(); }
+    [[nodiscard]] bool targetsDCA(int dca) const {
         return m_targetedDCAs.isEmpty() || m_targetedDCAs.contains(dca);
     }
 
     // per-DCA overrides
-    QMap<int, DCAOverride> dcaOverrides() const { return m_dcaOverrides; }
+    [[nodiscard]] QMap<int, DCAOverride> dcaOverrides() const { return m_dcaOverrides; }
     void setDCAOverrides(const QMap<int, DCAOverride>& overrides) { m_dcaOverrides = overrides; }
     void setDCAOverride(int dca, const DCAOverride& override);
-    DCAOverride dcaOverride(int dca) const;
+    [[nodiscard]] DCAOverride dcaOverride(int dca) const;
     void clearDCAOverride(int dca);
     void clearAllDCAOverrides() { m_dcaOverrides.clear(); }
 
     // per-cue DCA mapping (overrides show-level mapping during playback)
-    bool hasCustomDCAMapping() const;
+    [[nodiscard]] bool hasCustomDCAMapping() const;
     void setDCAChannelMapping(const QMap<int, QList<int>>& mapping);
     void setDCABusMapping(const QMap<int, QList<int>>& mapping);
-    QMap<int, QList<int>> dcaChannelMapping() const;
-    QMap<int, QList<int>> dcaBusMapping() const;
+    [[nodiscard]] QMap<int, QList<int>> dcaChannelMapping() const;
+    [[nodiscard]] QMap<int, QList<int>> dcaBusMapping() const;
     void clearCustomDCAMapping();
     void copyDCAMappingFrom(const class DCAMapping* showMapping);
 
-    bool isMacro() const { return m_type == CueType::Macro; }
-    QStringList childCueIds() const { return m_childCueIds; }
+    [[nodiscard]] bool isMacro() const noexcept { return m_type == CueType::Macro; }
+    [[nodiscard]] QStringList childCueIds() const { return m_childCueIds; }
     void setChildCueIds(const QStringList& ids) { m_childCueIds = ids; }
     void addChildCueId(const QString& id) { m_childCueIds.append(id); }
     void removeChildCueId(const QString& id) { m_childCueIds.removeAll(id); }
     void clearChildCueIds() { m_childCueIds.clear(); }
 
-    MacroExecutionMode macroExecutionMode() const { return m_macroExecutionMode; }
+    [[nodiscard]] MacroExecutionMode macroExecutionMode() const noexcept {
+        return m_macroExecutionMode;
+    }
     void setMacroExecutionMode(MacroExecutionMode mode) { m_macroExecutionMode = mode; }
 
-    QString gotoTarget() const { return m_gotoTarget; }
+    [[nodiscard]] QString gotoTarget() const { return m_gotoTarget; }
     void setGotoTarget(const QString& target) { m_gotoTarget = target; }
 
-    bool gotoAutoExecute() const { return m_gotoAutoExecute; }
+    [[nodiscard]] bool gotoAutoExecute() const noexcept { return m_gotoAutoExecute; }
     void setGotoAutoExecute(bool autoExec) { m_gotoAutoExecute = autoExec; }
 
-    StopBehavior stopBehavior() const { return m_stopBehavior; }
+    [[nodiscard]] StopBehavior stopBehavior() const noexcept { return m_stopBehavior; }
     void setStopBehavior(StopBehavior behavior) { m_stopBehavior = behavior; }
 
-    QString group() const { return m_group; }
+    [[nodiscard]] QString group() const { return m_group; }
     void setGroup(const QString& group) { m_group = group; }
 
-    QStringList tags() const { return m_tags; }
+    [[nodiscard]] QStringList tags() const { return m_tags; }
     void setTags(const QStringList& tags) { m_tags = tags; }
     void addTag(const QString& tag) {
         if (!m_tags.contains(tag))
@@ -136,17 +140,17 @@ class Cue {
     }
     void removeTag(const QString& tag) { m_tags.removeAll(tag); }
 
-    QJsonObject parameters() const { return m_parameters; }
+    [[nodiscard]] QJsonObject parameters() const { return m_parameters; }
     void setParameters(const QJsonObject& params) { m_parameters = params; }
     void setParameter(const QString& path, const QVariant& value);
-    QVariant parameter(const QString& path) const;
+    [[nodiscard]] QVariant parameter(const QString& path) const;
     void clearParameters() { m_parameters = QJsonObject(); }
 
     QJsonObject toJson() const;
-    static Cue fromJson(const QJsonObject& json);
+    [[nodiscard]] static Cue fromJson(const QJsonObject& json);
 
-    bool operator<(const Cue& other) const { return m_number < other.m_number; }
-    bool operator==(const Cue& other) const { return m_id == other.m_id; }
+    bool operator<(const Cue& other) const noexcept { return m_number < other.m_number; }
+    bool operator==(const Cue& other) const noexcept { return m_id == other.m_id; }
 
   private:
     QString m_id;

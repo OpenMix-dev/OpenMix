@@ -68,8 +68,8 @@ void PlaybackGuard::sendSafeValues() {
     if (!m_mixer)
         return;
 
-    for (auto it = m_defaultSafeValues.begin(); it != m_defaultSafeValues.end(); ++it) {
-        m_mixer->sendParameter(it.key(), it.value().toVariant());
+    for (const auto& [path, value] : m_defaultSafeValues.asKeyValueRange()) {
+        m_mixer->sendParameter(path.toString(), value.toVariant());
     }
 }
 

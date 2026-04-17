@@ -10,12 +10,16 @@ QString LogEntry::levelString() const {
     switch (level) {
     case LogLevel::Debug:
         return "Debug";
+
     case LogLevel::Info:
         return "Info";
+
     case LogLevel::Warning:
         return "Warning";
+
     case LogLevel::Error:
         return "Error";
+
     case LogLevel::Critical:
         return "Critical";
     }
@@ -26,16 +30,22 @@ QString LogEntry::sourceString() const {
     switch (source) {
     case LogSource::Connection:
         return "Connection";
+
     case LogSource::Protocol:
         return "Protocol";
+
     case LogSource::Playback:
         return "Playback";
+
     case LogSource::UI:
         return "UI";
+
     case LogSource::System:
         return "System";
+
     case LogSource::MIDI:
         return "MIDI";
+
     case LogSource::Discovery:
         return "Discovery";
     }
@@ -161,13 +171,18 @@ void AppLogger::critical(LogSource source, const QString& message, const QJsonOb
     log(LogLevel::Critical, source, message, metadata);
 }
 
+void AppLogger::logConnectionEvent(LogLevel level, const QString& event,
+                                   const QJsonObject& metadata) {
+    log(level, LogSource::Connection, event, metadata);
+}
+
 void AppLogger::logConnectionAttempt(const QString& protocol, const QString& host, int port) {
     QJsonObject meta;
     meta["protocol"] = protocol;
     meta["host"] = host;
     meta["port"] = port;
-    info(LogSource::Connection,
-         QString("Connecting to %1:%2 (%3)").arg(host).arg(port).arg(protocol), meta);
+    logConnectionEvent(LogLevel::Info,
+                       QString("Connecting to %1:%2 (%3)").arg(host).arg(port).arg(protocol), meta);
 }
 
 void AppLogger::logConnectionSuccess(const QString& protocol, const QString& host, int port) {
@@ -175,8 +190,8 @@ void AppLogger::logConnectionSuccess(const QString& protocol, const QString& hos
     meta["protocol"] = protocol;
     meta["host"] = host;
     meta["port"] = port;
-    info(LogSource::Connection,
-         QString("Connected to %1:%2 (%3)").arg(host).arg(port).arg(protocol), meta);
+    logConnectionEvent(LogLevel::Info,
+                       QString("Connected to %1:%2 (%3)").arg(host).arg(port).arg(protocol), meta);
 }
 
 void AppLogger::logConnectionFailed(const QString& protocol, const QString& host, int port,
@@ -186,8 +201,8 @@ void AppLogger::logConnectionFailed(const QString& protocol, const QString& host
     meta["host"] = host;
     meta["port"] = port;
     meta["error"] = error;
-    this->error(
-        LogSource::Connection,
+    logConnectionEvent(
+        LogLevel::Error,
         QString("Connection failed to %1:%2 (%3): %4").arg(host).arg(port).arg(protocol).arg(error),
         meta);
 }
@@ -197,8 +212,9 @@ void AppLogger::logConnectionLost(const QString& protocol, const QString& host, 
     meta["protocol"] = protocol;
     meta["host"] = host;
     meta["port"] = port;
-    warning(LogSource::Connection,
-            QString("Connection lost to %1:%2 (%3)").arg(host).arg(port).arg(protocol), meta);
+    logConnectionEvent(LogLevel::Warning,
+                       QString("Connection lost to %1:%2 (%3)").arg(host).arg(port).arg(protocol),
+                       meta);
 }
 
 void AppLogger::logReconnectAttempt(const QString& protocol, const QString& host, int port,
@@ -209,14 +225,14 @@ void AppLogger::logReconnectAttempt(const QString& protocol, const QString& host
     meta["port"] = port;
     meta["attempt"] = attempt;
     meta["maxAttempts"] = maxAttempts;
-    info(LogSource::Connection,
-         QString("Reconnecting to %1:%2 (%3) - attempt %4/%5")
-             .arg(host)
-             .arg(port)
-             .arg(protocol)
-             .arg(attempt)
-             .arg(maxAttempts),
-         meta);
+    logConnectionEvent(LogLevel::Info,
+                       QString("Reconnecting to %1:%2 (%3) - attempt %4/%5")
+                           .arg(host)
+                           .arg(port)
+                           .arg(protocol)
+                           .arg(attempt)
+                           .arg(maxAttempts),
+                       meta);
 }
 
 void AppLogger::logDisconnected(const QString& protocol, const QString& host, int port) {
@@ -224,8 +240,9 @@ void AppLogger::logDisconnected(const QString& protocol, const QString& host, in
     meta["protocol"] = protocol;
     meta["host"] = host;
     meta["port"] = port;
-    info(LogSource::Connection,
-         QString("Disconnected from %1:%2 (%3)").arg(host).arg(port).arg(protocol), meta);
+    logConnectionEvent(LogLevel::Info,
+                       QString("Disconnected from %1:%2 (%3)").arg(host).arg(port).arg(protocol),
+                       meta);
 }
 
 QVector<LogEntry> AppLogger::allEntries() const {

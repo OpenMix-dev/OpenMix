@@ -75,7 +75,7 @@ void LogViewerDialog::setupUi() {
     // auto scroll
     m_autoScrollCheck = new QCheckBox(tr("Auto-scroll"), this);
     m_autoScrollCheck->setChecked(true);
-    connect(m_autoScrollCheck, &QCheckBox::stateChanged, this,
+    connect(m_autoScrollCheck, &QCheckBox::checkStateChanged, this,
             &LogViewerDialog::onAutoScrollChanged);
 
     filterLayout->addWidget(levelLabel);
@@ -141,7 +141,7 @@ void LogViewerDialog::onSourceFilterChanged(int index) {
 
 void LogViewerDialog::onSearchTextChanged(const QString& text) { m_model->setSearchText(text); }
 
-void LogViewerDialog::onAutoScrollChanged(int state) { Q_UNUSED(state) }
+void LogViewerDialog::onAutoScrollChanged([[maybe_unused]] Qt::CheckState state) {}
 
 void LogViewerDialog::onClearClicked() {
     QMessageBox::StandardButton reply = QMessageBox::question(

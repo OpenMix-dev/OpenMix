@@ -9,6 +9,7 @@
 #include <QPushButton>
 #include <QSlider>
 #include <QVBoxLayout>
+#include <algorithm>
 #include <cmath>
 
 namespace OpenMix {
@@ -70,7 +71,7 @@ void DCAWidget::setupUi() {
 }
 
 void DCAWidget::setLevel(float level) {
-    m_level = qBound(0.0f, level, 1.0f);
+    m_level = std::clamp(level, 0.0f, 1.0f);
     m_faderSlider->setValue(static_cast<int>(m_level * 1000));
     updateDisplay();
 }
@@ -192,7 +193,7 @@ void DCAWidget::setPreviewMode(bool preview) {
 }
 
 void DCAWidget::setOriginalLevel(float level) {
-    m_originalLevel = qBound(0.0f, level, 1.0f);
+    m_originalLevel = std::clamp(level, 0.0f, 1.0f);
     update();
 }
 

@@ -25,17 +25,17 @@ class YamahaProtocol : public MixerProtocol {
     explicit YamahaProtocol(const MixerCapabilities& caps, QObject* parent = nullptr);
     ~YamahaProtocol() override;
 
-    QString protocolName() const override { return "Yamaha OSC"; }
-    QString protocolDescription() const override { return "Yamaha OSC/UDP Protocol"; }
+    [[nodiscard]] QString protocolName() const override { return "Yamaha OSC"; }
+    [[nodiscard]] QString protocolDescription() const override { return "Yamaha OSC/UDP Protocol"; }
 
-    bool connect(const QString& host, int port) override;
+    [[nodiscard]] bool connect(const QString& host, int port) override;
     void disconnect() override;
-    bool isConnected() const override { return m_connectionState == ConnectionState::Connected; }
-    QString connectionStatus() const override { return m_statusMessage; }
-    ConnectionState connectionState() const override { return m_connectionState; }
+    [[nodiscard]] bool isConnected() const override { return m_connectionState == ConnectionState::Connected; }
+    [[nodiscard]] QString connectionStatus() const override { return m_statusMessage; }
+    [[nodiscard]] ConnectionState connectionState() const override { return m_connectionState; }
 
     void sendParameter(const QString& path, const QVariant& value) override;
-    QVariant getParameter(const QString& path) override;
+    [[nodiscard]] QVariant getParameter(const QString& path) override;
     void requestParameter(const QString& path) override;
     void requestParameterAsync(const QString& path, ParameterCallback callback) override;
 
@@ -43,12 +43,21 @@ class YamahaProtocol : public MixerProtocol {
     void recallScene(int sceneNumber) override;
     void refresh() override;
 
-    int latencyMs() const override { return m_latencyMs; }
-    const MixerCapabilities& capabilities() const override { return m_capabilities; }
+    [[nodiscard]] int latencyMs() const override { return m_latencyMs; }
+    [[nodiscard]] const MixerCapabilities& capabilities() const override { return m_capabilities; }
 
   protected:
     virtual void initializeSnapshotParams();
     void rebuildSnapshotParams();
+
+    // appends per-channel fader/on, EQ, and effect-send snapshot parameters for
+    // `channelCount` channels.  `channelPrefix` is the path stem (e.g. "/ch/"),
+    // `channelFieldWidth` controls zero-padding (2 for CL/QL/TF, 3 for DM7), and
+    // `maxEffectSends` is the model-specific send-bus ceiling applied on top of
+    // m_capabilities.effectSendBuses.
+    void appendEqSnapshotParams(QStringList& params, const QString& channelPrefix,
+                                int channelCount, int channelFieldWidth = 2,
+                                int maxEffectSends = 16) const;
 
     MixerCapabilities m_capabilities;
     QStringList m_snapshotParams;
@@ -71,10 +80,6 @@ class YamahaProtocol : public MixerProtocol {
     void sendOscMessage(const QString& path, const QString& value);
     void parseOscMessage(const QByteArray& data);
     QVariant parseOscArgument(const QByteArray& data, int& offset, char type);
-    QByteArray buildOscMessage(const QString& path);
-    QByteArray buildOscMessage(const QString& path, float value);
-    QByteArray buildOscMessage(const QString& path, int value);
-    QByteArray buildOscMessage(const QString& path, const QString& value);
 
     void processResponse(const QString& path, const QVariant& value);
     void handleModelResponse(const QVariant& value);

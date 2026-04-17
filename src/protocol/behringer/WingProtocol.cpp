@@ -1,6 +1,7 @@
 #include "WingProtocol.h"
 #include "../../core/Cue.h"
 #include <QDateTime>
+#include <algorithm>
 
 namespace OpenMix {
 
@@ -64,7 +65,7 @@ void WingProtocol::initializeSnapshotParams() {
 
         // effect send params
         if (m_capabilities.supportsEffectSends) {
-            int sends = qMin(m_capabilities.effectSendBuses, 16);
+            int sends = std::min(m_capabilities.effectSendBuses, 16);
             for (int send = 1; send <= sends; ++send) {
                 QString sendPrefix = QString("%1/send/%2").arg(chPrefix).arg(send);
                 m_snapshotParams.append(sendPrefix + "/level");
@@ -211,8 +212,8 @@ void WingProtocol::recallSnapshot(const Cue& cue) {
         return;
 
     QJsonObject params = cue.parameters();
-    for (auto it = params.begin(); it != params.end(); ++it) {
-        sendParameter(it.key(), it.value().toVariant());
+    for (const auto& [path, value] : params.asKeyValueRange()) {
+        sendParameter(path.toString(), value.toVariant());
     }
 }
 
@@ -304,9 +305,9 @@ void WingProtocol::onRequestTimeoutCheck() {
     QDateTime now = QDateTime::currentDateTime();
     QStringList timedOut;
 
-    for (auto it = m_pendingRequests.begin(); it != m_pendingRequests.end(); ++it) {
-        if (it->timestamp.msecsTo(now) > m_requestTimeoutMs) {
-            timedOut.append(it.key());
+    for (const auto& [path, req] : m_pendingRequests.asKeyValueRange()) {
+        if (req.timestamp.msecsTo(now) > m_requestTimeoutMs) {
+            timedOut.append(path);
         }
     }
 
@@ -370,8 +371,7 @@ void WingProtocol::processResponse(const QString& path, const QVariant& value) {
     }
 }
 
-void WingProtocol::handleInfoResponse(const QVariant& value) {
-    Q_UNUSED(value);
+void WingProtocol::handleInfoResponse([[maybe_unused]] const QVariant& value) {
     m_connectionTimer.stop();
     m_waitingForInfo = false;
 

@@ -1,9 +1,6 @@
 #pragma once
 
-#include "Cue.h"
-#include "CueList.h"
 #include "CueValidator.h"
-#include "DCAMapping.h"
 #include <QJsonObject>
 #include <QObject>
 #include <QSet>
@@ -11,6 +8,9 @@
 
 namespace OpenMix {
 
+class Cue;
+class CueList;
+class DCAMapping;
 class MixerProtocol;
 class PlaybackGuard;
 class PlaybackLogger;
@@ -28,26 +28,26 @@ class PlaybackEngine : public QObject {
     void setDCAMapping(DCAMapping* mapping);
 
     void setValidator(CueValidator* validator);
-    CueValidator* validator() const { return m_validator; }
+    [[nodiscard]] CueValidator* validator() const noexcept { return m_validator; }
 
     void setGuard(PlaybackGuard* guard);
-    PlaybackGuard* guard() const { return m_guard; }
+    [[nodiscard]] PlaybackGuard* guard() const noexcept { return m_guard; }
 
     void setLogger(PlaybackLogger* logger);
-    PlaybackLogger* logger() const { return m_logger; }
+    [[nodiscard]] PlaybackLogger* logger() const noexcept { return m_logger; }
 
     void setDryRunMode(bool enabled) { m_dryRunMode = enabled; }
-    bool isDryRunMode() const { return m_dryRunMode; }
+    [[nodiscard]] bool isDryRunMode() const noexcept { return m_dryRunMode; }
 
-    PlaybackState state() const { return m_state; }
+    [[nodiscard]] PlaybackState state() const noexcept { return m_state; }
 
-    int currentCueIndex() const { return m_currentIndex; }
-    int standbyCueIndex() const { return m_standbyIndex; }
+    [[nodiscard]] int currentCueIndex() const noexcept { return m_currentIndex; }
+    [[nodiscard]] int standbyCueIndex() const noexcept { return m_standbyIndex; }
 
-    const Cue* currentCue() const;
-    const Cue* standbyCue() const;
+    [[nodiscard]] const Cue* currentCue() const;
+    [[nodiscard]] const Cue* standbyCue() const;
 
-    bool isAutoFollowArmed() const { return m_autoFollowArmed; }
+    [[nodiscard]] bool isAutoFollowArmed() const noexcept { return m_autoFollowArmed; }
 
   public slots:
     void go();

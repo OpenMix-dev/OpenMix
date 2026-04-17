@@ -13,16 +13,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install non-Qt dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y qt6-base-dev qt6-svg-dev libxkbcommon-dev liblo-dev libasound2-dev build-essential cmake
+          sudo apt-get install -y libxkbcommon-dev liblo-dev libasound2-dev build-essential cmake
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.11.0"
+          host: "linux"
+          target: "desktop"
+          arch: "linux_gcc_64"
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
 
       - name: Configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --config Release --parallel
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -35,33 +48,51 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+      - name: Cache Qt
+        id: cache-qt
+        uses: actions/cache@v4
         with:
-          version: "6.6.0"
-          host: "windows"
-          target: "desktop"
-          arch: "win64_msvc2019_64"
+          path: C:\Qt\6.11.0\msvc2022_64
+          key: qt-6.11.0-msvc2022_64
+
+      - name: Download Qt
+        if: steps.cache-qt.outputs.cache-hit != 'true'
+        run: |
+          gh release download qt-deps --pattern "msvc2022_64.zip" --dir $env:TEMP
+          Expand-Archive -Path "$env:TEMP\msvc2022_64.zip" -DestinationPath C:\Qt\6.11.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install liblo via vcpkg
         run: vcpkg install liblo:x64-windows
 
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
+
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DCMAKE_PREFIX_PATH="C:\Qt\6.11.0\msvc2022_64"
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --parallel
 
       - name: Deploy Qt
         run: |
-          cd build/Release
-          windeployqt --release OpenMix.exe
+          mkdir build\deploy
+          copy build\OpenMix.exe build\deploy\
+          C:\Qt\6.11.0\msvc2022_64\bin\windeployqt --release build\deploy\OpenMix.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: OpenMix-windows
-          path: build/Release/
+          path: build/deploy/
 
   build-macos:
     runs-on: macos-latest
@@ -71,6 +102,11 @@ jobs:
       - name: Install dependencies
         run: brew install qt@6 liblo
 
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
+
       - name: Configure
         run: |
           export PATH="/opt/homebrew/opt/qt@6/bin:$PATH"
@@ -79,7 +115,7 @@ jobs:
             -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt@6
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --config Release --parallel
 
       - name: Deploy, sign, & package
         run: |

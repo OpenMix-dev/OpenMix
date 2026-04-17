@@ -317,6 +317,7 @@ Cue Cue::fromJson(const QJsonObject& json) {
             }
             cue.m_dcaChannelMapping = channelMapping;
         }
+
         if (dcaMappingObj.contains("buses")) {
             QMap<int, QList<int>> busMapping;
             QJsonObject busesObj = dcaMappingObj["buses"].toObject();

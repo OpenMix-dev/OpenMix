@@ -1,54 +1,19 @@
 #pragma once
 
-#include <QAction>
-#include <QComboBox>
-#include <QEvent>
-#include <QKeyEvent>
-#include <QLineEdit>
-#include <QTimer>
-#include <QWheelEvent>
 #include <QWidget>
 
+class QAction;
 class QCheckBox;
+class QComboBox;
+class QEvent;
 class QGridLayout;
 class QGroupBox;
 class QLabel;
+class QLineEdit;
 class QPushButton;
 class QScrollArea;
 
 namespace OpenMix {
-
-class NoScrollComboBox : public QComboBox {
-    Q_OBJECT
-  public:
-    using QComboBox::QComboBox;
-
-  protected:
-    void wheelEvent(QWheelEvent* event) override { event->ignore(); }
-
-    void showPopup() override {
-        m_popupOpen = true;
-        QComboBox::showPopup();
-    }
-
-    void hidePopup() override {
-        QComboBox::hidePopup();
-        QTimer::singleShot(100, this, [this]() { m_popupOpen = false; });
-    }
-
-    void keyPressEvent(QKeyEvent* event) override {
-        int key = event->key();
-        if ((key == Qt::Key_Return || key == Qt::Key_Enter) && !m_popupOpen) {
-            showPopup();
-            event->accept();
-        } else {
-            QComboBox::keyPressEvent(event);
-        }
-    }
-
-  private:
-    bool m_popupOpen = false;
-};
 
 class Application;
 class Cue;

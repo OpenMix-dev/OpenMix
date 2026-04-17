@@ -381,8 +381,7 @@ void MainWindow::createBubbleBar() {
     m_cueEditor->addBottomWidget(m_bubbleBar);
 }
 
-void MainWindow::onBubbleButtonClicked(const QString& id, bool checked) {
-    Q_UNUSED(checked)
+void MainWindow::onBubbleButtonClicked(const QString& id, [[maybe_unused]] bool checked) {
 
     if (id == "dcaMapping") {
         toggleDCAMappingPanel();

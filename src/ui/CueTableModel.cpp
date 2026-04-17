@@ -237,9 +237,7 @@ QMimeData* CueTableModel::mimeData(const QModelIndexList& indexes) const {
 }
 
 bool CueTableModel::canDropMimeData(const QMimeData* data, Qt::DropAction action, int row,
-                                    int column, const QModelIndex& parent) const {
-    Q_UNUSED(column);
-    Q_UNUSED(parent);
+                                    [[maybe_unused]] int column, [[maybe_unused]] const QModelIndex& parent) const {
 
     if (!data->hasFormat(s_mimeType))
         return false;
@@ -251,10 +249,8 @@ bool CueTableModel::canDropMimeData(const QMimeData* data, Qt::DropAction action
     return true;
 }
 
-bool CueTableModel::dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column,
-                                 const QModelIndex& parent) {
-    Q_UNUSED(column);
-    Q_UNUSED(parent);
+bool CueTableModel::dropMimeData(const QMimeData* data, Qt::DropAction action, int row,
+                                 [[maybe_unused]] int column, [[maybe_unused]] const QModelIndex& parent) {
 
     if (!canDropMimeData(data, action, row, column, parent))
         return false;

@@ -2,6 +2,8 @@
 #include "../core/Cue.h"
 #include <QJsonObject>
 #include <QTimer>
+#include <algorithm>
+#include <array>
 
 namespace OpenMix {
 
@@ -11,10 +13,22 @@ LoopbackProtocol::LoopbackProtocol(const MixerCapabilities& caps, QObject* paren
 }
 
 void LoopbackProtocol::initializeDefaultState() {
-    // default EQ frequencies (6-band setup)
-    static const double defaultFreqs[6] = {80.0, 220.0, 1000.0, 2500.0, 6000.0, 12000.0};
-    // default EQ types: 0 = LCut, 1 = LShv, 2 = PEQ, 3 = VEQ, 4 = HShv, 5 = HCut
-    static const int defaultTypes[6] = {1, 2, 2, 2, 2, 4};
+    // 0=LCut 1=LShv 2=PEQ 3=VEQ 4=HShv 5=HCut
+    static constexpr std::array<double, 6> defaultFreqs = {80.0, 220.0, 1000.0, 2500.0, 6000.0, 12000.0};
+    static constexpr std::array<int, 6>    defaultTypes = {1, 2, 2, 2, 2, 4};
+
+    auto initEQ = [&](const QString& prefix) {
+        if (!m_capabilities.supportsChannelEQ)
+            return;
+        m_parameterState[prefix + "/eq/on"] = 1;
+        for (int band = 1; band <= m_capabilities.eqBandsPerChannel && band <= 6; ++band) {
+            const QString bandPrefix = QStringLiteral("%1/eq/%2").arg(prefix).arg(band);
+            m_parameterState[bandPrefix + "/type"] = defaultTypes[band - 1];
+            m_parameterState[bandPrefix + "/f"]    = defaultFreqs[band - 1];
+            m_parameterState[bandPrefix + "/g"]    = 0.0f;
+            m_parameterState[bandPrefix + "/q"]    = 2.0f;
+        }
+    };
 
     // init DCAs with default values
     for (int i = 1; i <= m_capabilities.dcaCount; ++i) {
@@ -25,7 +39,7 @@ void LoopbackProtocol::initializeDefaultState() {
     }
 
     // init input channels for testing
-    for (int i = 1; i <= qMin(m_capabilities.inputChannels, 32); ++i) {
+    for (int i = 1; i <= std::min(m_capabilities.inputChannels, 32); ++i) {
         QString chPrefix = QString("/ch/%1").arg(i, 2, 10, QChar('0'));
         m_parameterState[chPrefix + "/mix/fader"] = 0.75f;
         m_parameterState[chPrefix + "/mix/on"] = 1;
@@ -35,22 +49,11 @@ void LoopbackProtocol::initializeDefaultState() {
         int dcaIndex = ((i - 1) / 4) % m_capabilities.dcaCount;
         m_parameterState[chPrefix + "/grp/dca"] = (1 << dcaIndex);
 
-        // EQ parameters
-        if (m_capabilities.supportsChannelEQ) {
-            m_parameterState[chPrefix + "/eq/on"] = 1; // EQ enabled
-
-            for (int band = 1; band <= m_capabilities.eqBandsPerChannel && band <= 6; ++band) {
-                QString bandPrefix = QString("%1/eq/%2").arg(chPrefix).arg(band);
-                m_parameterState[bandPrefix + "/type"] = defaultTypes[band - 1];
-                m_parameterState[bandPrefix + "/f"] = defaultFreqs[band - 1];
-                m_parameterState[bandPrefix + "/g"] = 0.0f; // 0dB (unity)
-                m_parameterState[bandPrefix + "/q"] = 2.0f; // moderate Q
-            }
-        }
+        initEQ(chPrefix);
 
         // effect send parameters
         if (m_capabilities.supportsEffectSends) {
-            int sends = qMin(m_capabilities.effectSendBuses, 16);
+            int sends = std::min(m_capabilities.effectSendBuses, 16);
             for (int send = 1; send <= sends; ++send) {
                 QString sendPrefix =
                     QString("%1/mix/%2").arg(chPrefix).arg(send, 2, 10, QChar('0'));
@@ -61,7 +64,7 @@ void LoopbackProtocol::initializeDefaultState() {
     }
 
     // init mix buses with EQ
-    for (int i = 1; i <= qMin(m_capabilities.mixBuses, 16); ++i) {
+    for (int i = 1; i <= std::min(m_capabilities.mixBuses, 16); ++i) {
         QString busPrefix = QString("/bus/%1").arg(i, 2, 10, QChar('0'));
         m_parameterState[busPrefix + "/mix/fader"] = 0.75f;
         m_parameterState[busPrefix + "/mix/on"] = 1;
@@ -71,42 +74,18 @@ void LoopbackProtocol::initializeDefaultState() {
         int dcaIndex = ((i - 1) / 2) % m_capabilities.dcaCount;
         m_parameterState[busPrefix + "/grp/dca"] = (1 << dcaIndex);
 
-        // bus EQ parameters
-        if (m_capabilities.supportsChannelEQ) {
-            m_parameterState[busPrefix + "/eq/on"] = 1;
-
-            for (int band = 1; band <= m_capabilities.eqBandsPerChannel && band <= 6; ++band) {
-                QString bandPrefix = QString("%1/eq/%2").arg(busPrefix).arg(band);
-                m_parameterState[bandPrefix + "/type"] = defaultTypes[band - 1];
-                m_parameterState[bandPrefix + "/f"] = defaultFreqs[band - 1];
-                m_parameterState[bandPrefix + "/g"] = 0.0f;
-                m_parameterState[bandPrefix + "/q"] = 2.0f;
-            }
-        }
+        initEQ(busPrefix);
     }
 
     // init main stereo bus
     m_parameterState["/main/st/mix/fader"] = 0.75f;
     m_parameterState["/main/st/mix/on"] = 1;
 
-    if (m_capabilities.supportsChannelEQ) {
-        m_parameterState["/main/st/eq/on"] = 1;
-
-        for (int band = 1; band <= m_capabilities.eqBandsPerChannel && band <= 6; ++band) {
-            QString bandPrefix = QString("/main/st/eq/%1").arg(band);
-            m_parameterState[bandPrefix + "/type"] = defaultTypes[band - 1];
-            m_parameterState[bandPrefix + "/f"] = defaultFreqs[band - 1];
-            m_parameterState[bandPrefix + "/g"] = 0.0f;
-            m_parameterState[bandPrefix + "/q"] = 2.0f;
-        }
-    }
+    initEQ("/main/st");
 }
 
-bool LoopbackProtocol::connect(const QString& host, int port) {
-    Q_UNUSED(host);
-    Q_UNUSED(port);
-
-    m_connected = true;
+bool LoopbackProtocol::connect([[maybe_unused]] const QString& host, [[maybe_unused]] int port) {
+    m_connectionState = ConnectionState::Connected;
     m_statusMessage = "Connected (Offline)";
 
     // emit connection signal on next event loop
@@ -116,8 +95,8 @@ bool LoopbackProtocol::connect(const QString& host, int port) {
         emit connected();
 
         // emit initial parameter values
-        for (auto it = m_parameterState.begin(); it != m_parameterState.end(); ++it) {
-            emit parameterChanged(it.key(), it.value());
+        for (const auto& [path, value] : m_parameterState.asKeyValueRange()) {
+            emit parameterChanged(path, value);
         }
     });
 
@@ -125,7 +104,7 @@ bool LoopbackProtocol::connect(const QString& host, int port) {
 }
 
 void LoopbackProtocol::disconnect() {
-    m_connected = false;
+    m_connectionState = ConnectionState::Disconnected;
     m_statusMessage = "Disconnected";
 
     emit connectionStateChanged(ConnectionState::Disconnected);
@@ -134,14 +113,14 @@ void LoopbackProtocol::disconnect() {
 }
 
 void LoopbackProtocol::sendParameter(const QString& path, const QVariant& value) {
-    if (!m_connected) {
+    if (m_connectionState != ConnectionState::Connected) {
         return;
     }
 
     m_parameterState[path] = value;
 
     // echo back the change
-    QTimer::singleShot(5, this, [this, path, value]() { emit parameterChanged(path, value); });
+    emitParameterChangedAsync(path, value);
 }
 
 QVariant LoopbackProtocol::getParameter(const QString& path) {
@@ -149,18 +128,18 @@ QVariant LoopbackProtocol::getParameter(const QString& path) {
 }
 
 void LoopbackProtocol::requestParameter(const QString& path) {
-    if (!m_connected) {
+    if (m_connectionState != ConnectionState::Connected) {
         return;
     }
 
     QVariant value = m_parameterState.value(path);
 
     // respond asynchronously
-    QTimer::singleShot(5, this, [this, path, value]() { emit parameterChanged(path, value); });
+    emitParameterChangedAsync(path, value);
 }
 
 void LoopbackProtocol::requestParameterAsync(const QString& path, ParameterCallback callback) {
-    if (!m_connected) {
+    if (m_connectionState != ConnectionState::Connected) {
         if (callback) {
             callback(path, QVariant(), false);
         }
@@ -177,28 +156,20 @@ void LoopbackProtocol::requestParameterAsync(const QString& path, ParameterCallb
     });
 }
 
+void LoopbackProtocol::emitParameterChangedAsync(const QString& addr, const QVariant& val) {
+    QTimer::singleShot(5, this, [this, addr, val]() { emit parameterChanged(addr, val); });
+}
+
 void LoopbackProtocol::recallSnapshot(const Cue& cue) {
-    QJsonObject params = cue.parameters();
+    if (m_connectionState != ConnectionState::Connected)
+        return;
 
-    // recall DCA parameters
-    if (params.contains("dca")) {
-        QJsonObject dcaObj = params["dca"].toObject();
-        for (auto it = dcaObj.begin(); it != dcaObj.end(); ++it) {
-            int dcaNum = it.key().toInt();
-            QJsonObject dcaParams = it.value().toObject();
-            QString prefix = QString("/dca/%1").arg(dcaNum);
-
-            for (auto pit = dcaParams.begin(); pit != dcaParams.end(); ++pit) {
-                QString path = prefix + "/" + pit.key();
-                QVariant value = pit.value().toVariant();
-                sendParameter(path, value);
-            }
-        }
+    for (const auto& [path, value] : cue.parameters().asKeyValueRange()) {
+        sendParameter(path.toString(), value.toVariant());
     }
 }
 
 void LoopbackProtocol::recallScene(int sceneNumber) {
-    Q_UNUSED(sceneNumber);
     emit sceneChanged(sceneNumber);
 }
 

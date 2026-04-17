@@ -38,8 +38,7 @@ QSize ConnectionStateWidget::sizeHint() const { return QSize(200, 28); }
 
 QSize ConnectionStateWidget::minimumSizeHint() const { return QSize(100, 24); }
 
-void ConnectionStateWidget::paintEvent(QPaintEvent* event) {
-    Q_UNUSED(event);
+void ConnectionStateWidget::paintEvent([[maybe_unused]] QPaintEvent* event) {
 
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);

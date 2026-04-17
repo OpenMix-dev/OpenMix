@@ -75,9 +75,11 @@ class MidiInputManager : public QObject {
     void onDevicePollTimer();
 
   private:
+
     void processMidiMessage(const std::vector<unsigned char>& message);
     void executeAction(MidiAction action);
     bool tryReconnect();
+    int findDeviceIndex(const QString& deviceName) const;
 
     static void midiCallback(double timeStamp, std::vector<unsigned char>* message, void* userData);
 

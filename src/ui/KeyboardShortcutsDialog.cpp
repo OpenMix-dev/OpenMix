@@ -401,8 +401,8 @@ QString KeyboardShortcutsDialog::getCategoryName(const QString& actionId) const 
 
 void KeyboardShortcutsDialog::accept() {
     // apply all pending changes
-    for (auto it = m_pendingChanges.begin(); it != m_pendingChanges.end(); ++it) {
-        m_manager->setShortcut(it.key(), it.value());
+    for (const auto& [id, shortcut] : m_pendingChanges.asKeyValueRange()) {
+        m_manager->setShortcut(id, shortcut);
     }
 
     // save to settings

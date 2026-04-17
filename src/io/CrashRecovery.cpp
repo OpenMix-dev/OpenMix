@@ -3,6 +3,9 @@
 #include "core/Show.h"
 #include "protocol/MixerProtocol.h"
 
+#include <algorithm>
+#include <optional>
+
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
@@ -19,6 +22,29 @@
 #include <signal.h>
 #include <sys/types.h>
 #endif
+
+namespace {
+
+bool writeJsonToFile(const QString& path, const QJsonObject& obj) {
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return false;
+    file.write(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+    return true;
+}
+
+std::optional<QJsonObject> readJsonFromFile(const QString& path) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+        return std::nullopt;
+    QJsonParseError error;
+    auto doc = QJsonDocument::fromJson(file.readAll(), &error);
+    if (error.error != QJsonParseError::NoError || !doc.isObject())
+        return std::nullopt;
+    return doc.object();
+}
+
+} // anonymous namespace
 
 namespace OpenMix {
 
@@ -84,23 +110,15 @@ void CrashRecovery::saveState() {
     QDir dir;
     dir.mkpath(configDir());
 
-    QFile file(crashStatePath());
-    if (file.open(QIODevice::WriteOnly)) {
-        QJsonDocument doc(state);
-        file.write(doc.toJson(QJsonDocument::Compact));
-        file.close();
+    if (writeJsonToFile(crashStatePath(), state)) {
         emit stateSaved();
     }
 
-    QFile lockFile(lockFilePath());
-    if (lockFile.exists()) {
-        lockFile.open(QIODevice::WriteOnly);
+    if (QFile::exists(lockFilePath())) {
         QJsonObject lockData;
         lockData["timestamp"] = QDateTime::currentMSecsSinceEpoch();
         lockData["pid"] = QCoreApplication::applicationPid();
-        QJsonDocument doc(lockData);
-        lockFile.write(doc.toJson(QJsonDocument::Compact));
-        lockFile.close();
+        writeJsonToFile(lockFilePath(), lockData);
     }
 }
 
@@ -111,7 +129,7 @@ void CrashRecovery::markCleanExit() {
 }
 
 void CrashRecovery::setAutoSaveInterval(int seconds) {
-    m_autoSaveIntervalSec = qMax(1, seconds);
+    m_autoSaveIntervalSec = std::max(1, seconds);
     if (m_autoSaveTimer.isActive()) {
         m_autoSaveTimer.setInterval(m_autoSaveIntervalSec * 1000);
     }
@@ -144,17 +162,10 @@ bool CrashRecovery::createLockFile() {
     QDir dir;
     dir.mkpath(configDir());
 
-    QFile file(lockFilePath());
-    if (file.open(QIODevice::WriteOnly)) {
-        QJsonObject lockData;
-        lockData["timestamp"] = QDateTime::currentMSecsSinceEpoch();
-        lockData["pid"] = QCoreApplication::applicationPid();
-        QJsonDocument doc(lockData);
-        file.write(doc.toJson(QJsonDocument::Compact));
-        file.close();
-        return true;
-    }
-    return false;
+    QJsonObject lockData;
+    lockData["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+    lockData["pid"] = QCoreApplication::applicationPid();
+    return writeJsonToFile(lockFilePath(), lockData);
 }
 
 void CrashRecovery::removeLockFile() { QFile::remove(lockFilePath()); }
@@ -165,37 +176,19 @@ bool CrashRecovery::isLockFileStale() const {
         return false;
     }
 
-    QFile file(lockFilePath());
-    if (file.open(QIODevice::ReadOnly)) {
-        QByteArray data = file.readAll();
-        file.close();
-
-        QJsonParseError error;
-        QJsonDocument doc = QJsonDocument::fromJson(data, &error);
-        if (error.error == QJsonParseError::NoError && doc.isObject()) {
-            QJsonObject obj = doc.object();
-            qint64 timestamp = obj["timestamp"].toVariant().toLongLong();
-            qint64 now = QDateTime::currentMSecsSinceEpoch();
-            qint64 age = (now - timestamp) / 1000;
-            return age > LOCK_FILE_STALE_SECONDS;
-        }
+    if (auto obj = readJsonFromFile(lockFilePath())) {
+        qint64 timestamp = (*obj)["timestamp"].toVariant().toLongLong();
+        qint64 now = QDateTime::currentMSecsSinceEpoch();
+        qint64 age = (now - timestamp) / 1000;
+        return age > LOCK_FILE_STALE_SECONDS;
     }
 
     return true;
 }
 
 qint64 CrashRecovery::readPidFromLockFile() const {
-    QFile file(lockFilePath());
-    if (file.open(QIODevice::ReadOnly)) {
-        QByteArray data = file.readAll();
-        file.close();
-
-        QJsonParseError error;
-        QJsonDocument doc = QJsonDocument::fromJson(data, &error);
-        if (error.error == QJsonParseError::NoError && doc.isObject()) {
-            return doc.object()["pid"].toVariant().toLongLong();
-        }
-    }
+    if (auto obj = readJsonFromFile(lockFilePath()))
+        return (*obj)["pid"].toVariant().toLongLong();
     return 0;
 }
 
@@ -242,22 +235,13 @@ void CrashRecovery::loadCrashState() {
         }
     }
 
-    QFile file(statePath);
-    if (!file.open(QIODevice::ReadOnly)) {
+    auto optObj = readJsonFromFile(statePath);
+    if (!optObj) {
         m_crashStateLoaded = false;
         return;
     }
 
-    QJsonParseError error;
-    QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &error);
-    file.close();
-
-    if (error.error != QJsonParseError::NoError || !doc.isObject()) {
-        m_crashStateLoaded = false;
-        return;
-    }
-
-    QJsonObject obj = doc.object();
+    QJsonObject obj = *optObj;
 
     m_crashState.version = obj["version"].toString();
     m_crashState.timestamp = obj["timestamp"].toVariant().toLongLong();

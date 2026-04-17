@@ -55,10 +55,10 @@ DryRunResult DryRunEngine::executeDryRun(int cueIndex) {
     switch (cue.type()) {
     case CueType::Snapshot: {
         QJsonObject targetParams = cue.parameters();
-        for (auto it = targetParams.begin(); it != targetParams.end(); ++it) {
-            currentState[it.key()] = it.value();
+        for (const auto& [path, value] : targetParams.asKeyValueRange()) {
+            currentState[path.toString()] = value;
         }
-        result.timeline.append(qMakePair(currentTime, currentState));
+        result.timeline.append({currentTime, currentState});
         result.finalState = currentState;
         result.wouldSucceed = true;
         break;
@@ -85,11 +85,10 @@ DryRunResult DryRunEngine::executeDryRun(int cueIndex) {
     }
 
     case CueType::Stop: {
-        QJsonObject targetParams = cue.parameters();
-        for (auto it = targetParams.begin(); it != targetParams.end(); ++it) {
-            currentState[it.key()] = it.value();
+        for (const auto& [path, value] : cue.parameters().asKeyValueRange()) {
+            currentState[path.toString()] = value;
         }
-        result.timeline.append(qMakePair(currentTime, currentState));
+        result.timeline.append({currentTime, currentState});
         result.finalState = currentState;
         result.wouldSucceed = true;
         break;
@@ -118,8 +117,7 @@ DryRunResult DryRunEngine::executeDryRunById(const QString& cueId) {
         return result;
     }
 
-    int index = m_cueList->indexOf(cueId);
-    return executeDryRun(index);
+    return executeDryRun(m_cueList->indexOf(cueId).value_or(-1));
 }
 
 QVector<DryRunResult> DryRunEngine::executeDryRunSequence(int startIndex, int maxCues) {
@@ -168,9 +166,9 @@ QJsonObject DryRunEngine::predictedStateAtTime(int cueIndex, double secondsAfter
     qint64 targetTime = static_cast<qint64>(secondsAfterStart * 1000);
 
     QJsonObject state = m_initialState;
-    for (const auto& entry : result.timeline) {
-        if (entry.first <= targetTime) {
-            state = entry.second;
+    for (const auto& [time, snapshot] : result.timeline) {
+        if (time <= targetTime) {
+            state = snapshot;
         } else {
             break;
         }

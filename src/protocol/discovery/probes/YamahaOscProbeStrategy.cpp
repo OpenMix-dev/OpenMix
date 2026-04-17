@@ -2,11 +2,10 @@
 
 namespace OpenMix {
 
-DiscoveredConsole YamahaOscProbeStrategy::parseResponse(const QString& path, const QVariant& value,
+DiscoveredConsole YamahaOscProbeStrategy::parseResponse([[maybe_unused]] const QString& path,
+                                                        const QVariant& value,
                                                         const QHostAddress& sender,
-                                                        int senderPort) {
-    Q_UNUSED(path);
-    Q_UNUSED(senderPort);
+                                                        [[maybe_unused]] int senderPort) {
 
     DiscoveredConsole console;
     console.address = sender;

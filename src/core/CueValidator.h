@@ -12,13 +12,13 @@ class Cue;
 class CueList;
 
 struct ValidationIssue {
-    enum Severity { Warning, Error };
+    enum class Severity { Warning, Error };
     Severity severity;
     QString message;
     QString parameterPath;
 
-    bool isError() const { return severity == Error; }
-    bool isWarning() const { return severity == Warning; }
+    bool isError() const { return severity == Severity::Error; }
+    bool isWarning() const { return severity == Severity::Warning; }
 };
 
 struct ValidationResult {
@@ -52,22 +52,23 @@ class CueValidator : public QObject {
   public:
     explicit CueValidator(QObject* parent = nullptr);
 
-    ValidationResult validate(const Cue& cue, const CueList* cueList);
-    ValidationResult validateAll(const CueList* cueList);
+    [[nodiscard]] ValidationResult validate(const Cue& cue, const CueList* cueList);
+    [[nodiscard]] ValidationResult validateAll(const CueList* cueList);
 
   signals:
     void validationCompleted(const ValidationResult& result);
 
   private:
-    bool validateMacroIds(const Cue& cue, const CueList* cueList,
-                          QList<ValidationIssue>& issues) const;
-    bool validateParameters(const Cue& cue, QList<ValidationIssue>& issues) const;
-    bool detectCircularMacroReferences(const Cue& cue, const CueList* cueList,
-                                       QList<ValidationIssue>& issues) const;
-    bool detectConflictingFadeTargets(const Cue& cue, const CueList* cueList,
-                                      QList<ValidationIssue>& issues) const;
-    bool hasCircularReference(const QString& cueId, const CueList* cueList, QSet<QString>& visited,
-                              QSet<QString>& recursionStack) const;
+    [[nodiscard]] bool validateMacroIds(const Cue& cue, const CueList* cueList,
+                                        QList<ValidationIssue>& issues) const;
+    [[nodiscard]] bool validateParameters(const Cue& cue, QList<ValidationIssue>& issues) const;
+    [[nodiscard]] bool detectCircularMacroReferences(const Cue& cue, const CueList* cueList,
+                                                     QList<ValidationIssue>& issues) const;
+    [[nodiscard]] bool detectConflictingFadeTargets(const Cue& cue, const CueList* cueList,
+                                                    QList<ValidationIssue>& issues) const;
+    [[nodiscard]] bool hasCircularReference(const QString& cueId, const CueList* cueList,
+                                            QSet<QString>& visited,
+                                            QSet<QString>& recursionStack) const;
     QSet<QString> collectMacroParameters(const Cue& cue, const CueList* cueList) const;
 };
 

@@ -10,7 +10,7 @@ namespace OpenMix {
 class CueList;
 
 // command IDs for merging
-enum CommandId { EditCueId = 1, BatchEditId = 2 };
+enum class CommandId { EditCueId = 1, BatchEditId = 2 };
 
 // command for editing a single cue
 class EditCueCommand : public QUndoCommand {
@@ -20,7 +20,7 @@ class EditCueCommand : public QUndoCommand {
 
     void undo() override;
     void redo() override;
-    int id() const override { return EditCueId; }
+    int id() const override { return static_cast<int>(CommandId::EditCueId); }
     bool mergeWith(const QUndoCommand* other) override;
 
   private:

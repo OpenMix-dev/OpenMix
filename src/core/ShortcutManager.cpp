@@ -121,6 +121,7 @@ bool ShortcutManager::handleKeyPress(QKeyEvent* event) {
         }
     }
 
+
     // handle decimal point
     if (key == Qt::Key_Period || key == Qt::Key_Comma) {
         if (!m_keypadBuffer.contains('.')) {
@@ -133,6 +134,7 @@ bool ShortcutManager::handleKeyPress(QKeyEvent* event) {
             return true;
         }
     }
+
 
     // handle Enter key to confirm cue number
     if (key == Qt::Key_Return || key == Qt::Key_Enter) {
@@ -147,6 +149,7 @@ bool ShortcutManager::handleKeyPress(QKeyEvent* event) {
         }
     }
 
+
     // handle Escape to clear buffer
     if (key == Qt::Key_Escape) {
         if (!m_keypadBuffer.isEmpty()) {
@@ -154,6 +157,7 @@ bool ShortcutManager::handleKeyPress(QKeyEvent* event) {
             return true;
         }
     }
+
 
     // handle Backspace to remove last digit
     if (key == Qt::Key_Backspace) {

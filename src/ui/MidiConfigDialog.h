@@ -24,8 +24,8 @@ class MidiConfigDialog : public QDialog {
     void onDeviceListChanged();
     void onDeviceChanged(int index);
     void onRefreshDevicesClicked();
-    void onEnabledChanged(int state);
-    void onAutoReconnectChanged(int state);
+    void onEnabledChanged(Qt::CheckState state);
+    void onAutoReconnectChanged(Qt::CheckState state);
     void onAddMappingClicked();
     void onMidiLearnClicked();
     void onRemoveMappingClicked();

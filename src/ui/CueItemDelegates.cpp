@@ -31,9 +31,8 @@ void CueNumberDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
     QStyledItemDelegate::paint(painter, opt, index);
 }
 
-QWidget* CueNumberDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option,
+QWidget* CueNumberDelegate::createEditor(QWidget* parent, [[maybe_unused]] const QStyleOptionViewItem& option,
                                          const QModelIndex& index) const {
-    Q_UNUSED(option);
 
     m_currentEditIndex = index;
 
@@ -81,8 +80,8 @@ void CueNumberDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
 
     // check for conflicts with other cues
     if (m_cueList) {
-        int existingIndex = m_cueList->indexOfNumber(newNumber);
-        if (existingIndex >= 0 && existingIndex != index.row()) {
+        const auto existingIndex = m_cueList->indexOfNumber(newNumber);
+        if (existingIndex && *existingIndex != index.row()) {
             QMessageBox::warning(
                 qobject_cast<QWidget*>(editor->parent()), QObject::tr("Cue Number Conflict"),
                 QObject::tr("Cue %1 already exists. Please choose a different number.")
@@ -95,8 +94,7 @@ void CueNumberDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
 }
 
 void CueNumberDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option,
-                                             const QModelIndex& index) const {
-    Q_UNUSED(index);
+                                             [[maybe_unused]] const QModelIndex& index) const {
     editor->setGeometry(option.rect);
 }
 
@@ -104,8 +102,7 @@ bool CueNumberDelegate::eventFilter(QObject* object, QEvent* event) {
     if (event->type() == QEvent::KeyPress) {
         QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
         if (keyEvent->key() == Qt::Key_Tab || keyEvent->key() == Qt::Key_Backtab) {
-            QWidget* editor = qobject_cast<QWidget*>(object);
-            if (editor && m_currentEditIndex.isValid()) {
+            if (auto* editor = qobject_cast<QWidget*>(object); editor && m_currentEditIndex.isValid()) {
                 bool forward = (keyEvent->key() == Qt::Key_Tab);
                 emit tabNavigationRequested(m_currentEditIndex, forward);
                 return true;
@@ -132,9 +129,8 @@ void CueTypeDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
     QStyledItemDelegate::paint(painter, opt, index);
 }
 
-QWidget* CueTypeDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option,
+QWidget* CueTypeDelegate::createEditor(QWidget* parent, [[maybe_unused]] const QStyleOptionViewItem& option,
                                        const QModelIndex& index) const {
-    Q_UNUSED(option);
 
     m_currentEditIndex = index;
 
@@ -177,15 +173,12 @@ void CueTypeDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
 }
 
 void CueTypeDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option,
-                                           const QModelIndex& index) const {
-    Q_UNUSED(index);
+                                           [[maybe_unused]] const QModelIndex& index) const {
     editor->setGeometry(option.rect);
 }
 
 bool CueTypeDelegate::eventFilter(QObject* object, QEvent* event) {
-    QComboBox* comboBox = qobject_cast<QComboBox*>(object);
-
-    if (comboBox && event->type() == QEvent::KeyPress) {
+    if (auto* comboBox = qobject_cast<QComboBox*>(object); comboBox && event->type() == QEvent::KeyPress) {
         QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
 
         if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {
@@ -225,9 +218,8 @@ void CueTextDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
     QStyledItemDelegate::paint(painter, opt, index);
 }
 
-QWidget* CueTextDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option,
+QWidget* CueTextDelegate::createEditor(QWidget* parent, [[maybe_unused]] const QStyleOptionViewItem& option,
                                        const QModelIndex& index) const {
-    Q_UNUSED(option);
 
     m_currentEditIndex = index;
 
@@ -253,8 +245,7 @@ void CueTextDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
 }
 
 void CueTextDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option,
-                                           const QModelIndex& index) const {
-    Q_UNUSED(index);
+                                           [[maybe_unused]] const QModelIndex& index) const {
     editor->setGeometry(option.rect);
 }
 
@@ -262,8 +253,7 @@ bool CueTextDelegate::eventFilter(QObject* object, QEvent* event) {
     if (event->type() == QEvent::KeyPress) {
         QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
         if (keyEvent->key() == Qt::Key_Tab || keyEvent->key() == Qt::Key_Backtab) {
-            QWidget* editor = qobject_cast<QWidget*>(object);
-            if (editor && m_currentEditIndex.isValid()) {
+            if (auto* editor = qobject_cast<QWidget*>(object); editor && m_currentEditIndex.isValid()) {
                 bool forward = (keyEvent->key() == Qt::Key_Tab);
                 emit tabNavigationRequested(m_currentEditIndex, forward);
                 return true;

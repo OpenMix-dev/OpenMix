@@ -13,6 +13,18 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    if(MSVC)
+        foreach(config DEBUG RELWITHDEBINFO)
+            string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_${config} "${CMAKE_CXX_FLAGS_${config}}")
+            string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_${config} "${CMAKE_C_FLAGS_${config}}")
+        endforeach()
+    endif()
+endif()
+
 # find Qt6
 find_package(Qt6 REQUIRED COMPONENTS
     Core
@@ -40,8 +52,27 @@ else()
 endif()
 
 # RtMidi
-set(RTMIDI_SOURCES libs/RtMidi/RtMidi.cpp)
-set(RTMIDI_HEADERS libs/RtMidi/RtMidi.h)
+add_library(RtMidi STATIC libs/RtMidi/RtMidi.cpp libs/RtMidi/RtMidi.h)
+target_include_directories(RtMidi PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/libs/RtMidi)
+if(WIN32)
+    target_compile_definitions(RtMidi PUBLIC __WINDOWS_MM__)
+    target_compile_options(RtMidi PRIVATE /FIwindows.h)
+    target_link_libraries(RtMidi PUBLIC winmm)
+elseif(APPLE)
+    target_compile_definitions(RtMidi PUBLIC __MACOSX_CORE__)
+    find_library(COREMIDI_LIBRARY CoreMIDI REQUIRED)
+    find_library(COREAUDIO_LIBRARY CoreAudio REQUIRED)
+    find_library(COREFOUNDATION_LIBRARY CoreFoundation REQUIRED)
+    target_link_libraries(RtMidi PUBLIC
+        ${COREMIDI_LIBRARY}
+        ${COREAUDIO_LIBRARY}
+        ${COREFOUNDATION_LIBRARY}
+    )
+else()
+    target_compile_definitions(RtMidi PUBLIC __LINUX_ALSA__)
+    find_package(ALSA REQUIRED)
+    target_link_libraries(RtMidi PUBLIC ALSA::ALSA)
+endif()
 
 # source files
 set(SOURCES
@@ -214,8 +245,6 @@ set(RESOURCES
 add_executable(${PROJECT_NAME}
     ${SOURCES}
     ${HEADERS}
-    ${RTMIDI_SOURCES}
-    ${RTMIDI_HEADERS}
     ${RESOURCES}
 )
 
@@ -224,7 +253,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs/RtMidi
 )
 
 # link libraries
@@ -244,31 +272,28 @@ else()
     target_link_libraries(${PROJECT_NAME} PRIVATE PkgConfig::LIBLO)
 endif()
 
-# RtMidi config
-if(WIN32)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE __WINDOWS_MM__)
-    target_link_libraries(${PROJECT_NAME} PRIVATE winmm)
-    set_source_files_properties(libs/RtMidi/RtMidi.cpp PROPERTIES
-        COMPILE_FLAGS "/FIwindows.h"
-    )
-elseif(APPLE)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE __MACOSX_CORE__)
-    find_library(COREMIDI_LIBRARY CoreMIDI)
-    find_library(COREAUDIO_LIBRARY CoreAudio)
-    find_library(COREFOUNDATION_LIBRARY CoreFoundation)
-    target_link_libraries(${PROJECT_NAME} PRIVATE
-        ${COREMIDI_LIBRARY}
-        ${COREAUDIO_LIBRARY}
-        ${COREFOUNDATION_LIBRARY}
-    )
-else()
-    target_compile_definitions(${PROJECT_NAME} PRIVATE __LINUX_ALSA__)
-    find_package(ALSA REQUIRED)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ALSA::ALSA)
-endif()
+target_link_libraries(${PROJECT_NAME} PRIVATE RtMidi)
+
+target_precompile_headers(${PROJECT_NAME} PRIVATE
+    <QObject>
+    <QString>
+    <QStringList>
+    <QVector>
+    <QList>
+    <QMap>
+    <QHash>
+    <QSet>
+    <QTimer>
+    <QVariant>
+    <QJsonObject>
+    <QJsonArray>
+    <functional>
+    <optional>
+)
 
 # platform-specific settings
 if(WIN32)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NOMINMAX)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         WIN32_EXECUTABLE TRUE
     )
