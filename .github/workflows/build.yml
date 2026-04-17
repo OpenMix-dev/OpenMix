@@ -48,14 +48,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+      - name: Cache Qt
+        id: cache-qt
+        uses: actions/cache@v4
         with:
-          version: "6.11.0"
-          host: "windows"
-          target: "desktop"
-          arch: "win64_msvc2022_64"
-          aqtversion: ">=3.3.0"
+          path: C:\Qt\6.11.0\msvc2022_64
+          key: qt-6.11.0-msvc2022_64
+
+      - name: Download Qt
+        if: steps.cache-qt.outputs.cache-hit != 'true'
+        run: |
+          gh release download qt-deps --pattern "msvc2022_64.zip" --dir $env:TEMP
+          Expand-Archive -Path "$env:TEMP\msvc2022_64.zip" -DestinationPath C:\Qt\6.11.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install liblo via vcpkg
         run: vcpkg install liblo:x64-windows
@@ -71,7 +77,7 @@ jobs:
           key: ${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
 
       - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DCMAKE_PREFIX_PATH="C:\Qt\6.11.0\msvc2022_64"
 
       - name: Build
         run: cmake --build build --parallel
@@ -80,7 +86,7 @@ jobs:
         run: |
           mkdir build\deploy
           copy build\OpenMix.exe build\deploy\
-          windeployqt --release build\deploy\OpenMix.exe
+          C:\Qt\6.11.0\msvc2022_64\bin\windeployqt --release build\deploy\OpenMix.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
