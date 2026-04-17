@@ -55,6 +55,7 @@ jobs:
           host: "windows"
           target: "desktop"
           arch: "win64_msvc2022_64"
+          mirror: "https://download.qt.io"
 
       - name: Install liblo via vcpkg
         run: vcpkg install liblo:x64-windows
