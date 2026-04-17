@@ -10,52 +10,61 @@ CueFilterProxyModel::CueFilterProxyModel(QObject* parent) : QSortFilterProxyMode
 }
 
 void CueFilterProxyModel::setTypeFilter(CueType type) {
+    beginFilterChange();
     m_filterByType = true;
     m_typeFilter = type;
-    invalidateFilter();
+    endFilterChange();
 }
 
 void CueFilterProxyModel::clearTypeFilter() {
+    beginFilterChange();
     m_filterByType = false;
-    invalidateFilter();
+    endFilterChange();
 }
 
 void CueFilterProxyModel::setGroupFilter(const QString& group) {
+    beginFilterChange();
     m_groupFilter = group;
-    invalidateFilter();
+    endFilterChange();
 }
 
 void CueFilterProxyModel::clearGroupFilter() {
+    beginFilterChange();
     m_groupFilter.clear();
-    invalidateFilter();
+    endFilterChange();
 }
 
 void CueFilterProxyModel::setTagFilter(const QString& tag) {
+    beginFilterChange();
     m_tagFilter = tag;
-    invalidateFilter();
+    endFilterChange();
 }
 
 void CueFilterProxyModel::clearTagFilter() {
+    beginFilterChange();
     m_tagFilter.clear();
-    invalidateFilter();
+    endFilterChange();
 }
 
 void CueFilterProxyModel::setTextFilter(const QString& text) {
+    beginFilterChange();
     m_textFilter = text;
-    invalidateFilter();
+    endFilterChange();
 }
 
 void CueFilterProxyModel::clearTextFilter() {
+    beginFilterChange();
     m_textFilter.clear();
-    invalidateFilter();
+    endFilterChange();
 }
 
 void CueFilterProxyModel::clearAllFilters() {
+    beginFilterChange();
     m_filterByType = false;
     m_groupFilter.clear();
     m_tagFilter.clear();
     m_textFilter.clear();
-    invalidateFilter();
+    endFilterChange();
 }
 
 QStringList CueFilterProxyModel::availableGroups() const {

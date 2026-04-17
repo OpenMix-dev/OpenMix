@@ -24,7 +24,7 @@ class LogViewerDialog : public QDialog {
     void onLevelFilterChanged(int index);
     void onSourceFilterChanged(int index);
     void onSearchTextChanged(const QString& text);
-    void onAutoScrollChanged(int state);
+    void onAutoScrollChanged(Qt::CheckState state);
     void onClearClicked();
     void onExportClicked();
     void onEntryAdded();

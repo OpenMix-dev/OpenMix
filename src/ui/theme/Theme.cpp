@@ -44,9 +44,8 @@ QFont monoFont(int size) {
     QStringList monoFonts = {"JetBrains Mono", "Cascadia Code", "SF Mono",         "Consolas",
                              "Monaco",         "Menlo",         "DejaVu Sans Mono"};
 
-    QFontDatabase fontDb;
     for (const QString& fontName : monoFonts) {
-        if (fontDb.families().contains(fontName)) {
+        if (QFontDatabase::families().contains(fontName)) {
             QFont font(fontName);
             font.setPointSize(size);
             font.setStyleHint(QFont::Monospace);
