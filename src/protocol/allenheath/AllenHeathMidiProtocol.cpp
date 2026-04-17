@@ -165,6 +165,7 @@ QByteArray AllenHeathMidiProtocol::buildNRPNMessage(int channel, int nrpnMsb, in
     return msg;
 }
 
+// SysEx builders
 QByteArray AllenHeathMidiProtocol::buildSysExSceneRecall(int sceneNumber) {
     QByteArray msg;
     // Allen & Heath SysEx header

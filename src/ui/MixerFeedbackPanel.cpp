@@ -12,6 +12,7 @@
 #include <QLineEdit>
 #include <QRegularExpression>
 #include <QTimer>
+#include <algorithm>
 
 namespace OpenMix {
 
@@ -57,7 +58,7 @@ void MixerFeedbackPanel::connectDCASignals(DCAWidget* dca) {
 }
 
 void MixerFeedbackPanel::setDCACount(int count) {
-    count = qBound(1, count, 24); // support up to 24 DCAs (WING max)
+    count = std::clamp(count, 1, 24); // support up to 24 DCAs (WING max)
 
     QHBoxLayout* layout = qobject_cast<QHBoxLayout*>(this->layout());
     if (!layout)
@@ -213,9 +214,8 @@ void MixerFeedbackPanel::onDCALabelEdited(int dcaNumber, const QString& newLabel
     cue->setParameter(path, newLabel);
 
     // update cue in list
-    int cueIndex = cueList->indexOf(m_activeCueId);
-    if (cueIndex >= 0) {
-        cueList->updateCue(cueIndex, *cue);
+    if (const auto cueIndex = cueList->indexOf(m_activeCueId)) {
+        cueList->updateCue(*cueIndex, *cue);
     }
 
     // update widget immediately
@@ -266,13 +266,13 @@ void MixerFeedbackPanel::loadCueSettings(const QString& cueId) {
     }
 
     CueList* cueList = m_app->show()->cueList();
-    int index = cueList->indexOf(cueId);
-    if (index < 0) {
+    const auto index = cueList->indexOf(cueId);
+    if (!index) {
         clearCueSettings();
         return;
     }
 
-    const Cue& cue = cueList->at(index);
+    const Cue& cue = cueList->at(*index);
 
     // load /dca/N/label values from cue
     for (int i = 1; i <= m_dcaWidgets.size(); ++i) {

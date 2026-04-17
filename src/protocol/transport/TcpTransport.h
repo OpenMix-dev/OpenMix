@@ -13,14 +13,14 @@ class TcpTransport : public QObject {
     explicit TcpTransport(QObject* parent = nullptr);
     ~TcpTransport() override;
 
-    bool connect(const QString& host, int port);
+    [[nodiscard]] bool connect(const QString& host, int port);
     void disconnect();
-    bool isConnected() const;
+    [[nodiscard]] bool isConnected() const;
 
     bool send(const QByteArray& data);
 
-    QString host() const { return m_host; }
-    int port() const { return m_port; }
+    [[nodiscard]] QString host() const { return m_host; }
+    [[nodiscard]] int port() const noexcept { return m_port; }
 
     void setConnectionTimeout(int ms) { m_connectionTimeoutMs = ms; }
     void setReconnectEnabled(bool enabled) { m_reconnectEnabled = enabled; }

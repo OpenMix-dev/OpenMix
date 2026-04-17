@@ -141,7 +141,7 @@ void LogViewerDialog::onSourceFilterChanged(int index) {
 
 void LogViewerDialog::onSearchTextChanged(const QString& text) { m_model->setSearchText(text); }
 
-void LogViewerDialog::onAutoScrollChanged(int state) { Q_UNUSED(state) }
+void LogViewerDialog::onAutoScrollChanged([[maybe_unused]] int state) {}
 
 void LogViewerDialog::onClearClicked() {
     QMessageBox::StandardButton reply = QMessageBox::question(

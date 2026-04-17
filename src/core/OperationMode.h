@@ -17,31 +17,31 @@ class OperationModeManager : public QObject {
   public:
     explicit OperationModeManager(QObject* parent = nullptr);
 
-    AppMode currentMode() const { return m_mode; }
+    [[nodiscard]] AppMode currentMode() const noexcept { return m_mode; }
     void setMode(AppMode mode);
 
-    QString modeString() const;
-    static QString modeString(AppMode mode);
+    [[nodiscard]] QString modeString() const;
+    [[nodiscard]] static QString modeString(AppMode mode);
 
-    bool canEditCues();          // programmer only
-    bool canDeleteCues();        // programmer only
-    bool canModifyShow();        // programmer only
-    bool canAddCues();           // programmer only
-    bool canRenumberCues();      // programmer only
-    bool canOpenShow();          // programmer only
-    bool canNewShow();           // programmer only
-    bool canSaveShow() const;          // always (emergency save)
-    bool canGo() const;                // always
-    bool canStop() const;              // always
-    bool canNavigateCues() const;      // always
-    bool canUsePanic() const;          // always
-    bool canViewTimeline() const;      // always
-    bool canViewMixerFeedback() const; // always
+    [[nodiscard]] bool canEditCues();          // programmer only
+    [[nodiscard]] bool canDeleteCues();        // programmer only
+    [[nodiscard]] bool canModifyShow();        // programmer only
+    [[nodiscard]] bool canAddCues();           // programmer only
+    [[nodiscard]] bool canRenumberCues();      // programmer only
+    [[nodiscard]] bool canOpenShow();          // programmer only
+    [[nodiscard]] bool canNewShow();           // programmer only
+    [[nodiscard]] bool canSaveShow() const;          // always (emergency save)
+    [[nodiscard]] bool canGo() const;                // always
+    [[nodiscard]] bool canStop() const;              // always
+    [[nodiscard]] bool canNavigateCues() const;      // always
+    [[nodiscard]] bool canUsePanic() const;          // always
+    [[nodiscard]] bool canViewTimeline() const;      // always
+    [[nodiscard]] bool canViewMixerFeedback() const; // always
 
     void setShowModePassword(const QString& password);
     void clearPassword();
-    bool hasPassword() const { return !m_passwordHash.isEmpty(); }
-    bool validatePassword(const QString& password) const;
+    [[nodiscard]] bool hasPassword() const noexcept { return !m_passwordHash.isEmpty(); }
+    [[nodiscard]] bool validatePassword(const QString& password) const;
 
     bool switchToProgrammerMode(const QString& password = QString());
     void switchToShowMode();
@@ -50,7 +50,7 @@ class OperationModeManager : public QObject {
     void loadFromSettings();
 
     void setSaveMode(bool enabled) { m_saveMode = enabled; }
-    bool saveMode() const { return m_saveMode; }
+    [[nodiscard]] bool saveMode() const noexcept { return m_saveMode; }
 
   signals:
     void modeChanged(AppMode mode);

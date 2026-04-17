@@ -7,13 +7,14 @@
 #include <QObject>
 #include <QString>
 #include <QVector>
+#include <functional>
 
 namespace OpenMix {
 
 struct PlaybackLogEntry {
     QDateTime timestamp;
 
-    enum Type {
+    enum class Type {
         CueExecuted,
         MacroExpanded,
         AutoFollowTriggered,
@@ -36,7 +37,7 @@ struct PlaybackLogEntry {
 
     // serialize to JSON for file export
     QJsonObject toJson() const;
-    static PlaybackLogEntry fromJson(const QJsonObject& json);
+    [[nodiscard]] static PlaybackLogEntry fromJson(const QJsonObject& json);
 };
 
 class PlaybackLogger : public QObject {
@@ -48,13 +49,13 @@ class PlaybackLogger : public QObject {
 
     // file logging
     void setLogFile(const QString& path);
-    QString logFilePath() const { return m_logFilePath; }
-    bool isFileLoggingEnabled() const { return m_logFile.isOpen(); }
+    [[nodiscard]] QString logFilePath() const { return m_logFilePath; }
+    [[nodiscard]] bool isFileLoggingEnabled() const { return m_logFile.isOpen(); }
     void closeLogFile();
 
     // maximum entries to keep in memory (0 = unlimited)
     void setMaxMemoryEntries(int max) { m_maxMemoryEntries = max; }
-    int maxMemoryEntries() const { return m_maxMemoryEntries; }
+    [[nodiscard]] int maxMemoryEntries() const noexcept { return m_maxMemoryEntries; }
 
     // log entries
     void log(PlaybackLogEntry::Type type, const QString& cueId, const QString& details,
@@ -71,14 +72,14 @@ class PlaybackLogger : public QObject {
     void logStateCapture(const QString& description, const QJsonObject& state);
 
     // retrieve logged entries
-    QVector<PlaybackLogEntry> allEntries() const;
-    QVector<PlaybackLogEntry> recentEntries(int count = 100) const;
-    QVector<PlaybackLogEntry> entriesSince(const QDateTime& since) const;
-    QVector<PlaybackLogEntry> entriesForCue(const QString& cueId) const;
+    [[nodiscard]] QVector<PlaybackLogEntry> allEntries() const;
+    [[nodiscard]] QVector<PlaybackLogEntry> recentEntries(int count = 100) const;
+    [[nodiscard]] QVector<PlaybackLogEntry> entriesSince(const QDateTime& since) const;
+    [[nodiscard]] QVector<PlaybackLogEntry> entriesForCue(const QString& cueId) const;
 
     // export
-    bool exportToFile(const QString& path) const;
-    bool exportToCSV(const QString& path) const;
+    [[nodiscard]] bool exportToFile(const QString& path) const;
+    [[nodiscard]] bool exportToCSV(const QString& path) const;
 
     // clear logs
     void clear();
@@ -91,10 +92,14 @@ class PlaybackLogger : public QObject {
     void addEntry(const PlaybackLogEntry& entry);
     void writeToFile(const PlaybackLogEntry& entry);
     void pruneOldEntries();
+    [[nodiscard]] QVector<PlaybackLogEntry>
+    entriesMatching(std::function<bool(const PlaybackLogEntry&)> predicate) const;
+
+    static constexpr int DEFAULT_MAX_MEMORY_ENTRIES = 10000;
 
     mutable QMutex m_mutex;
     QVector<PlaybackLogEntry> m_entries;
-    int m_maxMemoryEntries = 10000; // default 10k entries in memory
+    int m_maxMemoryEntries = DEFAULT_MAX_MEMORY_ENTRIES;
 
     QString m_logFilePath;
     QFile m_logFile;

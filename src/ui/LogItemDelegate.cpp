@@ -94,8 +94,7 @@ void LogItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
 }
 
 QSize LogItemDelegate::sizeHint(const QStyleOptionViewItem& option,
-                                const QModelIndex& index) const {
-    Q_UNUSED(index)
+                                [[maybe_unused]] const QModelIndex& index) const {
     return QSize(option.rect.width(), 36);
 }
 

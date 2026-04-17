@@ -15,11 +15,11 @@ class ProjectFile {
     static bool save(const Show* show, const QString& filePath, QString* errorMsg = nullptr);
     static bool load(Show* show, const QString& filePath, QString* errorMsg = nullptr);
 
-    static QStringList recentProjects();
+    [[nodiscard]] static QStringList recentProjects();
     static void addRecentProject(const QString& filePath);
     static void removeRecentProject(const QString& filePath);
     static void clearRecentProjects();
-    static int maxRecentProjects() { return 10; }
+    [[nodiscard]] static int maxRecentProjects() noexcept { return 10; }
 
   private:
     static QString recentProjectsKey();

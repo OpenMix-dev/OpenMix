@@ -1,5 +1,6 @@
 #include "DCAMappingPanel.h"
 #include "app/Application.h"
+#include "MainWindow.h"
 #include "core/Cue.h"
 #include "core/DCAMapping.h"
 #include "core/ShortcutManager.h"
@@ -10,9 +11,14 @@
 #include "theme/Theme.h"
 
 #include <QCheckBox>
+#include <QComboBox>
+#include <QKeyEvent>
+#include <QTimer>
+#include <QWheelEvent>
 #include <QFileDialog>
 #include <QGridLayout>
 #include <QGroupBox>
+#include <algorithm>
 #include <QHBoxLayout>
 #include <QJsonDocument>
 #include <QLabel>
@@ -26,6 +32,37 @@
 #include <memory>
 
 namespace OpenMix {
+
+class NoScrollComboBox : public QComboBox {
+  public:
+    using QComboBox::QComboBox;
+
+  protected:
+    void wheelEvent(QWheelEvent* event) override { event->ignore(); }
+
+    void showPopup() override {
+        m_popupOpen = true;
+        QComboBox::showPopup();
+    }
+
+    void hidePopup() override {
+        QComboBox::hidePopup();
+        QTimer::singleShot(100, this, [this]() { m_popupOpen = false; });
+    }
+
+    void keyPressEvent(QKeyEvent* event) override {
+        int key = event->key();
+        if ((key == Qt::Key_Return || key == Qt::Key_Enter) && !m_popupOpen) {
+            showPopup();
+            event->accept();
+        } else {
+            QComboBox::keyPressEvent(event);
+        }
+    }
+
+  private:
+    bool m_popupOpen = false;
+};
 
 DCAMappingPanel::DCAMappingPanel(Application* app, QWidget* parent)
     : QWidget(parent), m_app(app), m_mapping(nullptr) {
@@ -328,18 +365,16 @@ void DCAMappingPanel::populateFromMapping() {
 
     // build reverse lookup from channel -> DCA
     QMap<int, int> channelToDCA;
-    for (auto it = channelMap.constBegin(); it != channelMap.constEnd(); ++it) {
-        int dca = it.key();
-        for (int ch : it.value()) {
+    for (const auto& [dca, channels] : channelMap.asKeyValueRange()) {
+        for (int ch : channels) {
             channelToDCA[ch] = dca;
         }
     }
 
     // build reverse lookup from bus -> DCA
     QMap<int, int> busToDCA;
-    for (auto it = busMap.constBegin(); it != busMap.constEnd(); ++it) {
-        int dca = it.key();
-        for (int bus : it.value()) {
+    for (const auto& [dca, buses] : busMap.asKeyValueRange()) {
+        for (int bus : buses) {
             busToDCA[bus] = dca;
         }
     }
@@ -387,18 +422,16 @@ void DCAMappingPanel::updateComboItemStates() {
 
     // build reverse lookup from channel -> DCA
     QMap<int, int> channelToDCA;
-    for (auto it = channelMap.constBegin(); it != channelMap.constEnd(); ++it) {
-        int dca = it.key();
-        for (int ch : it.value()) {
+    for (const auto& [dca, channels] : channelMap.asKeyValueRange()) {
+        for (int ch : channels) {
             channelToDCA[ch] = dca;
         }
     }
 
     // build reverse lookup from bus -> DCA
     QMap<int, int> busToDCA;
-    for (auto it = busMap.constBegin(); it != busMap.constEnd(); ++it) {
-        int dca = it.key();
-        for (int bus : it.value()) {
+    for (const auto& [dca, buses] : busMap.asKeyValueRange()) {
+        for (int bus : buses) {
             busToDCA[bus] = dca;
         }
     }
@@ -508,8 +541,8 @@ void DCAMappingPanel::syncFromMixer() {
     // X32/M32/loopback use zero-padded paths, WING uses non-padded
     bool useZeroPadding = (caps.type != ConsoleType::Wing);
 
-    int channelCount = qMin(caps.inputChannels, 32);
-    int busCount = qMin(caps.mixBuses, 16);
+    int channelCount = std::min(caps.inputChannels, 32);
+    int busCount = std::min(caps.mixBuses, 16);
     state->pendingCount = channelCount + busCount;
 
     // capture references for callbacks
@@ -523,10 +556,7 @@ void DCAMappingPanel::syncFromMixer() {
             return;
 
         // requests completed, populate mapping from bitmasks
-        for (auto it = state->channelDCAMasks.constBegin(); it != state->channelDCAMasks.constEnd();
-             ++it) {
-            int channel = it.key();
-            int mask = it.value();
+        for (const auto& [channel, mask] : state->channelDCAMasks.asKeyValueRange()) {
             for (int d = 1; d <= dcaCount; ++d) {
                 if (mask & (1 << (d - 1))) {
                     mapping->assignChannelToDCA(channel, d);
@@ -534,9 +564,7 @@ void DCAMappingPanel::syncFromMixer() {
             }
         }
 
-        for (auto it = state->busDCAMasks.constBegin(); it != state->busDCAMasks.constEnd(); ++it) {
-            int bus = it.key();
-            int mask = it.value();
+        for (const auto& [bus, mask] : state->busDCAMasks.asKeyValueRange()) {
             for (int d = 1; d <= dcaCount; ++d) {
                 if (mask & (1 << (d - 1))) {
                     mapping->assignBusToDCA(bus, d);
@@ -653,8 +681,8 @@ void DCAMappingPanel::onChannelDCAChanged(int channel, int dca) {
         QMap<int, QList<int>> channelMap = m_currentCue->dcaChannelMapping();
 
         // remove from any existing DCA
-        for (auto it = channelMap.begin(); it != channelMap.end(); ++it) {
-            it.value().removeAll(channel);
+        for (auto& channels : channelMap) {
+            channels.removeAll(channel);
         }
 
         // add to new DCA
@@ -681,8 +709,8 @@ void DCAMappingPanel::onBusDCAChanged(int bus, int dca) {
         QMap<int, QList<int>> busMap = m_currentCue->dcaBusMapping();
 
         // remove from any existing DCA
-        for (auto it = busMap.begin(); it != busMap.end(); ++it) {
-            it.value().removeAll(bus);
+        for (auto& buses : busMap) {
+            buses.removeAll(bus);
         }
 
         // add to new DCA
@@ -812,16 +840,14 @@ QString DCAMappingPanel::busDisplayName(int bus) const {
 
 bool DCAMappingPanel::eventFilter(QObject* obj, QEvent* event) {
     if (event->type() == QEvent::MouseButtonDblClick) {
-        QLabel* label = qobject_cast<QLabel*>(obj);
-        if (label && label->property("busIndex").isValid()) {
+        if (auto* label = qobject_cast<QLabel*>(obj); label && label->property("busIndex").isValid()) {
             int bus = label->property("busIndex").toInt();
             startBusNameEdit(bus);
             return true;
         }
     }
     if (event->type() == QEvent::KeyPress) {
-        QLineEdit* edit = qobject_cast<QLineEdit*>(obj);
-        if (edit && edit->property("busIndex").isValid()) {
+        if (auto* edit = qobject_cast<QLineEdit*>(obj); edit && edit->property("busIndex").isValid()) {
             QKeyEvent* ke = static_cast<QKeyEvent*>(event);
             if (ke->key() == Qt::Key_Escape) {
                 int bus = edit->property("busIndex").toInt();
@@ -831,8 +857,7 @@ bool DCAMappingPanel::eventFilter(QObject* obj, QEvent* event) {
         }
     }
     if (event->type() == QEvent::FocusOut) {
-        QLineEdit* edit = qobject_cast<QLineEdit*>(obj);
-        if (edit && edit->property("busIndex").isValid()) {
+        if (auto* edit = qobject_cast<QLineEdit*>(obj); edit && edit->property("busIndex").isValid()) {
             int bus = edit->property("busIndex").toInt();
             finishBusNameEdit(bus);
             return false;

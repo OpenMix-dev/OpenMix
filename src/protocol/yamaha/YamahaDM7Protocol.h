@@ -12,7 +12,7 @@ class YamahaDM7Protocol : public YamahaProtocol {
   public:
     explicit YamahaDM7Protocol(const MixerCapabilities& caps, QObject* parent = nullptr);
 
-    QString protocolDescription() const override { return "Yamaha DM7 Protocol"; }
+    [[nodiscard]] QString protocolDescription() const override { return "Yamaha DM7 Protocol"; }
 
   protected:
     void initializeSnapshotParams() override;

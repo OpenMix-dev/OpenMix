@@ -6,6 +6,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QToolTip>
+#include <algorithm>
 
 namespace OpenMix {
 
@@ -89,8 +90,7 @@ QString CueConfidenceIndicator::iconForLevel(ConfidenceLevel level) {
     return "?";
 }
 
-void CueConfidenceIndicator::paintEvent(QPaintEvent* event) {
-    Q_UNUSED(event);
+void CueConfidenceIndicator::paintEvent([[maybe_unused]] QPaintEvent* event) {
 
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
@@ -98,7 +98,7 @@ void CueConfidenceIndicator::paintEvent(QPaintEvent* event) {
     QColor color = colorForLevel(m_level);
 
     // draw filled circle
-    int size = qMin(width(), height());
+    int size = std::min(width(), height());
     int margin = 2;
     QRect circleRect(margin, margin, size - margin * 2, size - margin * 2);
 

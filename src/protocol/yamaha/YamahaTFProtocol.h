@@ -12,7 +12,7 @@ class YamahaTFProtocol : public YamahaProtocol {
   public:
     explicit YamahaTFProtocol(const MixerCapabilities& caps, QObject* parent = nullptr);
 
-    QString protocolDescription() const override { return "Yamaha TF Protocol"; }
+    [[nodiscard]] QString protocolDescription() const override { return "Yamaha TF Protocol"; }
 
   protected:
     void initializeSnapshotParams() override;

@@ -12,7 +12,7 @@ class YamahaCLProtocol : public YamahaProtocol {
   public:
     explicit YamahaCLProtocol(const MixerCapabilities& caps, QObject* parent = nullptr);
 
-    QString protocolDescription() const override { return "Yamaha CL Protocol"; }
+    [[nodiscard]] QString protocolDescription() const override { return "Yamaha CL Protocol"; }
 
   protected:
     void initializeSnapshotParams() override;

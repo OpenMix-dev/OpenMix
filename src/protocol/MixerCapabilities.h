@@ -48,6 +48,13 @@ enum class Manufacturer { Behringer, Midas, AllenHeath, Yamaha, Unknown };
 
 // capabilities descriptor for each console type
 struct MixerCapabilities {
+    static constexpr int DEFAULT_PORT = 10023;
+    static constexpr int DEFAULT_DCA_COUNT = 8;
+    static constexpr int DEFAULT_INPUT_CHANNELS = 32;
+    static constexpr int DEFAULT_MIX_BUSES = 16;
+    static constexpr int DEFAULT_SCENES = 100;
+    static constexpr int DEFAULT_MAX_DCA_NAME_LENGTH = 6;
+
     ConsoleType type = ConsoleType::Unknown;
     Manufacturer manufacturer = Manufacturer::Unknown;
     ProtocolType protocol = ProtocolType::OscUdp;
@@ -55,13 +62,13 @@ struct MixerCapabilities {
     QString displayName; // human-readable name
     QString protocolId;  // ID for factory lookup ("x32", "wing", "sq", etc.)
 
-    int defaultPort = 10023;  // default port
-    int dcaCount = 8;         // # of DCAs
-    int inputChannels = 32;   // # of input channels
-    int mixBuses = 16;        // # of mix buses
-    int matrixOutputs = 0;    // # of matrix outputs
-    int scenes = 100;         // # of scene/snapshot slots
-    int maxDCANameLength = 6; // default to safe minimum
+    int defaultPort = DEFAULT_PORT;
+    int dcaCount = DEFAULT_DCA_COUNT;
+    int inputChannels = DEFAULT_INPUT_CHANNELS;
+    int mixBuses = DEFAULT_MIX_BUSES;
+    int matrixOutputs = 0;
+    int scenes = DEFAULT_SCENES;
+    int maxDCANameLength = DEFAULT_MAX_DCA_NAME_LENGTH;
 
     bool supportsSceneRecall = true;
     bool supportsDCAMute = true;
@@ -76,13 +83,13 @@ struct MixerCapabilities {
     int effectSendBuses = 0; // # of effect send buses
     bool supportsEffectSends = false;
 
-    static MixerCapabilities forConsole(ConsoleType type);
-    static MixerCapabilities forProtocolId(const QString& protocolId);
-    static QVector<MixerCapabilities> allSupported();
-    static QVector<MixerCapabilities> forManufacturer(Manufacturer manufacturer);
+    [[nodiscard]] static MixerCapabilities forConsole(ConsoleType type);
+    [[nodiscard]] static MixerCapabilities forProtocolId(const QString& protocolId);
+    [[nodiscard]] static QVector<MixerCapabilities> allSupported();
+    [[nodiscard]] static QVector<MixerCapabilities> forManufacturer(Manufacturer manufacturer);
 
-    bool isSupported() const;
-    QString manufacturerName() const;
+    [[nodiscard]] bool isSupported() const;
+    [[nodiscard]] QString manufacturerName() const;
 };
 
 // convert between types & strings

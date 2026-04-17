@@ -15,9 +15,9 @@ class OscTransport : public QObject {
     explicit OscTransport(QObject* parent = nullptr);
     ~OscTransport() override;
 
-    bool connect(const QString& host, int port);
+    [[nodiscard]] bool connect(const QString& host, int port);
     void disconnect();
-    bool isConnected() const { return m_connected; }
+    [[nodiscard]] bool isConnected() const noexcept { return m_connected; }
 
     void send(const QString& path);
     void send(const QString& path, float value);
@@ -25,8 +25,8 @@ class OscTransport : public QObject {
     void send(const QString& path, const QString& value);
     void send(const QString& path, const QVariant& value);
 
-    QString host() const { return m_host; }
-    int port() const { return m_port; }
+    [[nodiscard]] QString host() const { return m_host; }
+    [[nodiscard]] int port() const noexcept { return m_port; }
 
   signals:
     void connected();

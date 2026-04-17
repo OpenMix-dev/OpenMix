@@ -6,8 +6,13 @@
 #include <QJsonDocument>
 #include <QSettings>
 #include <RtMidi.h>
+#include <algorithm>
 
 namespace OpenMix {
+
+namespace {
+constexpr int DEVICE_POLL_INTERVAL_MS = 2000;
+} // namespace
 
 MidiInputManager::MidiInputManager(QObject* parent) : QObject(parent) {
     try {
@@ -17,7 +22,7 @@ MidiInputManager::MidiInputManager(QObject* parent) : QObject(parent) {
     }
 
     // device polling timer for hot-plug detection
-    m_devicePollTimer.setInterval(2000);
+    m_devicePollTimer.setInterval(DEVICE_POLL_INTERVAL_MS);
     connect(&m_devicePollTimer, &QTimer::timeout, this, &MidiInputManager::onDevicePollTimer);
     m_devicePollTimer.start();
 }
@@ -73,13 +78,8 @@ bool MidiInputManager::openDevice(int deviceIndex) {
 }
 
 bool MidiInputManager::openDevice(const QString& deviceName) {
-    QVector<MidiDeviceInfo> devices = availableDevices();
-    for (const MidiDeviceInfo& dev : devices) {
-        if (dev.name == deviceName) {
-            return openDevice(dev.index);
-        }
-    }
-    return false;
+    const int idx = findDeviceIndex(deviceName);
+    return idx >= 0 ? openDevice(idx) : false;
 }
 
 void MidiInputManager::closeDevice() {
@@ -210,14 +210,15 @@ void MidiInputManager::onDevicePollTimer() {
 bool MidiInputManager::tryReconnect() {
     if (m_savedDeviceName.isEmpty())
         return false;
+    const int idx = findDeviceIndex(m_savedDeviceName);
+    return idx >= 0 ? openDevice(idx) : false;
+}
 
-    QVector<MidiDeviceInfo> devices = availableDevices();
-    for (const MidiDeviceInfo& dev : devices) {
-        if (dev.name == m_savedDeviceName) {
-            return openDevice(dev.index);
-        }
-    }
-    return false;
+int MidiInputManager::findDeviceIndex(const QString& deviceName) const {
+    const auto devices = availableDevices();
+    auto it = std::find_if(devices.cbegin(), devices.cend(),
+                           [&deviceName](const MidiDeviceInfo& dev) { return dev.name == deviceName; });
+    return it != devices.cend() ? it->index : -1;
 }
 
 void MidiInputManager::midiCallback(double /*timeStamp*/, std::vector<unsigned char>* message,

@@ -109,8 +109,7 @@ void MacroPreviewWidget::clear() {
     m_headerLabel->setText(tr("Macro Preview"));
 }
 
-void MacroPreviewWidget::onItemClicked(QTreeWidgetItem* item, int column) {
-    Q_UNUSED(column);
+void MacroPreviewWidget::onItemClicked(QTreeWidgetItem* item, [[maybe_unused]] int column) {
     if (item) {
         QString cueId = item->data(0, Qt::UserRole).toString();
         if (!cueId.isEmpty()) {
@@ -119,8 +118,7 @@ void MacroPreviewWidget::onItemClicked(QTreeWidgetItem* item, int column) {
     }
 }
 
-void MacroPreviewWidget::onItemDoubleClicked(QTreeWidgetItem* item, int column) {
-    Q_UNUSED(column);
+void MacroPreviewWidget::onItemDoubleClicked(QTreeWidgetItem* item, [[maybe_unused]] int column) {
     if (item) {
         QString cueId = item->data(0, Qt::UserRole).toString();
         if (!cueId.isEmpty()) {

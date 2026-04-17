@@ -44,6 +44,7 @@ class AutosaveManager : public QObject {
   signals:
     void autosaveCompleted(const QString& path);
     void autosaveFailed(const QString& error);
+
     void backupCreated(const QString& path);
 
   public slots:
@@ -58,6 +59,8 @@ class AutosaveManager : public QObject {
     void cleanupOldAutosaves();
     QString generateBackupFilename() const;
     QString generateAutosaveFilename() const;
+    QString showBaseName() const;
+    void cleanupOldFiles(const QString& dirPath, const QString& nameFilter, int maxCount);
 
     Application* m_app;
     QTimer m_timer;

@@ -18,11 +18,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qt6-base-dev qt6-svg-dev libxkbcommon-dev liblo-dev libasound2-dev build-essential cmake
 
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
+
       - name: Configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --config Release --parallel
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -46,22 +51,33 @@ jobs:
       - name: Install liblo via vcpkg
         run: vcpkg install liblo:x64-windows
 
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
+
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --parallel
 
       - name: Deploy Qt
         run: |
-          cd build/Release
-          windeployqt --release OpenMix.exe
+          mkdir build\deploy
+          copy build\OpenMix.exe build\deploy\
+          windeployqt --release build\deploy\OpenMix.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: OpenMix-windows
-          path: build/Release/
+          path: build/deploy/
 
   build-macos:
     runs-on: macos-latest
@@ -71,6 +87,11 @@ jobs:
       - name: Install dependencies
         run: brew install qt@6 liblo
 
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
+
       - name: Configure
         run: |
           export PATH="/opt/homebrew/opt/qt@6/bin:$PATH"
@@ -79,7 +100,7 @@ jobs:
             -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt@6
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --config Release --parallel
 
       - name: Deploy, sign, & package
         run: |

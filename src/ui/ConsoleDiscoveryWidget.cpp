@@ -142,8 +142,7 @@ void ConsoleDiscoveryWidget::onItemSelectionChanged() {
     updateUiState();
 }
 
-void ConsoleDiscoveryWidget::onItemDoubleClicked(QListWidgetItem* item) {
-    Q_UNUSED(item);
+void ConsoleDiscoveryWidget::onItemDoubleClicked([[maybe_unused]] QListWidgetItem* item) {
     DiscoveredConsole console = selectedConsole();
     if (console.isValid()) {
         emit consoleDoubleClicked(console);

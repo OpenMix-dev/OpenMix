@@ -154,6 +154,7 @@ QByteArray AllenHeathTcpProtocol::buildDCAFaderMessage(int dca, float level) {
     return msg;
 }
 
+// buildDCAMuteMessage
 QByteArray AllenHeathTcpProtocol::buildDCAMuteMessage(int dca, bool muted) {
     QByteArray msg;
 
@@ -168,6 +169,7 @@ QByteArray AllenHeathTcpProtocol::buildDCAMuteMessage(int dca, bool muted) {
     return msg;
 }
 
+// buildSceneRecallMessage
 QByteArray AllenHeathTcpProtocol::buildSceneRecallMessage(int sceneNumber) {
     QByteArray msg;
 

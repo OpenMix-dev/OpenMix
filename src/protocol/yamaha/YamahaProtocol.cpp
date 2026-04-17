@@ -1,6 +1,7 @@
 #include "YamahaProtocol.h"
 #include "../../core/Cue.h"
 #include <QNetworkDatagram>
+#include <algorithm>
 #include <cstring>
 #include <lo/lo.h>
 
@@ -39,40 +40,49 @@ void YamahaProtocol::initializeSnapshotParams() { rebuildSnapshotParams(); }
 void YamahaProtocol::rebuildSnapshotParams() {
     m_snapshotParams.clear();
 
-    // input channel fader/on parameters
-    for (int i = 1; i <= m_capabilities.inputChannels; ++i) {
-        QString chPrefix = QString("/ch/%1").arg(i, 2, 10, QChar('0'));
-        m_snapshotParams.append(chPrefix + "/mix/fader");
-        m_snapshotParams.append(chPrefix + "/mix/on");
-
-        // EQ parameters
-        if (m_capabilities.supportsChannelEQ) {
-            m_snapshotParams.append(chPrefix + "/eq/on");
-            for (int band = 1; band <= m_capabilities.eqBandsPerChannel; ++band) {
-                QString bandPrefix = QString("%1/eq/%2").arg(chPrefix).arg(band);
-                m_snapshotParams.append(bandPrefix + "/type");
-                m_snapshotParams.append(bandPrefix + "/f");
-                m_snapshotParams.append(bandPrefix + "/g");
-                m_snapshotParams.append(bandPrefix + "/q");
-            }
-        }
-
-        // effect send parameters
-        if (m_capabilities.supportsEffectSends) {
-            int sends = qMin(m_capabilities.effectSendBuses, 16);
-            for (int send = 1; send <= sends; ++send) {
-                QString sendPrefix =
-                    QString("%1/mix/%2").arg(chPrefix).arg(send, 2, 10, QChar('0'));
-                m_snapshotParams.append(sendPrefix + "/level");
-                m_snapshotParams.append(sendPrefix + "/on");
-            }
-        }
-    }
+    // input channel fader/on, EQ, and effect-send parameters
+    appendEqSnapshotParams(m_snapshotParams, "/ch/", m_capabilities.inputChannels);
 
     // DCA parameters, Yamaha uses /dca/X/fader and /dca/X/on (NOT /mute)
     for (int i = 1; i <= m_capabilities.dcaCount; ++i) {
         m_snapshotParams.append(QString("/dca/%1/fader").arg(i));
         m_snapshotParams.append(QString("/dca/%1/on").arg(i));
+    }
+}
+
+void YamahaProtocol::appendEqSnapshotParams(QStringList& params,
+                                            const QString& channelPrefix,
+                                            int channelCount,
+                                            int channelFieldWidth,
+                                            int maxEffectSends) const {
+    for (int ch = 1; ch <= m_capabilities.inputChannels && ch <= channelCount; ++ch) {
+        QString chPrefix =
+            QString("%1%2").arg(channelPrefix).arg(ch, channelFieldWidth, 10, QChar('0'));
+        params.append(chPrefix + "/mix/fader");
+        params.append(chPrefix + "/mix/on");
+
+        // EQ parameters
+        if (m_capabilities.supportsChannelEQ) {
+            params.append(chPrefix + "/eq/on");
+            for (int band = 1; band <= m_capabilities.eqBandsPerChannel; ++band) {
+                QString bandPrefix = QString("%1/eq/%2").arg(chPrefix).arg(band);
+                params.append(bandPrefix + "/type");
+                params.append(bandPrefix + "/f");
+                params.append(bandPrefix + "/g");
+                params.append(bandPrefix + "/q");
+            }
+        }
+
+        // effect send parameters
+        if (m_capabilities.supportsEffectSends) {
+            int sends = std::min(m_capabilities.effectSendBuses, maxEffectSends);
+            for (int send = 1; send <= sends; ++send) {
+                QString sendPrefix =
+                    QString("%1/mix/%2").arg(chPrefix).arg(send, 2, 10, QChar('0'));
+                params.append(sendPrefix + "/level");
+                params.append(sendPrefix + "/on");
+            }
+        }
     }
 }
 
@@ -208,8 +218,8 @@ void YamahaProtocol::recallSnapshot(const Cue& cue) {
     }
 
     QJsonObject params = cue.parameters();
-    for (auto it = params.begin(); it != params.end(); ++it) {
-        sendParameter(it.key(), it.value().toVariant());
+    for (const auto& [path, value] : params.asKeyValueRange()) {
+        sendParameter(path.toString(), value.toVariant());
     }
 }
 
@@ -279,9 +289,9 @@ void YamahaProtocol::onRequestTimeoutCheck() {
     QDateTime now = QDateTime::currentDateTime();
     QStringList timedOut;
 
-    for (auto it = m_pendingRequests.begin(); it != m_pendingRequests.end(); ++it) {
-        if (it->timestamp.msecsTo(now) > m_requestTimeoutMs) {
-            timedOut.append(it.key());
+    for (const auto& [path, req] : m_pendingRequests.asKeyValueRange()) {
+        if (req.timestamp.msecsTo(now) > m_requestTimeoutMs) {
+            timedOut.append(path);
         }
     }
 
@@ -485,8 +495,7 @@ void YamahaProtocol::processResponse(const QString& path, const QVariant& value)
     }
 }
 
-void YamahaProtocol::handleModelResponse(const QVariant& value) {
-    Q_UNUSED(value);
+void YamahaProtocol::handleModelResponse([[maybe_unused]] const QVariant& value) {
     m_connectionTimer.stop();
     m_waitingForModel = false;
 

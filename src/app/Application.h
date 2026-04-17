@@ -1,12 +1,12 @@
 #pragma once
 
-#include "ui/MainWindow.h"
 #include <QObject>
 #include <QPointer>
 #include <QUndoStack>
 
 namespace OpenMix {
 
+class MainWindow;
 class Show;
 class PlaybackEngine;
 class MixerProtocol;
@@ -32,36 +32,36 @@ class Application : public QObject {
     ~Application() override;
 
     // singleton access
-    static Application* instance() { return s_instance; }
+    [[nodiscard]] static Application* instance() { return s_instance; }
 
     // core components
-    Show* show() { return m_show; }
-    PlaybackEngine* playbackEngine() { return m_playbackEngine; }
-    MixerProtocol* mixer() { return m_mixer; }
-    QUndoStack* undoStack() { return m_undoStack; }
-    AutosaveManager* autosaveManager() { return m_autosaveManager; }
+    [[nodiscard]] Show* show() { return m_show; }
+    [[nodiscard]] PlaybackEngine* playbackEngine() { return m_playbackEngine; }
+    [[nodiscard]] MixerProtocol* mixer() { return m_mixer; }
+    [[nodiscard]] QUndoStack* undoStack() { return m_undoStack; }
+    [[nodiscard]] AutosaveManager* autosaveManager() { return m_autosaveManager; }
 
     // safety & validation
-    CueValidator* cueValidator() { return m_cueValidator; }
-    PlaybackGuard* playbackGuard() { return m_playbackGuard; }
-    PlaybackLogger* playbackLogger() { return m_playbackLogger; }
-    DryRunEngine* dryRunEngine() { return m_dryRunEngine; }
+    [[nodiscard]] CueValidator* cueValidator() { return m_cueValidator; }
+    [[nodiscard]] PlaybackGuard* playbackGuard() { return m_playbackGuard; }
+    [[nodiscard]] PlaybackLogger* playbackLogger() { return m_playbackLogger; }
+    [[nodiscard]] DryRunEngine* dryRunEngine() { return m_dryRunEngine; }
 
     // operator experience
-    ShortcutManager* shortcutManager() { return m_shortcutManager; }
-    OperationModeManager* operationModeManager() { return m_operationModeManager; }
+    [[nodiscard]] ShortcutManager* shortcutManager() { return m_shortcutManager; }
+    [[nodiscard]] OperationModeManager* operationModeManager() { return m_operationModeManager; }
 
     // recovery
-    CrashRecovery* crashRecovery() { return m_crashRecovery; }
+    [[nodiscard]] CrashRecovery* crashRecovery() { return m_crashRecovery; }
 
     // MIDI input
-    MidiInputManager* midiInputManager() { return m_midiInputManager; }
+    [[nodiscard]] MidiInputManager* midiInputManager() { return m_midiInputManager; }
 
     // console discovery
-    ConsoleDiscoveryService* discoveryService() { return m_discoveryService; }
+    [[nodiscard]] ConsoleDiscoveryService* discoveryService() { return m_discoveryService; }
 
     // application logging
-    AppLogger* appLogger() { return m_appLogger; }
+    [[nodiscard]] AppLogger* appLogger() { return m_appLogger; }
 
     // mixer connection
     void connectToMixer(const QString& type, const QString& host, int port);
@@ -69,8 +69,8 @@ class Application : public QObject {
     void disconnectFromMixer();
 
     // main window
-    void setMainWindow(MainWindow* window) { m_mainWindow = window; }
-    MainWindow* mainWindow() { return m_mainWindow; }
+    void setMainWindow(MainWindow* window);
+    [[nodiscard]] MainWindow* mainWindow();
 
     // initialization
     void initialize();
@@ -87,6 +87,8 @@ class Application : public QObject {
 
     static Application* s_instance;
 
+    // All pointer members below are owned by Qt's parent-child system (parent = this).
+    // m_mixer is the exception: created by ProtocolFactory with this as parent, swapped on reconnect.
     Show* m_show;
     PlaybackEngine* m_playbackEngine;
     MixerProtocol* m_mixer = nullptr;

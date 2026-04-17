@@ -66,8 +66,8 @@ QStringList CueFilterProxyModel::availableGroups() const {
         return QStringList();
 
     CueList* cueList = model->cueList();
-    for (int i = 0; i < cueList->count(); ++i) {
-        const QString& group = cueList->at(i).group();
+    for (const Cue& cue : *cueList) {
+        const QString& group = cue.group();
         if (!group.isEmpty()) {
             groups.insert(group);
         }
@@ -86,8 +86,8 @@ QStringList CueFilterProxyModel::availableTags() const {
         return QStringList();
 
     CueList* cueList = model->cueList();
-    for (int i = 0; i < cueList->count(); ++i) {
-        const QStringList& cueTags = cueList->at(i).tags();
+    for (const Cue& cue : *cueList) {
+        const QStringList& cueTags = cue.tags();
         for (const QString& tag : cueTags) {
             if (!tag.isEmpty()) {
                 tags.insert(tag);
@@ -100,8 +100,7 @@ QStringList CueFilterProxyModel::availableTags() const {
     return result;
 }
 
-bool CueFilterProxyModel::filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const {
-    Q_UNUSED(sourceParent);
+bool CueFilterProxyModel::filterAcceptsRow(int sourceRow, [[maybe_unused]] const QModelIndex& sourceParent) const {
 
     CueTableModel* model = qobject_cast<CueTableModel*>(sourceModel());
     if (!model)

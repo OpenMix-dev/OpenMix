@@ -8,25 +8,25 @@ namespace OpenMix {
 
 QString PlaybackLogEntry::typeString() const {
     switch (type) {
-    case CueExecuted:
+    case Type::CueExecuted:
         return "CueExecuted";
-    case MacroExpanded:
+    case Type::MacroExpanded:
         return "MacroExpanded";
-    case AutoFollowTriggered:
+    case Type::AutoFollowTriggered:
         return "AutoFollowTriggered";
-    case ValidationWarning:
+    case Type::ValidationWarning:
         return "ValidationWarning";
-    case ValidationError:
+    case Type::ValidationError:
         return "ValidationError";
-    case EmergencyStop:
+    case Type::EmergencyStop:
         return "EmergencyStop";
-    case GoLockout:
+    case Type::GoLockout:
         return "GoLockout";
-    case ParameterSent:
+    case Type::ParameterSent:
         return "ParameterSent";
-    case StateCapture:
+    case Type::StateCapture:
         return "StateCapture";
-    case Custom:
+    case Type::Custom:
         return "Custom";
     }
     return "Unknown";
@@ -50,25 +50,25 @@ PlaybackLogEntry PlaybackLogEntry::fromJson(const QJsonObject& json) {
 
     QString typeStr = json["type"].toString();
     if (typeStr == "CueExecuted")
-        entry.type = CueExecuted;
+        entry.type = Type::CueExecuted;
     else if (typeStr == "MacroExpanded")
-        entry.type = MacroExpanded;
+        entry.type = Type::MacroExpanded;
     else if (typeStr == "AutoFollowTriggered")
-        entry.type = AutoFollowTriggered;
+        entry.type = Type::AutoFollowTriggered;
     else if (typeStr == "ValidationWarning")
-        entry.type = ValidationWarning;
+        entry.type = Type::ValidationWarning;
     else if (typeStr == "ValidationError")
-        entry.type = ValidationError;
+        entry.type = Type::ValidationError;
     else if (typeStr == "EmergencyStop")
-        entry.type = EmergencyStop;
+        entry.type = Type::EmergencyStop;
     else if (typeStr == "GoLockout")
-        entry.type = GoLockout;
+        entry.type = Type::GoLockout;
     else if (typeStr == "ParameterSent")
-        entry.type = ParameterSent;
+        entry.type = Type::ParameterSent;
     else if (typeStr == "StateCapture")
-        entry.type = StateCapture;
+        entry.type = Type::StateCapture;
     else
-        entry.type = Custom;
+        entry.type = Type::Custom;
 
     entry.cueId = json["cueId"].toString();
     entry.details = json["details"].toString();
@@ -116,45 +116,45 @@ void PlaybackLogger::log(PlaybackLogEntry::Type type, const QString& cueId, cons
 void PlaybackLogger::logCueExecuted(const QString& cueId, const QString& cueName,
                                     double cueNumber) {
     QString details = QString("Executed cue %1: %2").arg(cueNumber, 0, 'f', 1).arg(cueName);
-    log(PlaybackLogEntry::CueExecuted, cueId, details);
+    log(PlaybackLogEntry::Type::CueExecuted, cueId, details);
 }
 
 void PlaybackLogger::logMacroExpanded(const QString& parentId, const QString& childId) {
     QString details = QString("Macro expanded: child %1").arg(childId);
-    log(PlaybackLogEntry::MacroExpanded, parentId, details);
+    log(PlaybackLogEntry::Type::MacroExpanded, parentId, details);
 }
 
 void PlaybackLogger::logAutoFollowTriggered(const QString& cueId, double delay) {
     QString details = QString("Auto-follow triggered after %1s delay").arg(delay, 0, 'f', 2);
-    log(PlaybackLogEntry::AutoFollowTriggered, cueId, details);
+    log(PlaybackLogEntry::Type::AutoFollowTriggered, cueId, details);
 }
 
 void PlaybackLogger::logValidationWarning(const QString& cueId, const QString& message) {
-    log(PlaybackLogEntry::ValidationWarning, cueId, message);
+    log(PlaybackLogEntry::Type::ValidationWarning, cueId, message);
 }
 
 void PlaybackLogger::logValidationError(const QString& cueId, const QString& message) {
-    log(PlaybackLogEntry::ValidationError, cueId, message);
+    log(PlaybackLogEntry::Type::ValidationError, cueId, message);
 }
 
 void PlaybackLogger::logEmergencyStop(const QString& reason) {
-    log(PlaybackLogEntry::EmergencyStop, QString(), reason);
+    log(PlaybackLogEntry::Type::EmergencyStop, QString(), reason);
 }
 
 void PlaybackLogger::logGoLockout(const QString& reason) {
-    log(PlaybackLogEntry::GoLockout, QString(), reason);
+    log(PlaybackLogEntry::Type::GoLockout, QString(), reason);
 }
 
 void PlaybackLogger::logParameterSent(const QString& path, const QVariant& value) {
     QJsonObject params;
     params["path"] = path;
     params["value"] = QJsonValue::fromVariant(value);
-    log(PlaybackLogEntry::ParameterSent, QString(),
+    log(PlaybackLogEntry::Type::ParameterSent, QString(),
         QString("Sent %1 = %2").arg(path).arg(value.toString()), params);
 }
 
 void PlaybackLogger::logStateCapture(const QString& description, const QJsonObject& state) {
-    log(PlaybackLogEntry::StateCapture, QString(), description, state);
+    log(PlaybackLogEntry::Type::StateCapture, QString(), description, state);
 }
 
 QVector<PlaybackLogEntry> PlaybackLogger::allEntries() const {
@@ -173,23 +173,20 @@ QVector<PlaybackLogEntry> PlaybackLogger::recentEntries(int count) const {
 }
 
 QVector<PlaybackLogEntry> PlaybackLogger::entriesSince(const QDateTime& since) const {
-    QMutexLocker locker(&m_mutex);
-
-    QVector<PlaybackLogEntry> result;
-    for (const PlaybackLogEntry& entry : m_entries) {
-        if (entry.timestamp >= since) {
-            result.append(entry);
-        }
-    }
-    return result;
+    return entriesMatching([&](const PlaybackLogEntry& e) { return e.timestamp >= since; });
 }
 
 QVector<PlaybackLogEntry> PlaybackLogger::entriesForCue(const QString& cueId) const {
+    return entriesMatching([&](const PlaybackLogEntry& e) { return e.cueId == cueId; });
+}
+
+QVector<PlaybackLogEntry>
+PlaybackLogger::entriesMatching(std::function<bool(const PlaybackLogEntry&)> predicate) const {
     QMutexLocker locker(&m_mutex);
 
     QVector<PlaybackLogEntry> result;
     for (const PlaybackLogEntry& entry : m_entries) {
-        if (entry.cueId == cueId) {
+        if (predicate(entry)) {
             result.append(entry);
         }
     }

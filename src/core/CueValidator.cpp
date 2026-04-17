@@ -21,7 +21,9 @@ ValidationResult CueValidator::validate(const Cue& cue, const CueList* cueList) 
         }
 
         if (cue.macroExecutionMode() == MacroExecutionMode::Parallel) {
-            detectConflictingFadeTargets(cue, cueList, result.issues);
+            if (!detectConflictingFadeTargets(cue, cueList, result.issues)) {
+                result.valid = false;
+            }
         }
     }
 
@@ -39,7 +41,7 @@ ValidationResult CueValidator::validateAll(const CueList* cueList) {
 
     if (!cueList) {
         result.valid = false;
-        result.issues.append({ValidationIssue::Error, tr("Cue list is null"), QString()});
+        result.issues.append({ValidationIssue::Severity::Error, tr("Cue list is null"), QString()});
         return result;
     }
 
@@ -74,12 +76,12 @@ bool CueValidator::validateMacroIds(const Cue& cue, const CueList* cueList,
     QStringList childIds = cue.childCueIds();
 
     if (childIds.isEmpty()) {
-        issues.append({ValidationIssue::Warning, tr("Macro cue has no child cues"), QString()});
+        issues.append({ValidationIssue::Severity::Warning, tr("Macro cue has no child cues"), QString()});
     }
 
     for (const QString& childId : childIds) {
         if (!cueList || !cueList->findById(childId)) {
-            issues.append({ValidationIssue::Error,
+            issues.append({ValidationIssue::Severity::Error,
                            tr("Macro references non-existent cue ID: %1").arg(childId), QString()});
             valid = false;
         }
@@ -94,7 +96,7 @@ bool CueValidator::validateParameters(const Cue& cue, QList<ValidationIssue>& is
     if (cue.type() == CueType::Snapshot) {
         QJsonObject params = cue.parameters();
         if (params.isEmpty()) {
-            issues.append({ValidationIssue::Warning, tr("Snapshot cue has no parameters defined"),
+            issues.append({ValidationIssue::Severity::Warning, tr("Snapshot cue has no parameters defined"),
                            QString()});
         }
     }
@@ -104,7 +106,7 @@ bool CueValidator::validateParameters(const Cue& cue, QList<ValidationIssue>& is
     for (auto it = params.begin(); it != params.end(); ++it) {
         QString path = it.key();
         if (!path.startsWith('/')) {
-            issues.append({ValidationIssue::Warning,
+            issues.append({ValidationIssue::Severity::Warning,
                            tr("Parameter path '%1' does not start with '/'").arg(path), path});
         }
     }
@@ -122,7 +124,7 @@ bool CueValidator::detectCircularMacroReferences(const Cue& cue, const CueList* 
     QSet<QString> recursionStack;
 
     if (hasCircularReference(cue.id(), cueList, visited, recursionStack)) {
-        issues.append({ValidationIssue::Error, tr("Circular macro reference detected"), QString()});
+        issues.append({ValidationIssue::Severity::Error, tr("Circular macro reference detected"), QString()});
         return false;
     }
 
@@ -199,7 +201,7 @@ bool CueValidator::detectConflictingFadeTargets(const Cue& cue, const CueList* c
     bool hasConflicts = false;
     for (auto it = parameterToCues.begin(); it != parameterToCues.end(); ++it) {
         if (it.value().size() > 1) {
-            issues.append({ValidationIssue::Warning,
+            issues.append({ValidationIssue::Severity::Error,
                            tr("Parameter '%1' is targeted by multiple parallel cues: %2")
                                .arg(it.key())
                                .arg(it.value().join(", ")),

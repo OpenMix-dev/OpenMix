@@ -1,4 +1,6 @@
 #include "PlaybackEngine.h"
+#include "CueList.h"
+#include "DCAMapping.h"
 #include "PlaybackGuard.h"
 #include "protocol/MixerCapabilities.h"
 #include "protocol/MixerProtocol.h"
@@ -114,9 +116,9 @@ void PlaybackEngine::goToIndex(int index) {
 void PlaybackEngine::goToNumber(double num) {
     if (!m_cueList)
         return;
-    int idx = m_cueList->indexOfNumber(num);
-    if (idx >= 0) {
-        setStandbyIndex(idx);
+    auto idx = m_cueList->indexOfNumber(num);
+    if (idx.has_value()) {
+        setStandbyIndex(idx.value());
     }
 }
 
@@ -149,9 +151,9 @@ void PlaybackEngine::executeCue(int index) {
 void PlaybackEngine::executeCueById(const QString& id) {
     if (!m_cueList)
         return;
-    int index = m_cueList->indexOf(id);
-    if (index >= 0) {
-        executeCue(index);
+    auto index = m_cueList->indexOf(id);
+    if (index.has_value()) {
+        executeCue(index.value());
     }
 }
 
@@ -290,6 +292,7 @@ QJsonObject PlaybackEngine::filterParametersForDCAs(const Cue& cue,
     if (!hasMapping || targetDCAs.isEmpty()) {
         QJsonObject filtered;
         static QRegularExpression dcaFaderRegex("^/dca/\\d+/fader$");
+
         for (auto it = cue.parameters().begin(); it != cue.parameters().end(); ++it) {
             if (!dcaFaderRegex.match(it.key()).hasMatch()) {
                 filtered[it.key()] = it.value();
@@ -315,7 +318,9 @@ QJsonObject PlaybackEngine::filterParametersForDCAs(const Cue& cue,
     // filter params to only include targeted channels/buses
     QJsonObject filtered;
     static QRegularExpression channelRegex("^/ch/(\\d+)/");
+
     static QRegularExpression busRegex("^/bus/(\\d+)/");
+
     static QRegularExpression dcaFaderRegex("^/dca/\\d+/fader$");
 
     const QJsonObject& params = cue.parameters();
@@ -403,9 +408,11 @@ void PlaybackEngine::executeMacroCue(const Cue& cue) {
 
             if (m_macroPendingChildren.isEmpty()) {
                 const Cue* macroCue = m_cueList->findById(m_currentMacroId);
+
                 m_currentMacroId.clear();
                 m_macroPendingChildren.clear();
                 m_macroChildIndex = 0;
+
                 emit cueCompleted(m_currentIndex);
                 if (macroCue) {
                     handleAutoFollow(*macroCue);
@@ -446,9 +453,11 @@ void PlaybackEngine::executeNextMacroChild() {
             executeNextMacroChild();
         } else {
             const Cue* macroCue = m_cueList->findById(m_currentMacroId);
+
             m_currentMacroId.clear();
             m_macroPendingChildren.clear();
             m_macroChildIndex = 0;
+
             emit cueCompleted(m_currentIndex);
             if (macroCue) {
                 handleAutoFollow(*macroCue);
@@ -474,11 +483,15 @@ void PlaybackEngine::executeGoToCue(const Cue& cue) {
     bool isNumber = false;
     double cueNumber = target.toDouble(&isNumber);
     if (isNumber) {
-        targetIndex = m_cueList->indexOfNumber(cueNumber);
+        auto result = m_cueList->indexOfNumber(cueNumber);
+        if (result.has_value())
+            targetIndex = result.value();
     }
 
     if (targetIndex < 0) {
-        targetIndex = m_cueList->indexOf(target);
+        auto result = m_cueList->indexOf(target);
+        if (result.has_value())
+            targetIndex = result.value();
     }
 
     if (targetIndex < 0) {

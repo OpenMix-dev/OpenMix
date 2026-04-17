@@ -1,8 +1,15 @@
 #include "X32Protocol.h"
 #include "../../core/Cue.h"
 #include <QDateTime>
+#include <algorithm>
 
 namespace OpenMix {
+
+namespace {
+constexpr int MAX_X32_INPUT_CHANNELS = 32;
+constexpr int MAX_X32_EFFECT_SENDS = 16;
+constexpr int MAX_X32_MIX_BUSES = 16;
+} // namespace
 
 X32Protocol::X32Protocol(const MixerCapabilities& caps, QObject* parent)
     : MixerProtocol(parent), m_capabilities(caps), m_transport(this) {
@@ -40,7 +47,7 @@ void X32Protocol::rebuildSnapshotParams() {
     m_snapshotParams.clear();
 
     // basic fader/mute parameters
-    for (int i = 1; i <= m_capabilities.inputChannels && i <= 32; ++i) {
+    for (int i = 1; i <= m_capabilities.inputChannels && i <= MAX_X32_INPUT_CHANNELS; ++i) {
         QString chPrefix = QString("/ch/%1").arg(i, 2, 10, QChar('0'));
         m_snapshotParams.append(chPrefix + "/mix/fader");
         m_snapshotParams.append(chPrefix + "/mix/on");
@@ -59,7 +66,7 @@ void X32Protocol::rebuildSnapshotParams() {
 
         // effect send parameters (mix bus sends)
         if (m_capabilities.supportsEffectSends) {
-            int sends = qMin(m_capabilities.effectSendBuses, 16);
+            int sends = std::min(m_capabilities.effectSendBuses, MAX_X32_EFFECT_SENDS);
             for (int send = 1; send <= sends; ++send) {
                 QString sendPrefix =
                     QString("%1/mix/%2").arg(chPrefix).arg(send, 2, 10, QChar('0'));
@@ -70,7 +77,7 @@ void X32Protocol::rebuildSnapshotParams() {
     }
 
     // mix bus parameters
-    for (int i = 1; i <= m_capabilities.mixBuses && i <= 16; ++i) {
+    for (int i = 1; i <= m_capabilities.mixBuses && i <= MAX_X32_MIX_BUSES; ++i) {
         QString busPrefix = QString("/bus/%1").arg(i, 2, 10, QChar('0'));
         m_snapshotParams.append(busPrefix + "/mix/fader");
         m_snapshotParams.append(busPrefix + "/mix/on");
@@ -205,8 +212,8 @@ void X32Protocol::recallSnapshot(const Cue& cue) {
         return;
 
     QJsonObject params = cue.parameters();
-    for (auto it = params.begin(); it != params.end(); ++it) {
-        sendParameter(it.key(), it.value().toVariant());
+    for (const auto& [path, value] : params.asKeyValueRange()) {
+        sendParameter(path.toString(), value.toVariant());
     }
 }
 
@@ -297,9 +304,9 @@ void X32Protocol::onRequestTimeoutCheck() {
     QDateTime now = QDateTime::currentDateTime();
     QStringList timedOut;
 
-    for (auto it = m_pendingRequests.begin(); it != m_pendingRequests.end(); ++it) {
-        if (it->timestamp.msecsTo(now) > m_requestTimeoutMs) {
-            timedOut.append(it.key());
+    for (const auto& [path, req] : m_pendingRequests.asKeyValueRange()) {
+        if (req.timestamp.msecsTo(now) > m_requestTimeoutMs) {
+            timedOut.append(path);
         }
     }
 
@@ -363,8 +370,7 @@ void X32Protocol::processResponse(const QString& path, const QVariant& value) {
     }
 }
 
-void X32Protocol::handleXinfoResponse(const QVariant& value) {
-    Q_UNUSED(value);
+void X32Protocol::handleXinfoResponse([[maybe_unused]] const QVariant& value) {
     m_connectionTimer.stop();
     m_waitingForXinfo = false;
 

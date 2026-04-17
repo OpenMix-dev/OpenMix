@@ -4,6 +4,7 @@
 #include <QJsonArray>
 #include <QObject>
 #include <QVector>
+#include <optional>
 
 namespace OpenMix {
 
@@ -13,18 +14,18 @@ class CueList : public QObject {
   public:
     explicit CueList(QObject* parent = nullptr);
 
-    int count() const { return m_cues.size(); }
-    bool isEmpty() const { return m_cues.isEmpty(); }
+    [[nodiscard]] int count() const noexcept { return m_cues.size(); }
+    [[nodiscard]] bool isEmpty() const noexcept { return m_cues.isEmpty(); }
 
-    const Cue& at(int index) const { return m_cues.at(index); }
-    Cue& operator[](int index) { return m_cues[index]; }
-    const Cue& operator[](int index) const { return m_cues[index]; }
+    [[nodiscard]] const Cue& at(int index) const { return m_cues.at(index); }
+    [[nodiscard]] Cue& operator[](int index) { return m_cues[index]; }
+    [[nodiscard]] const Cue& operator[](int index) const { return m_cues[index]; }
 
-    int indexOf(const QString& id) const;
-    int indexOfNumber(double number) const;
-    Cue* findById(const QString& id);
-    const Cue* findById(const QString& id) const;
-    Cue* findByNumber(double number);
+    [[nodiscard]] std::optional<int> indexOf(const QString& id) const;
+    [[nodiscard]] std::optional<int> indexOfNumber(double number) const;
+    [[nodiscard]] Cue* findById(const QString& id);
+    [[nodiscard]] const Cue* findById(const QString& id) const;
+    [[nodiscard]] Cue* findByNumber(double number);
 
     void addCue(const Cue& cue);
     void insertCue(int index, const Cue& cue);
@@ -36,7 +37,7 @@ class CueList : public QObject {
 
     void sortByNumber();
 
-    double nextCueNumber() const;
+    [[nodiscard]] double nextCueNumber() const;
 
     QVector<Cue>::iterator begin() { return m_cues.begin(); }
     QVector<Cue>::iterator end() { return m_cues.end(); }

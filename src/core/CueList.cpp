@@ -1,41 +1,44 @@
 #include "CueList.h"
 #include <algorithm>
+#include <iterator>
 
 namespace OpenMix {
 
+namespace {
+constexpr double FIRST_CUE_NUMBER = 1.0;
+} // namespace
+
 CueList::CueList(QObject* parent) : QObject(parent) {}
 
-int CueList::indexOf(const QString& id) const {
-    for (int i = 0; i < m_cues.size(); ++i) {
-        if (m_cues[i].id() == id) {
-            return i;
-        }
-    }
-    return -1;
+std::optional<int> CueList::indexOf(const QString& id) const {
+    auto it = std::find_if(m_cues.cbegin(), m_cues.cend(),
+                           [&id](const Cue& c) { return c.id() == id; });
+    if (it == m_cues.cend())
+        return std::nullopt;
+    return static_cast<int>(std::distance(m_cues.cbegin(), it));
 }
 
-int CueList::indexOfNumber(double number) const {
-    for (int i = 0; i < m_cues.size(); ++i) {
-        if (qFuzzyCompare(m_cues[i].number(), number)) {
-            return i;
-        }
-    }
-    return -1;
+std::optional<int> CueList::indexOfNumber(double number) const {
+    auto it = std::find_if(m_cues.cbegin(), m_cues.cend(),
+                           [number](const Cue& c) { return qFuzzyCompare(c.number(), number); });
+    if (it == m_cues.cend())
+        return std::nullopt;
+    return static_cast<int>(std::distance(m_cues.cbegin(), it));
 }
 
 Cue* CueList::findById(const QString& id) {
-    int idx = indexOf(id);
-    return idx >= 0 ? &m_cues[idx] : nullptr;
+    const auto idx = indexOf(id);
+    return idx ? &m_cues[*idx] : nullptr;
 }
 
 const Cue* CueList::findById(const QString& id) const {
-    int idx = indexOf(id);
-    return idx >= 0 ? &m_cues[idx] : nullptr;
+    const auto idx = indexOf(id);
+    return idx ? &m_cues[*idx] : nullptr;
 }
 
 Cue* CueList::findByNumber(double number) {
-    int idx = indexOfNumber(number);
-    return idx >= 0 ? &m_cues[idx] : nullptr;
+    const auto idx = indexOfNumber(number);
+    return idx ? &m_cues[*idx] : nullptr;
 }
 
 void CueList::addCue(const Cue& cue) {
@@ -67,9 +70,8 @@ void CueList::removeCue(int index) {
 }
 
 void CueList::removeCueById(const QString& id) {
-    int idx = indexOf(id);
-    if (idx >= 0) {
-        removeCue(idx);
+    if (const auto idx = indexOf(id)) {
+        removeCue(*idx);
     }
 }
 
@@ -94,16 +96,11 @@ void CueList::clear() {
 void CueList::sortByNumber() { std::sort(m_cues.begin(), m_cues.end()); }
 
 double CueList::nextCueNumber() const {
-    if (m_cues.isEmpty()) {
-        return 1.0;
-    }
-    double maxNum = 0.0;
-    for (const auto& cue : m_cues) {
-        if (cue.number() > maxNum) {
-            maxNum = cue.number();
-        }
-    }
-    return std::floor(maxNum) + 1.0;
+    if (m_cues.isEmpty())
+        return FIRST_CUE_NUMBER;
+    auto it = std::max_element(m_cues.cbegin(), m_cues.cend(),
+                               [](const Cue& a, const Cue& b) { return a.number() < b.number(); });
+    return std::floor(it->number()) + FIRST_CUE_NUMBER;
 }
 
 QJsonArray CueList::toJson() const {

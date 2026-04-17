@@ -25,11 +25,11 @@ void DCAMapping::removeChannelFromDCA(int channel, int dca) {
     }
 }
 
-void DCAMapping::clearChannelFromAllDCAs(int channel) {
-    for (auto it = m_channelAssignments.begin(); it != m_channelAssignments.end();) {
-        if (it.value().removeAll(channel) > 0) {
+void DCAMapping::clearFromAllDCAs(QMap<int, QList<int>>& map, int id) {
+    for (auto it = map.begin(); it != map.end();) {
+        if (it.value().removeAll(id) > 0) {
             if (it.value().isEmpty()) {
-                it = m_channelAssignments.erase(it);
+                it = map.erase(it);
                 continue;
             }
         }
@@ -37,18 +37,22 @@ void DCAMapping::clearChannelFromAllDCAs(int channel) {
     }
 }
 
-QList<int> DCAMapping::channelsForDCA(int dca) const { return m_channelAssignments.value(dca); }
-
-int DCAMapping::dcaForChannel(int channel) const {
-    for (auto it = m_channelAssignments.constBegin(); it != m_channelAssignments.constEnd(); ++it) {
-        if (it.value().contains(channel)) {
-            return it.key();
-        }
-    }
-    return -1;
+void DCAMapping::clearChannelFromAllDCAs(int channel) {
+    clearFromAllDCAs(m_channelAssignments, channel);
 }
 
-bool DCAMapping::isChannelAssigned(int channel) const { return dcaForChannel(channel) >= 0; }
+QList<int> DCAMapping::channelsForDCA(int dca) const { return m_channelAssignments.value(dca); }
+
+std::optional<int> DCAMapping::dcaForChannel(int channel) const {
+    for (const auto& [dca, channels] : m_channelAssignments.asKeyValueRange()) {
+        if (channels.contains(channel)) {
+            return dca;
+        }
+    }
+    return std::nullopt;
+}
+
+bool DCAMapping::isChannelAssigned(int channel) const { return dcaForChannel(channel).has_value(); }
 
 void DCAMapping::assignBusToDCA(int bus, int dca) {
     clearBusFromAllDCAs(bus);
@@ -71,29 +75,21 @@ void DCAMapping::removeBusFromDCA(int bus, int dca) {
 }
 
 void DCAMapping::clearBusFromAllDCAs(int bus) {
-    for (auto it = m_busAssignments.begin(); it != m_busAssignments.end();) {
-        if (it.value().removeAll(bus) > 0) {
-            if (it.value().isEmpty()) {
-                it = m_busAssignments.erase(it);
-                continue;
-            }
-        }
-        ++it;
-    }
+    clearFromAllDCAs(m_busAssignments, bus);
 }
 
 QList<int> DCAMapping::busesForDCA(int dca) const { return m_busAssignments.value(dca); }
 
-int DCAMapping::dcaForBus(int bus) const {
-    for (auto it = m_busAssignments.constBegin(); it != m_busAssignments.constEnd(); ++it) {
-        if (it.value().contains(bus)) {
-            return it.key();
+std::optional<int> DCAMapping::dcaForBus(int bus) const {
+    for (const auto& [dca, buses] : m_busAssignments.asKeyValueRange()) {
+        if (buses.contains(bus)) {
+            return dca;
         }
     }
-    return -1;
+    return std::nullopt;
 }
 
-bool DCAMapping::isBusAssigned(int bus) const { return dcaForBus(bus) >= 0; }
+bool DCAMapping::isBusAssigned(int bus) const { return dcaForBus(bus).has_value(); }
 
 void DCAMapping::setBusName(int bus, const QString& name) {
     if (name.isEmpty()) {
@@ -122,46 +118,49 @@ void DCAMapping::setBusAssignments(const QMap<int, QList<int>>& assignments) {
 
 QSet<int> DCAMapping::assignedDCAs() const {
     QSet<int> dcas;
-    for (auto it = m_channelAssignments.constBegin(); it != m_channelAssignments.constEnd(); ++it) {
-        if (!it.value().isEmpty()) {
-            dcas.insert(it.key());
-        }
+    for (const auto& [dca, channels] : m_channelAssignments.asKeyValueRange()) {
+        if (!channels.isEmpty())
+            dcas.insert(dca);
     }
-    for (auto it = m_busAssignments.constBegin(); it != m_busAssignments.constEnd(); ++it) {
-        if (!it.value().isEmpty()) {
-            dcas.insert(it.key());
-        }
+    for (const auto& [dca, buses] : m_busAssignments.asKeyValueRange()) {
+        if (!buses.isEmpty())
+            dcas.insert(dca);
     }
     return dcas;
 }
 
+QJsonObject DCAMapping::mappingToJsonObject(const QMap<int, QList<int>>& map) {
+    QJsonObject obj;
+    for (const auto& [dca, items] : map.asKeyValueRange()) {
+        QJsonArray arr;
+        for (int item : items)
+            arr.append(item);
+        obj[QString::number(dca)] = arr;
+    }
+    return obj;
+}
+
+QMap<int, QList<int>> DCAMapping::jsonObjectToMapping(const QJsonObject& obj) {
+    QMap<int, QList<int>> result;
+    for (const auto& [key, val] : obj.asKeyValueRange()) {
+        QList<int> items;
+        for (const QJsonValue& v : val.toArray())
+            items.append(v.toInt());
+        if (!items.isEmpty())
+            result[key.toString().toInt()] = items;
+    }
+    return result;
+}
+
 QJsonObject DCAMapping::toJson() const {
     QJsonObject json;
-
-    QJsonObject channelsObj;
-    for (auto it = m_channelAssignments.constBegin(); it != m_channelAssignments.constEnd(); ++it) {
-        QJsonArray channels;
-        for (int ch : it.value()) {
-            channels.append(ch);
-        }
-        channelsObj[QString::number(it.key())] = channels;
-    }
-    json["channels"] = channelsObj;
-
-    QJsonObject busesObj;
-    for (auto it = m_busAssignments.constBegin(); it != m_busAssignments.constEnd(); ++it) {
-        QJsonArray buses;
-        for (int bus : it.value()) {
-            buses.append(bus);
-        }
-        busesObj[QString::number(it.key())] = buses;
-    }
-    json["buses"] = busesObj;
+    json["channels"] = mappingToJsonObject(m_channelAssignments);
+    json["buses"]    = mappingToJsonObject(m_busAssignments);
 
     if (!m_busNames.isEmpty()) {
         QJsonObject busNamesObj;
-        for (auto it = m_busNames.constBegin(); it != m_busNames.constEnd(); ++it) {
-            busNamesObj[QString::number(it.key())] = it.value();
+        for (const auto& [bus, name] : m_busNames.asKeyValueRange()) {
+            busNamesObj[QString::number(bus)] = name;
         }
         json["busNames"] = busNamesObj;
     }
@@ -180,39 +179,14 @@ void DCAMapping::loadFromJson(const QJsonObject& json) {
     m_busAssignments.clear();
     m_busNames.clear();
 
-    QJsonObject channelsObj = json["channels"].toObject();
-    for (auto it = channelsObj.constBegin(); it != channelsObj.constEnd(); ++it) {
-        int dca = it.key().toInt();
-        QJsonArray channels = it.value().toArray();
-        QList<int> channelList;
-        for (const QJsonValue& val : channels) {
-            channelList.append(val.toInt());
-        }
-        if (!channelList.isEmpty()) {
-            m_channelAssignments[dca] = channelList;
-        }
-    }
+    m_channelAssignments = jsonObjectToMapping(json["channels"].toObject());
+    m_busAssignments     = jsonObjectToMapping(json["buses"].toObject());
 
-    QJsonObject busesObj = json["buses"].toObject();
-    for (auto it = busesObj.constBegin(); it != busesObj.constEnd(); ++it) {
-        int dca = it.key().toInt();
-        QJsonArray buses = it.value().toArray();
-        QList<int> busList;
-        for (const QJsonValue& val : buses) {
-            busList.append(val.toInt());
-        }
-        if (!busList.isEmpty()) {
-            m_busAssignments[dca] = busList;
-        }
-    }
-
-    QJsonObject busNamesObj = json["busNames"].toObject();
-    for (auto it = busNamesObj.constBegin(); it != busNamesObj.constEnd(); ++it) {
-        int bus = it.key().toInt();
-        QString name = it.value().toString();
-        if (bus > 0 && !name.isEmpty()) {
+    for (const auto& [key, val] : json["busNames"].toObject().asKeyValueRange()) {
+        int bus = key.toString().toInt();
+        QString name = val.toString();
+        if (bus > 0 && !name.isEmpty())
             m_busNames[bus] = name;
-        }
     }
 }
 

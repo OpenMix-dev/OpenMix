@@ -3,7 +3,6 @@
 #include "MixerCapabilities.h"
 #include "MixerProtocol.h"
 #include <QMap>
-#include <QTimer>
 
 namespace OpenMix {
 
@@ -16,21 +15,23 @@ class LoopbackProtocol : public MixerProtocol {
     ~LoopbackProtocol() override = default;
 
     // protocol identification
-    QString protocolName() const override { return m_capabilities.displayName; }
-    QString protocolDescription() const override { return "Virtual loopback for testing"; }
+    [[nodiscard]] QString protocolName() const override { return m_capabilities.displayName; }
+    [[nodiscard]] QString protocolDescription() const override { return "Virtual loopback for testing"; }
 
     // connection management
-    bool connect(const QString& host, int port) override;
+    [[nodiscard]] bool connect(const QString& host, int port) override;
     void disconnect() override;
-    bool isConnected() const override { return m_connected; }
-    QString connectionStatus() const override { return m_statusMessage; }
-    ConnectionState connectionState() const override {
-        return m_connected ? ConnectionState::Connected : ConnectionState::Disconnected;
+    [[nodiscard]] bool isConnected() const noexcept override {
+        return m_connectionState == ConnectionState::Connected;
+    }
+    [[nodiscard]] QString connectionStatus() const override { return m_statusMessage; }
+    [[nodiscard]] ConnectionState connectionState() const noexcept override {
+        return m_connectionState;
     }
 
     // parameter operations
     void sendParameter(const QString& path, const QVariant& value) override;
-    QVariant getParameter(const QString& path) override;
+    [[nodiscard]] QVariant getParameter(const QString& path) override;
     void requestParameter(const QString& path) override;
     void requestParameterAsync(const QString& path, ParameterCallback callback) override;
 
@@ -44,16 +45,17 @@ class LoopbackProtocol : public MixerProtocol {
     void refresh() override;
 
     // latency
-    int latencyMs() const override { return 1; }
+    [[nodiscard]] int latencyMs() const noexcept override { return 1; }
 
     // capabilities
-    const MixerCapabilities& capabilities() const override { return m_capabilities; }
+    [[nodiscard]] const MixerCapabilities& capabilities() const override { return m_capabilities; }
 
   private:
     void initializeDefaultState();
+    void emitParameterChangedAsync(const QString& addr, const QVariant& val);
 
     MixerCapabilities m_capabilities;
-    bool m_connected = false;
+    ConnectionState m_connectionState = ConnectionState::Disconnected;
     QString m_statusMessage;
     QMap<QString, QVariant> m_parameterState;
 };

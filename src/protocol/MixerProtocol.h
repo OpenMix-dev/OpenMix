@@ -50,8 +50,10 @@ class MixerProtocol : public QObject {
     void connectionStatusChanged(const QString& status);
     void connectionStateChanged(ConnectionState state);
     void connectionLost();
+
     void parameterChanged(const QString& path, const QVariant& value);
     void requestTimeout(const QString& path);
+
     void latencyChanged(int ms);
     void sceneChanged(int sceneNumber);
 };

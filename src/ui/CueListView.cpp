@@ -17,6 +17,7 @@
 #include <QKeyEvent>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <algorithm>
 
 namespace OpenMix {
 
@@ -398,22 +399,17 @@ QModelIndex CueListView::nextEditableIndex(const QModelIndex& current, bool forw
     int col = current.column();
 
     // order of editable columns
-    static const int editableColumns[] = {CueTableModel::ColNumber, CueTableModel::ColName,
-                                          CueTableModel::ColType,   CueTableModel::ColGroup,
-                                          CueTableModel::ColTags,   CueTableModel::ColNotes};
+    static constexpr int editableColumns[] = {CueTableModel::ColNumber, CueTableModel::ColName,
+                                             CueTableModel::ColType,   CueTableModel::ColGroup,
+                                             CueTableModel::ColTags,   CueTableModel::ColNotes};
 
-    static const int editableCount = sizeof(editableColumns) / sizeof(editableColumns[0]);
+    static constexpr int editableCount = sizeof(editableColumns) / sizeof(editableColumns[0]);
 
     // find column's position in list
-    int colPos = -1;
-    for (int i = 0; i < editableCount; ++i) {
-        if (editableColumns[i] == col) {
-            colPos = i;
-            break;
-        }
-    }
-    if (colPos < 0)
-        colPos = 0;
+    const auto* found = std::find(std::begin(editableColumns), std::end(editableColumns), col);
+    int colPos = (found != std::end(editableColumns))
+        ? static_cast<int>(std::distance(std::begin(editableColumns), found))
+        : 0;
 
     // move to next position
     if (forward) {
