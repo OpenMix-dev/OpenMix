@@ -1,5 +1,6 @@
 #include "UndoCommands.h"
 #include "CueList.h"
+#include <algorithm>
 
 namespace OpenMix {
 
@@ -51,7 +52,8 @@ AddCueCommand::AddCueCommand(CueList* cueList, const Cue& cue, int index, QUndoC
 void AddCueCommand::undo() {
     if (m_cueList) {
         int idx = m_index >= 0 ? m_index : m_cueList->count() - 1;
-        m_cueList->removeCue(idx);
+        if (idx >= 0)
+            m_cueList->removeCue(idx);
     }
 }
 
@@ -129,6 +131,7 @@ BatchEditCommand::BatchEditCommand(CueList* cueList, const QVector<int>& indices
                                    const QString& text, QUndoCommand* parent)
     : QUndoCommand(parent), m_cueList(cueList), m_indices(indices), m_oldCues(oldCues),
       m_newCues(newCues) {
+    Q_ASSERT(indices.size() == oldCues.size() && oldCues.size() == newCues.size());
     setText(text);
 }
 
@@ -136,7 +139,8 @@ void BatchEditCommand::undo() {
     if (!m_cueList)
         return;
 
-    for (int i = 0; i < m_indices.size(); ++i) {
+    int count = std::min({m_indices.size(), m_oldCues.size(), m_newCues.size()});
+    for (int i = 0; i < count; ++i) {
         int idx = m_indices[i];
         if (idx >= 0 && idx < m_cueList->count()) {
             m_cueList->updateCue(idx, m_oldCues[i]);
@@ -153,7 +157,8 @@ void BatchEditCommand::redo() {
     if (!m_cueList)
         return;
 
-    for (int i = 0; i < m_indices.size(); ++i) {
+    int count = std::min({m_indices.size(), m_oldCues.size(), m_newCues.size()});
+    for (int i = 0; i < count; ++i) {
         int idx = m_indices[i];
         if (idx >= 0 && idx < m_cueList->count()) {
             m_cueList->updateCue(idx, m_newCues[i]);

@@ -72,7 +72,7 @@ class Show : public QObject {
     CueList m_cueList;
     MixerConfig m_mixerConfig;
     DCAMapping m_dcaMapping;
-    QJsonObject m_originalState;
+    bool m_isDirty = false;
     bool m_lastEmittedModified = false;
 };
 

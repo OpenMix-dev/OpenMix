@@ -1,4 +1,5 @@
 #include "TcpTransport.h"
+#include <algorithm>
 
 namespace OpenMix {
 
@@ -147,7 +148,8 @@ void TcpTransport::startReconnection() {
         return;
 
     // exponential backoff
-    int delay = m_reconnectDelayMs * (1 << m_reconnectAttempts);
+    int shift = std::min(m_reconnectAttempts, 10);
+    int delay = std::min(m_reconnectDelayMs * (1 << shift), 30000);
     m_reconnectTimer.start(delay);
 }
 

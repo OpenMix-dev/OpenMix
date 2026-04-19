@@ -34,25 +34,21 @@ void Show::setName(const QString& name) {
     }
 }
 
-bool Show::isModified() const { return toJson() != m_originalState; }
+bool Show::isModified() const { return m_isDirty; }
 
 void Show::setModified(bool modified) {
-    if (!modified) {
-        m_originalState = toJson();
-        if (m_lastEmittedModified) {
-            m_lastEmittedModified = false;
-            emit modifiedChanged(false);
-        }
-    } else {
-        checkModifiedState();
-    }
+    if (m_isDirty == modified)
+        return;
+    m_isDirty = modified;
+    m_lastEmittedModified = modified;
+    emit modifiedChanged(modified);
 }
 
 void Show::checkModifiedState() {
-    bool nowModified = isModified();
-    if (nowModified != m_lastEmittedModified) {
-        m_lastEmittedModified = nowModified;
-        emit modifiedChanged(nowModified);
+    if (!m_isDirty) {
+        m_isDirty = true;
+        m_lastEmittedModified = true;
+        emit modifiedChanged(true);
     }
 }
 
@@ -79,7 +75,7 @@ void Show::newShow() {
     m_mixerConfig.port = 10023;
     m_cueList.clear();
     m_dcaMapping.clear();
-    m_originalState = toJson();
+    m_isDirty = false;
     m_lastEmittedModified = false;
 }
 
@@ -108,7 +104,7 @@ void Show::fromJson(const QJsonObject& json) {
         m_dcaMapping.clear();
     }
 
-    m_originalState = toJson();
+    m_isDirty = false;
     m_lastEmittedModified = false;
     emit nameChanged(m_name);
 }
