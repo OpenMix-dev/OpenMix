@@ -256,7 +256,8 @@ void WingProtocol::onTransportError(const QString& error) {
             setStatus("Reconnection failed - max attempts reached");
             setConnectionState(ConnectionState::Disconnected);
         } else {
-            int delay = m_reconnectDelayMs * (1 << m_reconnectAttempts);
+            int shift = std::min(m_reconnectAttempts, 10);
+            int delay = std::min(m_reconnectDelayMs * (1 << shift), 30000);
             m_reconnectTimer.start(delay);
         }
     }
@@ -292,7 +293,8 @@ void WingProtocol::onConnectionTimeout() {
             setConnectionState(ConnectionState::Disconnected);
             emit connectionError("Failed to reconnect after maximum attempts");
         } else {
-            int delay = m_reconnectDelayMs * (1 << m_reconnectAttempts);
+            int shift = std::min(m_reconnectAttempts, 10);
+            int delay = std::min(m_reconnectDelayMs * (1 << shift), 30000);
             m_reconnectTimer.start(delay);
         }
     }
@@ -336,7 +338,8 @@ void WingProtocol::onReconnectAttempt() {
     m_transport.disconnect();
 
     if (!m_transport.connect(m_host, m_port)) {
-        int delay = m_reconnectDelayMs * (1 << (m_reconnectAttempts - 1));
+        int shift = std::min(m_reconnectAttempts - 1, 10);
+        int delay = std::min(m_reconnectDelayMs * (1 << shift), 30000);
         m_reconnectTimer.start(delay);
         return;
     }

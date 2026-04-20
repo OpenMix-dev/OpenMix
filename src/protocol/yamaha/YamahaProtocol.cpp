@@ -275,7 +275,8 @@ void YamahaProtocol::onConnectionTimeout() {
             setConnectionState(ConnectionState::Disconnected);
             emit connectionError("Failed to reconnect after maximum attempts");
         } else {
-            int delay = m_reconnectDelayMs * (1 << m_reconnectAttempts);
+            int shift = std::min(m_reconnectAttempts, 10);
+            int delay = std::min(m_reconnectDelayMs * (1 << shift), 30000);
             m_reconnectTimer.start(delay);
         }
     }
@@ -328,7 +329,8 @@ void YamahaProtocol::onReconnectAttempt() {
     m_oscAddress = lo_address_new(m_host.toUtf8().constData(),
                                   QString::number(m_transmitPort).toUtf8().constData());
     if (!m_oscAddress) {
-        int delay = m_reconnectDelayMs * (1 << (m_reconnectAttempts - 1));
+        int shift = std::min(m_reconnectAttempts - 1, 10);
+        int delay = std::min(m_reconnectDelayMs * (1 << shift), 30000);
         m_reconnectTimer.start(delay);
         return;
     }
@@ -336,7 +338,8 @@ void YamahaProtocol::onReconnectAttempt() {
     if (!m_receiveSocket.bind(QHostAddress::Any, m_port)) {
         lo_address_free(m_oscAddress);
         m_oscAddress = nullptr;
-        int delay = m_reconnectDelayMs * (1 << (m_reconnectAttempts - 1));
+        int shift = std::min(m_reconnectAttempts - 1, 10);
+        int delay = std::min(m_reconnectDelayMs * (1 << shift), 30000);
         m_reconnectTimer.start(delay);
         return;
     }
@@ -456,6 +459,8 @@ QVariant YamahaProtocol::parseOscArgument(const QByteArray& data, int& offset, c
                           (static_cast<quint8>(data[offset + 1]) << 16) |
                           (static_cast<quint8>(data[offset + 2]) << 8) |
                           static_cast<quint8>(data[offset + 3]);
+            if (size < 0)
+                break;
             offset += 4;
             if (offset + size <= data.size()) {
                 QByteArray blob = data.mid(offset, size);

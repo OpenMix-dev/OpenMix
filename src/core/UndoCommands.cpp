@@ -51,7 +51,8 @@ AddCueCommand::AddCueCommand(CueList* cueList, const Cue& cue, int index, QUndoC
 void AddCueCommand::undo() {
     if (m_cueList) {
         int idx = m_index >= 0 ? m_index : m_cueList->count() - 1;
-        m_cueList->removeCue(idx);
+        if (idx >= 0)
+            m_cueList->removeCue(idx);
     }
 }
 
@@ -129,6 +130,7 @@ BatchEditCommand::BatchEditCommand(CueList* cueList, const QVector<int>& indices
                                    const QString& text, QUndoCommand* parent)
     : QUndoCommand(parent), m_cueList(cueList), m_indices(indices), m_oldCues(oldCues),
       m_newCues(newCues) {
+    Q_ASSERT(indices.size() == oldCues.size() && oldCues.size() == newCues.size());
     setText(text);
 }
 

@@ -1,6 +1,7 @@
 #include "AllenHeathTcpProtocol.h"
 #include "../../core/Cue.h"
 #include <QtEndian>
+#include <cstring>
 
 namespace OpenMix {
 
@@ -143,12 +144,10 @@ QByteArray AllenHeathTcpProtocol::buildDCAFaderMessage(int dca, float level) {
     msg.append(static_cast<char>(dca - 1)); // 0-indexed
 
     // float in big-endian
-    union {
-        float f;
-        quint32 i;
-    } val;
-    val.f = qBound(0.0f, level, 1.0f);
-    quint32 be = qToBigEndian(val.i);
+    float clamped = qBound(0.0f, level, 1.0f);
+    quint32 i;
+    std::memcpy(&i, &clamped, 4);
+    quint32 be = qToBigEndian(i);
     msg.append(reinterpret_cast<const char*>(&be), 4);
 
     return msg;
@@ -231,13 +230,11 @@ void AllenHeathTcpProtocol::parseProtocolData(const QByteArray& data) {
                     if (valueType == 0x01 && frame.size() >= valueOffset + 4) {
                         // float value
                         quint32 be;
-                        memcpy(&be, frame.constData() + valueOffset, 4);
-                        union {
-                            float f;
-                            quint32 i;
-                        } fval;
-                        fval.i = qFromBigEndian(be);
-                        value = fval.f;
+                        std::memcpy(&be, frame.constData() + valueOffset, 4);
+                        quint32 hostBits = qFromBigEndian(be);
+                        float f;
+                        std::memcpy(&f, &hostBits, 4);
+                        value = f;
                     } else if (valueType == 0x02 && frame.size() >= valueOffset + 4) {
                         quint32 be;
                         memcpy(&be, frame.constData() + valueOffset, 4);
@@ -275,15 +272,13 @@ void AllenHeathTcpProtocol::parseProtocolData(const QByteArray& data) {
                     emit parameterChanged(path, muted);
                 } else if (frame.size() >= 6) {
                     quint32 be;
-                    memcpy(&be, frame.constData() + 2, 4);
-                    union {
-                        float f;
-                        quint32 i;
-                    } val;
-                    val.i = qFromBigEndian(be);
+                    std::memcpy(&be, frame.constData() + 2, 4);
+                    quint32 hostBits = qFromBigEndian(be);
+                    float f;
+                    std::memcpy(&f, &hostBits, 4);
                     QString path = QString("/dca/%1/fader").arg(dcaIndex + 1);
-                    m_parameterCache[path] = val.f;
-                    emit parameterChanged(path, val.f);
+                    m_parameterCache[path] = f;
+                    emit parameterChanged(path, f);
                 }
             }
             break;
