@@ -72,7 +72,10 @@ void AllenHeathTcpProtocol::sendParameter(const QString& path, const QVariant& v
     if (path.startsWith("/dca/")) {
         QStringList parts = path.split('/');
         if (parts.size() >= 4) {
-            int dca = parts[2].toInt();
+            bool ok;
+            int dca = parts[2].toInt(&ok);
+            if (!ok || dca < 1)
+                return;
             QString param = parts[3];
 
             if (param == "fader") {
@@ -132,6 +135,9 @@ void AllenHeathTcpProtocol::refresh() {
 }
 
 QByteArray AllenHeathTcpProtocol::buildDCAFaderMessage(int dca, float level) {
+    if (dca < 1)
+        return {};
+
     QByteArray msg;
 
     // ACE Protocol frame: [Length(2)] [Type(1)] [Payload...]
@@ -155,6 +161,9 @@ QByteArray AllenHeathTcpProtocol::buildDCAFaderMessage(int dca, float level) {
 
 // buildDCAMuteMessage
 QByteArray AllenHeathTcpProtocol::buildDCAMuteMessage(int dca, bool muted) {
+    if (dca < 1)
+        return {};
+
     QByteArray msg;
 
     // DCA mute: Type 0x10, Payload: [DCA index(1)] [0x80 flag for mute] [Mute state(1)]
