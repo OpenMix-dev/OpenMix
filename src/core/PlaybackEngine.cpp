@@ -425,47 +425,31 @@ void PlaybackEngine::executeMacroCue(const Cue& cue) {
 }
 
 void PlaybackEngine::executeNextMacroChild() {
-    if (m_currentMacroId.isEmpty() || m_macroPendingChildren.isEmpty() || !m_cueList) {
-        if (!m_currentMacroId.isEmpty()) {
-            const Cue* macroCue = m_cueList->findById(m_currentMacroId);
-
-            m_currentMacroId.clear();
-            m_macroPendingChildren.clear();
-            m_macroChildIndex = 0;
-
-            emit cueCompleted(m_currentIndex);
-
-            if (macroCue) {
-                handleAutoFollow(*macroCue);
-            }
-        }
+    if (m_currentMacroId.isEmpty() || !m_cueList) {
+        m_currentMacroId.clear();
+        m_macroPendingChildren.clear();
+        m_macroChildIndex = 0;
         return;
     }
 
-    QString childId = m_macroPendingChildren.takeFirst();
-    const Cue* childCue = m_cueList->findById(childId);
-    if (childCue) {
+    while (!m_macroPendingChildren.isEmpty()) {
+        QString childId = m_macroPendingChildren.takeFirst();
+        const Cue* childCue = m_cueList->findById(childId);
+        if (!childCue)
+            continue;
         executeCueInternal(*childCue);
         emit macroChildExecuted(m_currentMacroId, childId);
         m_macroChildIndex++;
-
-        if (!m_macroPendingChildren.isEmpty()) {
-            executeNextMacroChild();
-        } else {
-            const Cue* macroCue = m_cueList->findById(m_currentMacroId);
-
-            m_currentMacroId.clear();
-            m_macroPendingChildren.clear();
-            m_macroChildIndex = 0;
-
-            emit cueCompleted(m_currentIndex);
-            if (macroCue) {
-                handleAutoFollow(*macroCue);
-            }
-        }
-    } else {
-        executeNextMacroChild();
     }
+
+    const Cue* macroCue = m_cueList->findById(m_currentMacroId);
+    m_currentMacroId.clear();
+    m_macroPendingChildren.clear();
+    m_macroChildIndex = 0;
+
+    emit cueCompleted(m_currentIndex);
+    if (macroCue)
+        handleAutoFollow(*macroCue);
 }
 
 void PlaybackEngine::executeGoToCue(const Cue& cue) {

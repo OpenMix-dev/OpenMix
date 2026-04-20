@@ -38,7 +38,7 @@ include(FetchContent)
 FetchContent_Declare(
     qlementine-icons
     GIT_REPOSITORY "https://github.com/oclero/qlementine-icons.git"
-    GIT_TAG "master"
+    GIT_TAG "e2ad8c109d245f11b3fcb2c39f8b26aeee87ff50"
 )
 FetchContent_MakeAvailable(qlementine-icons)
 

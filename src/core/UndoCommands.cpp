@@ -82,7 +82,7 @@ RemoveCueCommand::RemoveCueCommand(CueList* cueList, int index, QUndoCommand* pa
 }
 
 void RemoveCueCommand::undo() {
-    if (m_cueList) {
+    if (m_cueList && m_index >= 0 && m_index <= m_cueList->count()) {
         m_cueList->insertCue(m_index, m_cue);
     }
 }
