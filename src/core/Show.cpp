@@ -40,14 +40,12 @@ void Show::setModified(bool modified) {
     if (m_isDirty == modified)
         return;
     m_isDirty = modified;
-    m_lastEmittedModified = modified;
     emit modifiedChanged(modified);
 }
 
 void Show::checkModifiedState() {
     if (!m_isDirty) {
         m_isDirty = true;
-        m_lastEmittedModified = true;
         emit modifiedChanged(true);
     }
 }
@@ -76,7 +74,6 @@ void Show::newShow() {
     m_cueList.clear();
     m_dcaMapping.clear();
     m_isDirty = false;
-    m_lastEmittedModified = false;
 }
 
 QJsonObject Show::toJson() const {
@@ -105,7 +102,6 @@ void Show::fromJson(const QJsonObject& json) {
     }
 
     m_isDirty = false;
-    m_lastEmittedModified = false;
     emit nameChanged(m_name);
 }
 

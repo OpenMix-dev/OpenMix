@@ -73,12 +73,14 @@ class YamahaProtocol : public MixerProtocol {
     void onRequestTimeoutCheck();
     void onReconnectAttempt();
 
+  protected:
+    void parseOscMessage(const QByteArray& data);
+
   private:
     void sendOscMessage(const QString& path);
     void sendOscMessage(const QString& path, float value);
     void sendOscMessage(const QString& path, int value);
     void sendOscMessage(const QString& path, const QString& value);
-    void parseOscMessage(const QByteArray& data);
     QVariant parseOscArgument(const QByteArray& data, int& offset, char type);
 
     void processResponse(const QString& path, const QVariant& value);

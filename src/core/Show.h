@@ -31,10 +31,10 @@ class Show : public QObject {
     void setName(const QString& name);
 
     [[nodiscard]] QString author() const { return m_author; }
-    void setAuthor(const QString& author) { m_author = author; }
+    void setAuthor(const QString& author) { m_author = author; checkModifiedState(); }
 
     [[nodiscard]] QString notes() const { return m_notes; }
-    void setNotes(const QString& notes) { m_notes = notes; }
+    void setNotes(const QString& notes) { m_notes = notes; checkModifiedState(); }
 
     [[nodiscard]] QString filePath() const { return m_filePath; }
     void setFilePath(const QString& path) { m_filePath = path; }
@@ -50,7 +50,7 @@ class Show : public QObject {
     [[nodiscard]] const DCAMapping* dcaMapping() const { return &m_dcaMapping; }
 
     [[nodiscard]] MixerConfig mixerConfig() const { return m_mixerConfig; }
-    void setMixerConfig(const MixerConfig& config) { m_mixerConfig = config; }
+    void setMixerConfig(const MixerConfig& config) { m_mixerConfig = config; checkModifiedState(); }
 
     QJsonObject toJson() const;
     void fromJson(const QJsonObject& json);
@@ -73,7 +73,6 @@ class Show : public QObject {
     MixerConfig m_mixerConfig;
     DCAMapping m_dcaMapping;
     bool m_isDirty = false;
-    bool m_lastEmittedModified = false;
 };
 
 } // namespace OpenMix

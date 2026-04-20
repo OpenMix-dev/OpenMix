@@ -188,6 +188,8 @@ QVariant OscTransport::parseOscArgument(const QByteArray& data, int& offset, cha
                           (static_cast<quint8>(data[offset + 1]) << 16) |
                           (static_cast<quint8>(data[offset + 2]) << 8) |
                           static_cast<quint8>(data[offset + 3]);
+            if (size < 0)
+                break;
             offset += 4;
             if (offset + size <= data.size()) {
                 QByteArray blob = data.mid(offset, size);

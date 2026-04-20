@@ -1,6 +1,5 @@
 #include "UndoCommands.h"
 #include "CueList.h"
-#include <algorithm>
 
 namespace OpenMix {
 
@@ -139,8 +138,7 @@ void BatchEditCommand::undo() {
     if (!m_cueList)
         return;
 
-    int count = std::min({m_indices.size(), m_oldCues.size(), m_newCues.size()});
-    for (int i = 0; i < count; ++i) {
+    for (int i = 0; i < m_indices.size(); ++i) {
         int idx = m_indices[i];
         if (idx >= 0 && idx < m_cueList->count()) {
             m_cueList->updateCue(idx, m_oldCues[i]);
@@ -157,8 +155,7 @@ void BatchEditCommand::redo() {
     if (!m_cueList)
         return;
 
-    int count = std::min({m_indices.size(), m_oldCues.size(), m_newCues.size()});
-    for (int i = 0; i < count; ++i) {
+    for (int i = 0; i < m_indices.size(); ++i) {
         int idx = m_indices[i];
         if (idx >= 0 && idx < m_cueList->count()) {
             m_cueList->updateCue(idx, m_newCues[i]);
