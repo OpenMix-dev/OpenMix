@@ -39,6 +39,8 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+        env:
+          QT_QPA_PLATFORM: offscreen
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -87,6 +89,8 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+        env:
+          QT_QPA_PLATFORM: offscreen
 
       - name: Deploy Qt
         run: |
@@ -125,6 +129,8 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+        env:
+          QT_QPA_PLATFORM: offscreen
 
       - name: Deploy, sign, & package
         run: |
