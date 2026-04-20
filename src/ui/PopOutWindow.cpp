@@ -2,8 +2,6 @@
 #include "theme/Theme.h"
 
 #include <QCloseEvent>
-#include <QHBoxLayout>
-#include <QLabel>
 #include <QMoveEvent>
 #include <QResizeEvent>
 #include <QSettings>
@@ -29,20 +27,6 @@ void PopOutWindow::setupUi(const QString& title) {
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
-
-    m_titleBar = new QWidget(this);
-    m_titleBar->setObjectName("PopOutTitleBar");
-    m_titleBar->setFixedHeight(36);
-
-    QHBoxLayout* titleLayout = new QHBoxLayout(m_titleBar);
-    titleLayout->setContentsMargins(12, 0, 8, 0);
-    titleLayout->setSpacing(8);
-
-    m_titleLabel = new QLabel(title, m_titleBar);
-    m_titleLabel->setProperty("role", "header");
-    titleLayout->addWidget(m_titleLabel);
-
-    m_mainLayout->addWidget(m_titleBar);
 
     m_contentContainer = new QWidget(this);
     m_contentContainer->setObjectName("PopOutContent");
@@ -80,14 +64,11 @@ void PopOutWindow::showAndRestore() {
 }
 
 void PopOutWindow::setMinimumContentSize(int width, int height) {
-    setMinimumSize(width, height + m_titleBar->height());
+    setMinimumSize(width, height);
 }
 
 void PopOutWindow::setWindowTitle(const QString& title) {
     QDialog::setWindowTitle(title);
-    if (m_titleLabel) {
-        m_titleLabel->setText(title);
-    }
 }
 
 void PopOutWindow::closeEvent(QCloseEvent* event) {

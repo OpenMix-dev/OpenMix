@@ -4,8 +4,6 @@
 #include <QPointer>
 
 class QVBoxLayout;
-class QHBoxLayout;
-class QLabel;
 
 namespace OpenMix {
 
@@ -43,8 +41,6 @@ class PopOutWindow : public QDialog {
     QString m_settingsKey;
     QWidget* m_content = nullptr;
     QVBoxLayout* m_mainLayout = nullptr;
-    QWidget* m_titleBar = nullptr;
-    QLabel* m_titleLabel = nullptr;
     QWidget* m_contentContainer = nullptr;
 
     bool m_geometryLoaded = false;
