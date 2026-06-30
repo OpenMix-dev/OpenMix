@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MidiControlMapping.h"
+#include "MtcParser.h"
 
 #include <QObject>
 #include <QTimer>
@@ -77,6 +78,8 @@ class MidiInputManager : public QObject {
     void midiLearnReceived(const MidiTrigger& trigger);
     void actionExecuted(MidiAction action);
     void mscReceived(int command); // a MIDI Show Control command was handled
+    // a full MIDI Time Code frame was assembled (from quarter-frame or full-frame)
+    void timecodeChanged(int hours, int minutes, int seconds, int frames);
 
   private slots:
     void onDevicePollTimer();
@@ -107,6 +110,8 @@ class MidiInputManager : public QObject {
 
     QTimer m_devicePollTimer;
     QStringList m_lastDeviceList;
+
+    MtcParser m_mtcParser; // assembles MIDI Time Code quarter-frames
 
     PlaybackEngine* m_engine = nullptr;
     PlaybackGuard* m_guard = nullptr;

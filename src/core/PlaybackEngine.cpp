@@ -4,6 +4,7 @@
 #include "CueList.h"
 #include "DCAMapping.h"
 #include "PlaybackGuard.h"
+#include "Position.h"
 #include "protocol/MixerCapabilities.h"
 #include "protocol/MixerProtocol.h"
 #include <QDateTime>
@@ -31,6 +32,8 @@ void PlaybackEngine::setMixer(MixerProtocol* mixer) { m_mixer = mixer; }
 void PlaybackEngine::setDCAMapping(DCAMapping* mapping) { m_dcaMapping = mapping; }
 
 void PlaybackEngine::setActorLibrary(ActorProfileLibrary* library) { m_actorLibrary = library; }
+
+void PlaybackEngine::setPositionLibrary(PositionLibrary* library) { m_positionLibrary = library; }
 
 void PlaybackEngine::setValidator(CueValidator* validator) { m_validator = validator; }
 
@@ -223,6 +226,9 @@ void PlaybackEngine::executeCueInternal(const Cue& cue) {
         // apply per-channel fader levels (faded over cue.fadeTime if set)
         applyChannelLevels(cue);
 
+        // apply named-position pan/delay assignments
+        applyChannelPositions(cue);
+
         // apply DCA overrides (mute & label only)
         applyDCAOverrides(cue, targetDCAs);
 
@@ -320,6 +326,39 @@ void PlaybackEngine::applyChannelLevels(const Cue& cue) {
             m_mixer->setChannelFader(channel, target);
         }
         m_appliedChannelLevels[channel] = target;
+    }
+}
+
+void PlaybackEngine::applyChannelPositions(const Cue& cue) {
+    if (!m_mixer || !m_positionLibrary)
+        return;
+
+    // resolve each channel's assigned Position to pan + delay sends. Paths are the
+    // project's OSC-ish convention (matching cue parameters / LoopbackProtocol):
+    //   /ch/NN/mix/pan        channel image pan (-1..+1)
+    //   /ch/NN/delay/on       per-channel delay enable
+    //   /ch/NN/delay/time     per-channel delay (ms)
+    //   /ch/NN/mix/BB/pan     pan of the channel's send into bus BB (per-bus imaging)
+    const QMap<int, QString> channelPositions = cue.channelPositions();
+    for (auto it = channelPositions.constBegin(); it != channelPositions.constEnd(); ++it) {
+        const int channel = it.key();
+        std::optional<Position> position = m_positionLibrary->position(it.value());
+        if (!position.has_value())
+            continue;
+
+        const QString ch = QString("%1").arg(channel, 2, 10, QChar('0'));
+
+        m_mixer->sendParameter(QString("/ch/%1/mix/pan").arg(ch), position->pan());
+
+        if (position->delay() > 0.0) {
+            m_mixer->sendParameter(QString("/ch/%1/delay/on").arg(ch), 1);
+            m_mixer->sendParameter(QString("/ch/%1/delay/time").arg(ch), position->delay());
+        }
+
+        for (int bus : position->buses()) {
+            const QString busStr = QString("%1").arg(bus, 2, 10, QChar('0'));
+            m_mixer->sendParameter(QString("/ch/%1/mix/%2/pan").arg(ch, busStr), position->pan());
+        }
     }
 }
 

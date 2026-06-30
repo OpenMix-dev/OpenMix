@@ -2,12 +2,16 @@
 
 #include "ActorProfileLibrary.h"
 #include "CueList.h"
+#include "CueZero.h"
 #include "DCAMapping.h"
+#include "Position.h"
 #include <QJsonObject>
 #include <QObject>
 #include <QString>
 
 namespace OpenMix {
+
+class MixerProtocol;
 
 struct MixerConfig {
     static constexpr int DEFAULT_PORT = 10023;
@@ -55,6 +59,15 @@ class Show : public QObject {
         return &m_actorProfileLibrary;
     }
 
+    [[nodiscard]] PositionLibrary* positionLibrary() { return &m_positionLibrary; }
+    [[nodiscard]] const PositionLibrary* positionLibrary() const { return &m_positionLibrary; }
+
+    [[nodiscard]] CueZero* cueZero() { return &m_cueZero; }
+    [[nodiscard]] const CueZero* cueZero() const { return &m_cueZero; }
+
+    // recall the show's Cue Zero base state onto a connected mixer
+    void applyCueZero(MixerProtocol* mixer) const { m_cueZero.apply(mixer); }
+
     [[nodiscard]] MixerConfig mixerConfig() const { return m_mixerConfig; }
     void setMixerConfig(const MixerConfig& config) { m_mixerConfig = config; checkModifiedState(); }
 
@@ -71,6 +84,8 @@ class Show : public QObject {
     void connectCueListSignals();
     void connectDcaMappingSignals();
     void connectActorLibrarySignals();
+    void connectPositionLibrarySignals();
+    void connectCueZeroSignals();
 
     QString m_name;
     QString m_author;
@@ -80,6 +95,8 @@ class Show : public QObject {
     MixerConfig m_mixerConfig;
     DCAMapping m_dcaMapping;
     ActorProfileLibrary m_actorProfileLibrary;
+    PositionLibrary m_positionLibrary;
+    CueZero m_cueZero;
     bool m_isDirty = false;
 };
 

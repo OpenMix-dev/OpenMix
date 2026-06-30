@@ -17,6 +17,7 @@ class MixerProtocol;
 class PlaybackGuard;
 class PlaybackLogger;
 class ActorProfileLibrary;
+class PositionLibrary;
 struct VoiceData;
 
 enum class PlaybackState { Stopped, Running };
@@ -31,6 +32,7 @@ class PlaybackEngine : public QObject {
     void setMixer(MixerProtocol* mixer);
     void setDCAMapping(DCAMapping* mapping);
     void setActorLibrary(ActorProfileLibrary* library);
+    void setPositionLibrary(PositionLibrary* library);
 
     // drives timed fader fades; exposed so the UI (and tests) can observe/step it
     [[nodiscard]] FadeEngine* fadeEngine() { return &m_fadeEngine; }
@@ -117,12 +119,14 @@ class PlaybackEngine : public QObject {
     void expandChannelProfiles(const Cue& cue);
     void applyVoice(int channel, const VoiceData& voice);
     void applyChannelLevels(const Cue& cue); // fade-aware per-channel fader moves
+    void applyChannelPositions(const Cue& cue); // named-position pan/delay sends
     void verifyCue(int index, const Cue& cue);
 
     CueList* m_cueList = nullptr;
     MixerProtocol* m_mixer = nullptr;
     DCAMapping* m_dcaMapping = nullptr;
     ActorProfileLibrary* m_actorLibrary = nullptr;
+    PositionLibrary* m_positionLibrary = nullptr;
 
     FadeEngine m_fadeEngine;
     QMap<int, double> m_appliedChannelLevels; // last-applied fader per channel (fade source)

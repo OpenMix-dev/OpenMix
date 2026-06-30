@@ -96,6 +96,10 @@ set(SOURCES
     src/core/Actor.cpp
     src/core/ActorProfileLibrary.cpp
     src/core/FadeEngine.cpp
+    src/core/Position.cpp
+    src/core/CueZero.cpp
+    src/core/TimecodeTrigger.cpp
+    src/core/ChannelMonitor.cpp
     src/core/AppLogger.cpp
     src/core/ConnectionLogBridge.cpp
     src/ui/MainWindow.cpp
@@ -183,6 +187,10 @@ set(HEADERS
     src/core/ActorProfileLibrary.h
     src/core/FadeCurve.h
     src/core/FadeEngine.h
+    src/core/Position.h
+    src/core/CueZero.h
+    src/core/TimecodeTrigger.h
+    src/core/ChannelMonitor.h
     src/core/AppLogger.h
     src/core/ConnectionLogBridge.h
     src/ui/MainWindow.h
@@ -243,6 +251,7 @@ set(HEADERS
     src/midi/MidiControlMapping.h
     src/midi/MidiInputManager.h
     src/midi/MscParser.h
+    src/midi/MtcParser.h
     src/ui/MidiConfigDialog.h
     src/ui/KeyboardShortcutsDialog.h
     src/ui/LogViewerDialog.h

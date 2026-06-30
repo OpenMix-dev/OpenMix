@@ -36,6 +36,8 @@ add_executable(test_show
     ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
     ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueZero.cpp
 )
 target_link_libraries(test_show PRIVATE
     Qt6::Core
@@ -55,6 +57,8 @@ add_executable(test_actor_profiles
     ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueZero.cpp
 )
 target_link_libraries(test_actor_profiles PRIVATE
     Qt6::Core
@@ -78,6 +82,7 @@ add_executable(test_playback_profiles
     ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
     ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
     ${CMAKE_SOURCE_DIR}/src/core/FadeEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/LoopbackProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
@@ -123,6 +128,7 @@ add_executable(test_osc_remote
     ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
     ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
     ${CMAKE_SOURCE_DIR}/src/core/FadeEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
 )
@@ -205,3 +211,47 @@ if(WIN32)
     target_compile_definitions(test_yamaha_scp PRIVATE NOMINMAX)
 endif()
 add_test(NAME YamahaScpTest COMMAND test_yamaha_scp)
+
+# --- Phase 5 backend: positions, cue zero, timecode, channel monitoring ---
+
+add_executable(test_position
+    test_position.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+)
+target_link_libraries(test_position PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(test_position PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME PositionTest COMMAND test_position)
+
+add_executable(test_mtc test_mtc.cpp)
+target_link_libraries(test_mtc PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(test_mtc PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME MtcTest COMMAND test_mtc)
+
+add_executable(test_timecode_trigger
+    test_timecode_trigger.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/TimecodeTrigger.cpp
+)
+target_link_libraries(test_timecode_trigger PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(test_timecode_trigger PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME TimecodeTriggerTest COMMAND test_timecode_trigger)
+
+add_executable(test_channel_monitor
+    test_channel_monitor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ChannelMonitor.cpp
+)
+target_link_libraries(test_channel_monitor PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(test_channel_monitor PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME ChannelMonitorTest COMMAND test_channel_monitor)
+
+add_executable(test_cuezero
+    test_cuezero.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueZero.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/LoopbackProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+)
+target_link_libraries(test_cuezero PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(test_cuezero PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME CueZeroTest COMMAND test_cuezero)

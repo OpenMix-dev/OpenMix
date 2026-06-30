@@ -62,8 +62,10 @@ bool MidiInputManager::openDevice(int deviceIndex) {
     try {
         m_midiIn->openPort(deviceIndex);
         m_midiIn->setCallback(&MidiInputManager::midiCallback, this);
-        // receive sysex (for MIDI Show Control); still ignore timing + active sensing
-        m_midiIn->ignoreTypes(false, true, true);
+        // receive sysex (MIDI Show Control) and timing (MTC quarter-frame, 0xF1);
+        // still ignore active sensing. Single-byte clock (0xF8) is dropped by the
+        // size check in processMidiMessage.
+        m_midiIn->ignoreTypes(false, false, true);
 
         m_currentDeviceName = QString::fromStdString(m_midiIn->getPortName(deviceIndex));
         m_savedDeviceName = m_currentDeviceName;
@@ -245,6 +247,16 @@ void MidiInputManager::processMidiMessage(const std::vector<unsigned char>& mess
     // System Exclusive — MIDI Show Control frames drive the playback engine
     if (message[0] == 0xF0) {
         handleSysex(message);
+        return;
+    }
+
+    // MIDI Time Code quarter-frame (0xF1 + data nibble): assemble the running
+    // timecode; emit once a full hh:mm:ss:ff frame completes (every 8th message)
+    if (message[0] == 0xF1) {
+        if (m_mtcParser.parseQuarterFrame(message[1])) {
+            const MtcTime tc = m_mtcParser.time();
+            emit timecodeChanged(tc.hours, tc.minutes, tc.seconds, tc.frames);
+        }
         return;
     }
 
