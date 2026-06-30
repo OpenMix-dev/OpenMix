@@ -69,7 +69,17 @@ class AllenHeathMidiProtocol : public MixerProtocol {
     // capabilities
     [[nodiscard]] const MixerCapabilities& capabilities() const override { return m_capabilities; }
 
+    // Input-channel fader level via NRPN (used by actor-voice levels + fades).
+    // NOTE: CH_FADER_NRPN_MSB is a placeholder for the input-channel -> LR level
+    // parameter MSB; set it from the A&H SQ MIDI Protocol Issue 5 reference tables
+    // before driving real hardware:
+    //   https://www.allen-heath.com/content/uploads/2023/11/SQ-MIDI-Protocol-Issue5.pdf
+    // Channel mute over A&H MIDI uses MIDI notes and is left unimplemented here.
+    void setChannelFader(int channel, double level) override;
+
   protected:
+    static constexpr int CH_FADER_NRPN_MSB = 0x40; // placeholder — verify vs SQ MIDI tables
+
     // MIDI message builders used by subclasses
     QByteArray buildNRPNMessage(int channel, int nrpnMsb, int nrpnLsb, int valueMsb, int valueLsb);
     QByteArray buildSysExSceneRecall(int sceneNumber);

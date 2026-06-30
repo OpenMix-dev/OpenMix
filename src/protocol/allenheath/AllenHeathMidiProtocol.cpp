@@ -83,9 +83,30 @@ void AllenHeathMidiProtocol::sendParameter(const QString& path, const QVariant& 
                 m_transport.send(msg);
             }
         }
+    } else if (path.startsWith("/ch/")) {
+        QStringList parts = path.split('/');
+        if (parts.size() >= 4) {
+            int ch = parts[2].toInt();
+            QString param = parts[3];
+
+            if (param == "fader") {
+                // input-channel fader: 14-bit NRPN, same value scaling as DCA.
+                // CH_FADER_NRPN_MSB is a placeholder — see the note in the header.
+                int midiValue = qBound(0, static_cast<int>(value.toFloat() * 16383.0f), 16383);
+                int msb = (midiValue >> 7) & 0x7F;
+                int lsb = midiValue & 0x7F;
+                QByteArray msg = buildNRPNMessage(0, CH_FADER_NRPN_MSB, ch - 1, msb, lsb);
+                m_transport.send(msg);
+            }
+        }
     }
 
     m_parameterCache[path] = value;
+}
+
+void AllenHeathMidiProtocol::setChannelFader(int channel, double level) {
+    // route through the path-based encoder above (keeps one wire-format code path)
+    sendParameter(QString("/ch/%1/fader").arg(channel), static_cast<float>(level));
 }
 
 QVariant AllenHeathMidiProtocol::getParameter(const QString& path) {
