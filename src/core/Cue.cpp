@@ -138,6 +138,14 @@ QVariant Cue::parameter(const QString& path) const {
     return QVariant();
 }
 
+void Cue::setChannelPosition(int channel, const QString& positionId) {
+    if (positionId.isEmpty()) {
+        m_channelPositions.remove(channel);
+    } else {
+        m_channelPositions[channel] = positionId;
+    }
+}
+
 void Cue::setDCAOverride(int dca, const DCAOverride& override) {
     if (override.hasOverrides()) {
         m_dcaOverrides[dca] = override;
@@ -291,6 +299,15 @@ QJsonObject Cue::toJson() const {
         json["channelLevels"] = levelsObj;
     }
 
+    // named-position assignments
+    if (!m_channelPositions.isEmpty()) {
+        QJsonObject positionsObj;
+        for (auto it = m_channelPositions.constBegin(); it != m_channelPositions.constEnd(); ++it) {
+            positionsObj[QString::number(it.key())] = it.value();
+        }
+        json["channelPositions"] = positionsObj;
+    }
+
     return json;
 }
 
@@ -395,6 +412,14 @@ Cue Cue::fromJson(const QJsonObject& json) {
         const QJsonObject levelsObj = json["channelLevels"].toObject();
         for (auto it = levelsObj.constBegin(); it != levelsObj.constEnd(); ++it) {
             cue.m_channelLevels[it.key().toInt()] = it.value().toDouble();
+        }
+    }
+
+    // named-position assignments
+    if (json.contains("channelPositions")) {
+        QJsonObject positionsObj = json["channelPositions"].toObject();
+        for (auto it = positionsObj.constBegin(); it != positionsObj.constEnd(); ++it) {
+            cue.m_channelPositions[it.key().toInt()] = it.value().toString();
         }
     }
 

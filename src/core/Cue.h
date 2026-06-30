@@ -151,6 +151,17 @@ class Cue {
     }
     void removeTag(const QString& tag) { m_tags.removeAll(tag); }
 
+    // named-position assignments (channel# -> Position id; resolved at playback
+    // against the show's PositionLibrary to pan/delay sends)
+    [[nodiscard]] QMap<int, QString> channelPositions() const { return m_channelPositions; }
+    void setChannelPositions(const QMap<int, QString>& positions) { m_channelPositions = positions; }
+    void setChannelPosition(int channel, const QString& positionId);
+    [[nodiscard]] QString channelPosition(int channel) const {
+        return m_channelPositions.value(channel);
+    }
+    void clearChannelPosition(int channel) { m_channelPositions.remove(channel); }
+    void clearChannelPositions() { m_channelPositions.clear(); }
+
     [[nodiscard]] QJsonObject parameters() const { return m_parameters; }
     void setParameters(const QJsonObject& params) { m_parameters = params; }
     void setParameter(const QString& path, const QVariant& value);
@@ -209,6 +220,9 @@ class Cue {
     QString m_group;
     QStringList m_tags;
     QString m_qLabCue; // linked QLab cue id (DAW remote)
+
+    // channel# -> Position id (named-position assignments)
+    QMap<int, QString> m_channelPositions;
 
     QJsonObject m_parameters;
 

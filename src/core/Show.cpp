@@ -21,10 +21,13 @@ MixerConfig MixerConfig::fromJson(const QJsonObject& json) {
 }
 
 Show::Show(QObject* parent)
-    : QObject(parent), m_cueList(this), m_dcaMapping(this), m_actorProfileLibrary(this) {
+    : QObject(parent), m_cueList(this), m_dcaMapping(this), m_actorProfileLibrary(this),
+      m_positionLibrary(this), m_cueZero(this) {
     connectCueListSignals();
     connectDcaMappingSignals();
     connectActorLibrarySignals();
+    connectPositionLibrarySignals();
+    connectCueZeroSignals();
     newShow();
 }
 
@@ -69,6 +72,14 @@ void Show::connectActorLibrarySignals() {
     connect(&m_actorProfileLibrary, &ActorProfileLibrary::changed, this, &Show::checkModifiedState);
 }
 
+void Show::connectPositionLibrarySignals() {
+    connect(&m_positionLibrary, &PositionLibrary::changed, this, &Show::checkModifiedState);
+}
+
+void Show::connectCueZeroSignals() {
+    connect(&m_cueZero, &CueZero::changed, this, &Show::checkModifiedState);
+}
+
 void Show::newShow() {
     m_name = tr("Untitled Show");
     m_author.clear();
@@ -80,6 +91,8 @@ void Show::newShow() {
     m_cueList.clear();
     m_dcaMapping.clear();
     m_actorProfileLibrary.clear();
+    m_positionLibrary.clear();
+    m_cueZero.clear();
     m_isDirty = false;
 }
 
@@ -93,6 +106,8 @@ QJsonObject Show::toJson() const {
     json["cues"] = m_cueList.toJson();
     json["dcaMapping"] = m_dcaMapping.toJson();
     json["actors"] = m_actorProfileLibrary.toJson();
+    json["positions"] = m_positionLibrary.toJson();
+    json["cueZero"] = m_cueZero.toJson();
     return json;
 }
 
@@ -119,6 +134,20 @@ void Show::fromJson(const QJsonObject& json) {
         m_actorProfileLibrary.loadFromJson(json["actors"].toObject());
     } else {
         m_actorProfileLibrary.clear();
+    }
+
+    // named-position library (added in show version 1.2)
+    if (json.contains("positions")) {
+        m_positionLibrary.loadFromJson(json["positions"].toObject());
+    } else {
+        m_positionLibrary.clear();
+    }
+
+    // Cue Zero base state (added in show version 1.2)
+    if (json.contains("cueZero")) {
+        m_cueZero.loadFromJson(json["cueZero"].toObject());
+    } else {
+        m_cueZero.clear();
     }
 
     m_isDirty = false;
