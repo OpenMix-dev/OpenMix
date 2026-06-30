@@ -56,6 +56,14 @@ void CueConfidenceIndicator::validate() {
     emit validationCompleted(m_level);
 }
 
+void CueConfidenceIndicator::setConfidence(ConfidenceLevel level, const QString& tooltip) {
+    m_level = level;
+    m_tooltipText = tooltip;
+    setToolTip(tooltip);
+    update();
+    emit validationCompleted(m_level);
+}
+
 QString CueConfidenceIndicator::tooltipText() const { return m_tooltipText; }
 
 QSize CueConfidenceIndicator::sizeHint() const { return QSize(16, 16); }

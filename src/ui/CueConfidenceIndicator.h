@@ -36,6 +36,10 @@ class CueConfidenceIndicator : public QWidget {
     // manually trigger validation
     void validate();
 
+    // directly set a confidence state (e.g. post-fire landed/drift feedback from
+    // the playback engine), bypassing the validator
+    void setConfidence(ConfidenceLevel level, const QString& tooltip);
+
     // get tooltip text describing issues
     QString tooltipText() const;
 

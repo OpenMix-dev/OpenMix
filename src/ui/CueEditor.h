@@ -14,10 +14,12 @@ class QListWidget;
 class QGroupBox;
 class QScrollArea;
 class QVBoxLayout;
+class QTableWidget;
 
 namespace OpenMix {
 
 class Application;
+class ActorProfileLibrary;
 class Cue;
 
 class CueEditor : public QWidget {
@@ -46,9 +48,21 @@ class CueEditor : public QWidget {
     void onTargetedDCAsChanged();
     void onDCAOverrideChanged(int dca);
 
+    void onFadeTimeChanged(double value);
+    void onFadeCurveChanged(int index);
+    void onQLabCueChanged(const QString& text);
+    void onChannelProfileChanged(int channel);
+    void onChannelLevelToggled(int channel, bool on);
+    void onChannelLevelChanged(int channel);
+    void onActorLibraryChanged();
+
   private:
     void setupUi();
     void createDCATargetingSection();
+    void createFadeSection();
+    void createChannelProfilesSection();
+    void rebuildChannelTable();
+    void populateChannelTable();
     void updateFromCue();
     void updateDCAOverridesUI();
     void setEnabled(bool enabled);
@@ -67,6 +81,18 @@ class CueEditor : public QWidget {
     QCheckBox* m_autoFollowCheck;
     QDoubleSpinBox* m_autoFollowDelaySpin;
     QTextEdit* m_notesEdit;
+
+    // fade transition
+    QDoubleSpinBox* m_fadeTimeSpin = nullptr;
+    QComboBox* m_fadeCurveCombo = nullptr;
+
+    // linked QLab (DAW remote) cue id
+    QLineEdit* m_qLabCueEdit = nullptr;
+
+    // per-channel actor profile slot + level
+    ActorProfileLibrary* m_actorLibrary = nullptr;
+    QGroupBox* m_channelProfilesGroup = nullptr;
+    QTableWidget* m_channelTable = nullptr;
 
     // DCA targeting widgets
     QGroupBox* m_dcaTargetingGroup;

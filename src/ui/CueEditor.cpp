@@ -1,9 +1,13 @@
 #include "CueEditor.h"
 #include "app/Application.h"
+#include "core/Actor.h"
+#include "core/ActorProfileLibrary.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
+#include "core/FadeCurve.h"
 #include "core/PlaybackEngine.h"
 #include "core/Show.h"
+#include "theme/Theme.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -12,18 +16,31 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSpinBox>
+#include <QTableWidget>
 #include <QTextEdit>
 #include <QVBoxLayout>
+
+#include <algorithm>
 
 namespace OpenMix {
 
 CueEditor::CueEditor(Application* app, QWidget* parent) : QWidget(parent), m_app(app) {
+    if (m_app && m_app->show())
+        m_actorLibrary = m_app->show()->actorProfileLibrary();
+
     setupUi();
     setEnabled(false);
+
+    if (m_actorLibrary) {
+        connect(m_actorLibrary, &ActorProfileLibrary::changed, this,
+                &CueEditor::onActorLibraryChanged);
+    }
 }
 
 void CueEditor::setupUi() {
@@ -71,6 +88,27 @@ void CueEditor::setupUi() {
     timingLayout->addRow(tr("Delay:"), m_autoFollowDelaySpin);
 
     m_mainLayout->addWidget(timingGroup);
+
+    // fade transition group
+    QGroupBox* fadeGroup = new QGroupBox(tr("Fade Transition"), this);
+    QFormLayout* fadeLayout = new QFormLayout(fadeGroup);
+
+    m_fadeTimeSpin = new QDoubleSpinBox(this);
+    m_fadeTimeSpin->setRange(0.0, 600.0);
+    m_fadeTimeSpin->setDecimals(2);
+    m_fadeTimeSpin->setSingleStep(0.5);
+    m_fadeTimeSpin->setSuffix(tr(" sec"));
+    m_fadeTimeSpin->setToolTip(tr("Fade duration for fader/level moves on fire (0 = instant)"));
+    fadeLayout->addRow(tr("Fade time:"), m_fadeTimeSpin);
+
+    m_fadeCurveCombo = new QComboBox(this);
+    m_fadeCurveCombo->addItem(tr("Linear"), static_cast<int>(FadeCurve::Linear));
+    m_fadeCurveCombo->addItem(tr("Ease In-Out"), static_cast<int>(FadeCurve::EaseInOut));
+    m_fadeCurveCombo->addItem(tr("Ease In"), static_cast<int>(FadeCurve::EaseIn));
+    m_fadeCurveCombo->addItem(tr("Ease Out"), static_cast<int>(FadeCurve::EaseOut));
+    fadeLayout->addRow(tr("Curve:"), m_fadeCurveCombo);
+
+    m_mainLayout->addWidget(fadeGroup);
 
     // DCA targeting section
     createDCATargetingSection();
@@ -139,6 +177,19 @@ void CueEditor::setupUi() {
 
     m_mainLayout->addWidget(m_dcaOverridesGroup);
 
+    // per-channel actor profile + level
+    createChannelProfilesSection();
+    m_mainLayout->addWidget(m_channelProfilesGroup);
+
+    // linked QLab (DAW remote) cue
+    QGroupBox* qlabGroup = new QGroupBox(tr("QLab / DAW Remote"), this);
+    QFormLayout* qlabLayout = new QFormLayout(qlabGroup);
+    m_qLabCueEdit = new QLineEdit(this);
+    m_qLabCueEdit->setPlaceholderText(tr("QLab cue number / id"));
+    m_qLabCueEdit->setToolTip(tr("Fire this QLab cue when the OpenMix cue executes"));
+    qlabLayout->addRow(tr("QLab cue:"), m_qLabCueEdit);
+    m_mainLayout->addWidget(qlabGroup);
+
     // notes group
     QGroupBox* notesGroup = new QGroupBox(tr("Notes"), this);
     QVBoxLayout* notesLayout = new QVBoxLayout(notesGroup);
@@ -162,6 +213,35 @@ void CueEditor::setupUi() {
     connect(m_autoFollowDelaySpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
             &CueEditor::onAutoFollowDelayChanged);
     connect(m_notesEdit, &QTextEdit::textChanged, this, &CueEditor::onNotesChanged);
+
+    connect(m_fadeTimeSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
+            &CueEditor::onFadeTimeChanged);
+    connect(m_fadeCurveCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            &CueEditor::onFadeCurveChanged);
+    connect(m_qLabCueEdit, &QLineEdit::textChanged, this, &CueEditor::onQLabCueChanged);
+}
+
+void CueEditor::createChannelProfilesSection() {
+    m_channelProfilesGroup = new QGroupBox(tr("Channel Profiles & Levels"), this);
+    QVBoxLayout* layout = new QVBoxLayout(m_channelProfilesGroup);
+    layout->setContentsMargins(4, 4, 4, 4);
+
+    QLabel* hint = new QLabel(
+        tr("Per actor-channel: the profile slot applied on fire, and an optional fader level."),
+        m_channelProfilesGroup);
+    hint->setWordWrap(true);
+    hint->setStyleSheet(QString("color: %1;").arg(Theme::Colors::TextSecondary));
+    layout->addWidget(hint);
+
+    m_channelTable = new QTableWidget(0, 5, m_channelProfilesGroup);
+    m_channelTable->setHorizontalHeaderLabels(
+        {tr("Ch"), tr("Actor"), tr("Profile"), tr("Set"), tr("Level")});
+    m_channelTable->verticalHeader()->setVisible(false);
+    m_channelTable->setSelectionMode(QAbstractItemView::NoSelection);
+    m_channelTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_channelTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    m_channelTable->setMaximumHeight(220);
+    layout->addWidget(m_channelTable);
 }
 
 void CueEditor::addBottomWidget(QWidget* widget) {
@@ -283,6 +363,18 @@ void CueEditor::updateFromCue() {
 
         // DCA overrides
         updateDCAOverridesUI();
+
+        // fade transition
+        m_fadeTimeSpin->setValue(cue->fadeTime());
+        int curveIdx = m_fadeCurveCombo->findData(static_cast<int>(cue->fadeCurve()));
+        m_fadeCurveCombo->setCurrentIndex(curveIdx < 0 ? 0 : curveIdx);
+
+        // linked QLab cue
+        m_qLabCueEdit->setText(cue->qLabCue());
+
+        // per-channel profile + level
+        rebuildChannelTable();
+        populateChannelTable();
     } else {
         m_numberSpin->setValue(0);
         m_nameEdit->clear();
@@ -294,6 +386,12 @@ void CueEditor::updateFromCue() {
         for (QCheckBox* cb : m_dcaTargetChecks) {
             cb->setChecked(false);
         }
+
+        m_fadeTimeSpin->setValue(0.0);
+        m_fadeCurveCombo->setCurrentIndex(0);
+        m_qLabCueEdit->clear();
+        if (m_channelTable)
+            m_channelTable->setRowCount(0);
     }
 
     m_updatingUi = false;
@@ -330,6 +428,10 @@ void CueEditor::setEnabled(bool enabled) {
     m_notesEdit->setEnabled(enabled);
     m_dcaTargetingGroup->setEnabled(enabled);
     m_dcaOverridesGroup->setEnabled(enabled);
+    m_fadeTimeSpin->setEnabled(enabled);
+    m_fadeCurveCombo->setEnabled(enabled);
+    m_qLabCueEdit->setEnabled(enabled);
+    m_channelProfilesGroup->setEnabled(enabled);
 }
 
 void CueEditor::onNumberChanged(double value) {
@@ -460,6 +562,214 @@ void CueEditor::onDCAOverrideChanged(int dca) {
     cue->setDCAOverride(dca, override);
     m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
     emit cueModified();
+}
+
+void CueEditor::rebuildChannelTable() {
+    if (!m_channelTable)
+        return;
+    m_channelTable->setRowCount(0);
+    if (!m_actorLibrary)
+        return;
+
+    // one row per actor-assigned channel (deduped, lowest channel first)
+    QList<Actor> actors = m_actorLibrary->actors();
+    std::stable_sort(actors.begin(), actors.end(),
+                     [](const Actor& a, const Actor& b) { return a.channel() < b.channel(); });
+
+    const QStringList slotList = m_actorLibrary->profileSlots();
+    QSet<int> seen;
+
+    for (const Actor& a : actors) {
+        const int ch = a.channel();
+        if (seen.contains(ch))
+            continue;
+        seen.insert(ch);
+
+        const int row = m_channelTable->rowCount();
+        m_channelTable->insertRow(row);
+
+        auto* chItem = new QTableWidgetItem(QString::number(ch));
+        chItem->setFlags(Qt::ItemIsEnabled);
+        m_channelTable->setItem(row, 0, chItem);
+
+        auto* nameItem = new QTableWidgetItem(a.name().isEmpty() ? tr("(unnamed)") : a.name());
+        nameItem->setFlags(Qt::ItemIsEnabled);
+        m_channelTable->setItem(row, 1, nameItem);
+
+        auto* profileCombo = new QComboBox(m_channelTable);
+        profileCombo->addItem(tr("(none)"), QString());
+        for (const QString& s : slotList)
+            profileCombo->addItem(s, s);
+        profileCombo->setProperty("channel", ch);
+        connect(profileCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+                [this, ch]() { onChannelProfileChanged(ch); });
+        m_channelTable->setCellWidget(row, 2, profileCombo);
+
+        auto* setCheck = new QCheckBox(m_channelTable);
+        setCheck->setToolTip(tr("Override this channel's fader level on fire"));
+        setCheck->setProperty("channel", ch);
+        connect(setCheck, &QCheckBox::toggled, this,
+                [this, ch](bool on) { onChannelLevelToggled(ch, on); });
+        m_channelTable->setCellWidget(row, 3, setCheck);
+
+        auto* levelSpin = new QSpinBox(m_channelTable);
+        levelSpin->setRange(0, 100);
+        levelSpin->setSuffix(tr(" %"));
+        levelSpin->setEnabled(false);
+        levelSpin->setProperty("channel", ch);
+        connect(levelSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
+                [this, ch]() { onChannelLevelChanged(ch); });
+        m_channelTable->setCellWidget(row, 4, levelSpin);
+    }
+}
+
+void CueEditor::populateChannelTable() {
+    Cue* cue = currentCue();
+    if (!cue || !m_channelTable)
+        return;
+
+    const QMap<int, QString> profiles = cue->channelProfiles();
+    const QMap<int, double> levels = cue->channelLevels();
+
+    for (int row = 0; row < m_channelTable->rowCount(); ++row) {
+        auto* combo = qobject_cast<QComboBox*>(m_channelTable->cellWidget(row, 2));
+        auto* check = qobject_cast<QCheckBox*>(m_channelTable->cellWidget(row, 3));
+        auto* spin = qobject_cast<QSpinBox*>(m_channelTable->cellWidget(row, 4));
+        if (!combo || !check || !spin)
+            continue;
+        const int ch = combo->property("channel").toInt();
+
+        const int idx = combo->findData(profiles.value(ch));
+        combo->setCurrentIndex(idx < 0 ? 0 : idx);
+
+        const bool hasLevel = levels.contains(ch);
+        check->setChecked(hasLevel);
+        spin->setEnabled(hasLevel);
+        spin->setValue(hasLevel ? std::clamp(static_cast<int>(levels.value(ch) * 100.0 + 0.5), 0, 100)
+                                : 75);
+    }
+}
+
+void CueEditor::onFadeTimeChanged(double value) {
+    if (m_updatingUi)
+        return;
+    Cue* cue = currentCue();
+    if (!cue)
+        return;
+    cue->setFadeTime(value);
+    m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
+    emit cueModified();
+}
+
+void CueEditor::onFadeCurveChanged(int index) {
+    if (m_updatingUi)
+        return;
+    Cue* cue = currentCue();
+    if (!cue)
+        return;
+    cue->setFadeCurve(static_cast<FadeCurve>(m_fadeCurveCombo->itemData(index).toInt()));
+    m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
+    emit cueModified();
+}
+
+void CueEditor::onQLabCueChanged(const QString& text) {
+    if (m_updatingUi)
+        return;
+    Cue* cue = currentCue();
+    if (!cue)
+        return;
+    cue->setQLabCue(text);
+    m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
+    emit cueModified();
+}
+
+void CueEditor::onChannelProfileChanged(int channel) {
+    if (m_updatingUi)
+        return;
+    Cue* cue = currentCue();
+    if (!cue || !m_channelTable)
+        return;
+
+    QComboBox* combo = nullptr;
+    for (int row = 0; row < m_channelTable->rowCount(); ++row) {
+        auto* c = qobject_cast<QComboBox*>(m_channelTable->cellWidget(row, 2));
+        if (c && c->property("channel").toInt() == channel) {
+            combo = c;
+            break;
+        }
+    }
+    if (!combo)
+        return;
+
+    const QString slot = combo->currentData().toString();
+    if (slot.isEmpty())
+        cue->removeChannelProfile(channel);
+    else
+        cue->setChannelProfile(channel, slot);
+
+    m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
+    emit cueModified();
+}
+
+void CueEditor::onChannelLevelToggled(int channel, bool on) {
+    if (m_updatingUi)
+        return;
+    Cue* cue = currentCue();
+    if (!cue || !m_channelTable)
+        return;
+
+    QSpinBox* spin = nullptr;
+    for (int row = 0; row < m_channelTable->rowCount(); ++row) {
+        auto* s = qobject_cast<QSpinBox*>(m_channelTable->cellWidget(row, 4));
+        if (s && s->property("channel").toInt() == channel) {
+            spin = s;
+            break;
+        }
+    }
+    if (spin)
+        spin->setEnabled(on);
+
+    if (on)
+        cue->setChannelLevel(channel, (spin ? spin->value() : 75) / 100.0);
+    else
+        cue->removeChannelLevel(channel);
+
+    m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
+    emit cueModified();
+}
+
+void CueEditor::onChannelLevelChanged(int channel) {
+    if (m_updatingUi)
+        return;
+    Cue* cue = currentCue();
+    if (!cue || !m_channelTable)
+        return;
+
+    QSpinBox* spin = nullptr;
+    for (int row = 0; row < m_channelTable->rowCount(); ++row) {
+        auto* s = qobject_cast<QSpinBox*>(m_channelTable->cellWidget(row, 4));
+        if (s && s->property("channel").toInt() == channel) {
+            spin = s;
+            break;
+        }
+    }
+    if (!spin || !spin->isEnabled())
+        return;
+
+    cue->setChannelLevel(channel, spin->value() / 100.0);
+    m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
+    emit cueModified();
+}
+
+void CueEditor::onActorLibraryChanged() {
+    // actors/slots changed (e.g. project loaded, or edited in Actor Setup):
+    // refresh the per-channel table for the cue currently shown.
+    if (m_currentIndex < 0)
+        return;
+    m_updatingUi = true;
+    rebuildChannelTable();
+    populateChannelTable();
+    m_updatingUi = false;
 }
 
 } // namespace OpenMix

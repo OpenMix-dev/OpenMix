@@ -61,4 +61,12 @@ inline QIcon download() { return fromPath(":/qlementine/icons/16/action/download
 inline QIcon upload() { return fromPath(":/qlementine/icons/16/document/open.svg"); }
 inline QIcon helpAbout() { return fromPath(":/qlementine/icons/16/misc/help.svg"); }
 
+inline QIcon actorSetup() { return fromPath(":/qlementine/icons/16/misc/users.svg"); }
+inline QIcon actor() { return fromPath(":/qlementine/icons/16/misc/user.svg"); }
+inline QIcon remoteControl() { return fromPath(":/qlementine/icons/16/hardware/radio.svg"); }
+inline QIcon copy() { return fromPath(":/qlementine/icons/16/action/copy.svg"); }
+inline QIcon paste() { return fromPath(":/qlementine/icons/16/action/paste.svg"); }
+inline QIcon moveUp() { return fromPath(":/qlementine/icons/16/navigation/chevron-up.svg"); }
+inline QIcon moveDown() { return fromPath(":/qlementine/icons/16/navigation/chevron-down.svg"); }
+
 } // namespace OpenMix::Icons

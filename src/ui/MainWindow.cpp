@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "ActorSetupPanel.h"
 #include "BubbleBar.h"
 #include "BubbleButton.h"
 #include "ConnectionPanel.h"
@@ -9,6 +10,7 @@
 #include "LogViewerDialog.h"
 #include "MixerFeedbackPanel.h"
 #include "PopOutWindow.h"
+#include "RemoteControlDialog.h"
 #include "app/Application.h"
 #include "core/AppLogger.h"
 #include "core/CueList.h"
@@ -188,6 +190,13 @@ void MainWindow::createActions() {
     m_showConnectionAction->setToolTip(tr("Show/hide connection panel (F7)"));
     connect(m_showConnectionAction, &QAction::triggered, this, &MainWindow::toggleConnectionPanel);
 
+    m_showActorSetupAction = new QAction(Icons::actorSetup(), tr("&Actor Setup"), this);
+    m_showActorSetupAction->setCheckable(true);
+    m_showActorSetupAction->setChecked(false);
+    m_showActorSetupAction->setShortcut(Qt::Key_F9);
+    m_showActorSetupAction->setToolTip(tr("Show/hide actor setup panel (F9)"));
+    connect(m_showActorSetupAction, &QAction::triggered, this, &MainWindow::toggleActorSetupPanel);
+
     m_showLogViewerAction = new QAction(tr("Application &Log..."), this);
     m_showLogViewerAction->setShortcut(Qt::Key_F8);
     m_showLogViewerAction->setToolTip(tr("Show application log (F8)"));
@@ -202,6 +211,10 @@ void MainWindow::createActions() {
     m_midiControllerAction = new QAction(tr("MIDI Controller..."), this);
     m_midiControllerAction->setToolTip(tr("Configure MIDI controller mappings"));
     connect(m_midiControllerAction, &QAction::triggered, this, &MainWindow::showMidiConfigDialog);
+
+    m_remoteControlAction = new QAction(Icons::remoteControl(), tr("Remote Control..."), this);
+    m_remoteControlAction->setToolTip(tr("Configure MSC, inbound OSC, and QLab remote control"));
+    connect(m_remoteControlAction, &QAction::triggered, this, &MainWindow::showRemoteControlDialog);
 
     // help actions
     m_aboutAction = new QAction(tr("&About OpenMix"), this);
@@ -248,11 +261,13 @@ void MainWindow::registerShortcuts() {
     sm->registerAction("view.dcaMapping", m_showDCAMappingAction, QKeySequence(Qt::Key_F5));
     sm->registerAction("view.mixerFeedback", m_showMixerFeedbackAction, QKeySequence(Qt::Key_F6));
     sm->registerAction("view.connection", m_showConnectionAction, QKeySequence(Qt::Key_F7));
+    sm->registerAction("view.actorSetup", m_showActorSetupAction, QKeySequence(Qt::Key_F9));
     sm->registerAction("view.logViewer", m_showLogViewerAction, QKeySequence(Qt::Key_F8));
 
     // settings actions
     sm->registerAction("settings.keyboardShortcuts", m_keyboardShortcutsAction, QKeySequence());
     sm->registerAction("settings.midiController", m_midiControllerAction, QKeySequence());
+    sm->registerAction("settings.remoteControl", m_remoteControlAction, QKeySequence());
 
     // help actions
     sm->registerAction("help.about", m_aboutAction, QKeySequence());
@@ -293,12 +308,14 @@ void MainWindow::createMenus() {
     m_viewMenu->addAction(m_showDCAMappingAction);
     m_viewMenu->addAction(m_showMixerFeedbackAction);
     m_viewMenu->addAction(m_showConnectionAction);
+    m_viewMenu->addAction(m_showActorSetupAction);
     m_viewMenu->addSeparator();
     m_viewMenu->addAction(m_showLogViewerAction);
 
     m_settingsMenu = menuBar()->addMenu(tr("&Settings"));
     m_settingsMenu->addAction(m_keyboardShortcutsAction);
     m_settingsMenu->addAction(m_midiControllerAction);
+    m_settingsMenu->addAction(m_remoteControlAction);
 
     m_helpMenu = menuBar()->addMenu(tr("&Help"));
     m_helpMenu->addAction(m_aboutAction);
@@ -367,6 +384,16 @@ void MainWindow::createPopOutWindows() {
         m_showDCAMappingAction->setChecked(visible);
         m_bubbleBar->setButtonActive("dcaMapping", visible);
     });
+
+    m_actorSetupPanel = new ActorSetupPanel(m_app, nullptr);
+    m_actorSetupPopOut = new PopOutWindow("actorSetup", tr("Actor Setup"), this);
+    m_actorSetupPopOut->setContentWidget(m_actorSetupPanel);
+    m_actorSetupPopOut->setMinimumContentSize(760, 520);
+
+    connect(m_actorSetupPopOut, &PopOutWindow::visibilityChanged, [this](bool visible) {
+        m_showActorSetupAction->setChecked(visible);
+        m_bubbleBar->setButtonActive("actors", visible);
+    });
 }
 
 void MainWindow::createBubbleBar() {
@@ -375,6 +402,7 @@ void MainWindow::createBubbleBar() {
     m_bubbleBar->addButton("dcaMapping", Icons::sliders(), tr("DCA Mapping (F5)"));
     m_bubbleBar->addButton("mixer", Icons::audioVolume(), tr("Mixer Feedback (F6)"));
     m_bubbleBar->addButton("connection", Icons::network(), tr("Connection (F7)"));
+    m_bubbleBar->addButton("actors", Icons::actorSetup(), tr("Actor Setup (F9)"));
 
     connect(m_bubbleBar, &BubbleBar::buttonClicked, this, &MainWindow::onBubbleButtonClicked);
 
@@ -389,6 +417,8 @@ void MainWindow::onBubbleButtonClicked(const QString& id, [[maybe_unused]] bool 
         toggleMixerFeedbackPanel();
     } else if (id == "connection") {
         toggleConnectionPanel();
+    } else if (id == "actors") {
+        toggleActorSetupPanel();
     }
 }
 
@@ -407,6 +437,19 @@ void MainWindow::connectSignals() {
 
     connect(m_app->playbackEngine(), &PlaybackEngine::currentCueChanged, m_mixerFeedbackPanel,
             &MixerFeedbackPanel::onActiveCueChanged);
+
+    // post-fire confidence: surface cue landed/drift from verification
+    connect(m_app->playbackEngine(), &PlaybackEngine::cueLanded, m_mixerFeedbackPanel,
+            &MixerFeedbackPanel::onCueLanded);
+    connect(m_app->playbackEngine(), &PlaybackEngine::cueDrifted, m_mixerFeedbackPanel,
+            &MixerFeedbackPanel::onCueDrifted);
+    connect(m_app->playbackEngine(), &PlaybackEngine::cueLanded, this,
+            [this](int) { statusBar()->showMessage(tr("Cue landed - console matches"), 2500); });
+    connect(m_app->playbackEngine(), &PlaybackEngine::cueDrifted, this,
+            [this](int, const QStringList& paths) {
+                statusBar()->showMessage(
+                    tr("Cue drift on %n parameter(s) - see Mixer Feedback", "", paths.size()), 4000);
+            });
 
     connect(m_app->playbackEngine(), &PlaybackEngine::standbyCueChanged, this,
             &MainWindow::updateStatusBar);
@@ -647,6 +690,15 @@ void MainWindow::toggleDCAMappingPanel() {
     }
 }
 
+void MainWindow::toggleActorSetupPanel() {
+    if (m_actorSetupPopOut->isVisible()) {
+        m_actorSetupPopOut->hide();
+    } else {
+        m_actorSetupPopOut->showAndRestore();
+        m_actorSetupPanel->refresh();
+    }
+}
+
 void MainWindow::updateTitle() {
     QString title = m_app->show()->name();
     if (m_app->show()->isModified()) {
@@ -804,6 +856,11 @@ void MainWindow::onLockoutStateChanged(bool locked) {
 
 void MainWindow::showMidiConfigDialog() {
     MidiConfigDialog dialog(m_app->midiInputManager(), this);
+    dialog.exec();
+}
+
+void MainWindow::showRemoteControlDialog() {
+    RemoteControlDialog dialog(m_app, this);
     dialog.exec();
 }
 

@@ -17,6 +17,7 @@ class CueEditor;
 class ConnectionPanel;
 class MixerFeedbackPanel;
 class DCAMappingPanel;
+class ActorSetupPanel;
 class PopOutWindow;
 class BubbleBar;
 class PlaybackGuard;
@@ -56,6 +57,7 @@ class MainWindow : public QMainWindow {
     void toggleConnectionPanel();
     void toggleMixerFeedbackPanel();
     void toggleDCAMappingPanel();
+    void toggleActorSetupPanel();
 
     // update UI state
     void updateTitle();
@@ -75,6 +77,7 @@ class MainWindow : public QMainWindow {
 
     // settings dialogs
     void showMidiConfigDialog();
+    void showRemoteControlDialog();
     void showKeyboardShortcutsDialog();
     void showLogViewerDialog();
 
@@ -107,11 +110,13 @@ class MainWindow : public QMainWindow {
     ConnectionPanel* m_connectionPanel;
     MixerFeedbackPanel* m_mixerFeedbackPanel;
     DCAMappingPanel* m_dcaMappingPanel;
+    ActorSetupPanel* m_actorSetupPanel;
 
     // pop-out windows
     PopOutWindow* m_connectionPopOut;
     PopOutWindow* m_mixerFeedbackPopOut;
     PopOutWindow* m_dcaMappingPopOut;
+    PopOutWindow* m_actorSetupPopOut;
 
     // bubble bar
     BubbleBar* m_bubbleBar;
@@ -157,11 +162,13 @@ class MainWindow : public QMainWindow {
     QAction* m_showConnectionAction;
     QAction* m_showMixerFeedbackAction;
     QAction* m_showDCAMappingAction;
+    QAction* m_showActorSetupAction;
     QAction* m_showLogViewerAction;
 
     // settings actions
     QAction* m_keyboardShortcutsAction;
     QAction* m_midiControllerAction;
+    QAction* m_remoteControlAction;
 
     // help actions
     QAction* m_aboutAction;

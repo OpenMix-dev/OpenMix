@@ -1,4 +1,5 @@
 #include "MixerFeedbackPanel.h"
+#include "CueConfidenceIndicator.h"
 #include "DCAWidget.h"
 #include "app/Application.h"
 #include "core/Cue.h"
@@ -6,12 +7,14 @@
 #include "core/PlaybackEngine.h"
 #include "core/Show.h"
 #include "protocol/MixerProtocol.h"
+#include "theme/Theme.h"
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QRegularExpression>
 #include <QTimer>
+#include <QVBoxLayout>
 #include <algorithm>
 
 namespace OpenMix {
@@ -36,19 +39,38 @@ void MixerFeedbackPanel::setupUi() {
     setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
     setFocusPolicy(Qt::StrongFocus);
 
-    QHBoxLayout* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(8, 8, 8, 8);
-    layout->setSpacing(4);
+    QVBoxLayout* outer = new QVBoxLayout(this);
+    outer->setContentsMargins(8, 8, 8, 8);
+    outer->setSpacing(6);
+
+    // post-fire confidence row: did the last GO actually land on the console?
+    QHBoxLayout* statusRow = new QHBoxLayout();
+    statusRow->setSpacing(6);
+    QLabel* caption = new QLabel(tr("Last fire:"), this);
+    m_fireIndicator = new CueConfidenceIndicator(this);
+    m_fireIndicator->setFixedSize(14, 14);
+    m_fireIndicator->setConfidence(ConfidenceLevel::Unknown, tr("Awaiting GO"));
+    m_fireStatusLabel = new QLabel(tr("Awaiting GO"), this);
+    m_fireStatusLabel->setStyleSheet(QString("color: %1;").arg(Theme::Colors::TextSecondary));
+    statusRow->addWidget(caption);
+    statusRow->addWidget(m_fireIndicator);
+    statusRow->addWidget(m_fireStatusLabel, 1);
+    statusRow->addStretch();
+    outer->addLayout(statusRow);
+
+    m_dcaLayout = new QHBoxLayout();
+    m_dcaLayout->setSpacing(4);
 
     // create default 8 DCA widgets (will be adjusted by setDCACount)
     for (int i = 1; i <= 8; ++i) {
         DCAWidget* dca = new DCAWidget(i, this);
         connectDCASignals(dca);
         m_dcaWidgets.append(dca);
-        layout->addWidget(dca);
+        m_dcaLayout->addWidget(dca);
     }
 
-    layout->addStretch();
+    m_dcaLayout->addStretch();
+    outer->addLayout(m_dcaLayout);
 }
 
 void MixerFeedbackPanel::connectDCASignals(DCAWidget* dca) {
@@ -60,13 +82,12 @@ void MixerFeedbackPanel::connectDCASignals(DCAWidget* dca) {
 void MixerFeedbackPanel::setDCACount(int count) {
     count = std::clamp(count, 1, 24); // support up to 24 DCAs (WING max)
 
-    QHBoxLayout* layout = qobject_cast<QHBoxLayout*>(this->layout());
-    if (!layout)
+    if (!m_dcaLayout)
         return;
 
     while (m_dcaWidgets.size() > count) {
         DCAWidget* dca = m_dcaWidgets.takeLast();
-        layout->removeWidget(dca);
+        m_dcaLayout->removeWidget(dca);
         dca->deleteLater();
     }
 
@@ -76,7 +97,7 @@ void MixerFeedbackPanel::setDCACount(int count) {
         connectDCASignals(dca);
         m_dcaWidgets.append(dca);
         // insert before stretch
-        layout->insertWidget(layout->count() - 1, dca);
+        m_dcaLayout->insertWidget(m_dcaLayout->count() - 1, dca);
     }
 }
 
@@ -287,6 +308,40 @@ void MixerFeedbackPanel::clearCueSettings() {
     for (DCAWidget* dca : m_dcaWidgets) {
         dca->setCueLabel(QString());
     }
+}
+
+QString MixerFeedbackPanel::cueDescription(int cueIndex) const {
+    if (!m_app || !m_app->show() || !m_app->show()->cueList())
+        return tr("Cue %1").arg(cueIndex);
+    const CueList* cueList = m_app->show()->cueList();
+    if (cueIndex < 0 || cueIndex >= cueList->count())
+        return tr("Cue %1").arg(cueIndex);
+    const Cue& cue = cueList->at(cueIndex);
+    QString desc = tr("Cue %1").arg(cue.number(), 0, 'f', 1);
+    if (!cue.name().isEmpty())
+        desc += QString(" - %1").arg(cue.name());
+    return desc;
+}
+
+void MixerFeedbackPanel::onCueLanded(int cueIndex) {
+    if (!m_fireIndicator)
+        return;
+    const QString desc = cueDescription(cueIndex);
+    m_fireIndicator->setConfidence(ConfidenceLevel::Good,
+                                   tr("%1 landed: console matches the fired values.").arg(desc));
+    m_fireStatusLabel->setText(tr("%1 landed").arg(desc));
+    m_fireStatusLabel->setStyleSheet(QString("color: %1;").arg(Theme::Colors::AccentGreen));
+}
+
+void MixerFeedbackPanel::onCueDrifted(int cueIndex, const QStringList& paths) {
+    if (!m_fireIndicator)
+        return;
+    const QString desc = cueDescription(cueIndex);
+    QString tooltip = tr("%1 drift on %n parameter(s):", "", paths.size()).arg(desc);
+    tooltip += "\n" + paths.join("\n");
+    m_fireIndicator->setConfidence(ConfidenceLevel::Warning, tooltip);
+    m_fireStatusLabel->setText(tr("%1 drift on %n parameter(s)", "", paths.size()).arg(desc));
+    m_fireStatusLabel->setStyleSheet(QString("color: %1;").arg(Theme::Colors::AccentAmber));
 }
 
 void MixerFeedbackPanel::keyPressEvent(QKeyEvent* event) {

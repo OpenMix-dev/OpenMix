@@ -116,6 +116,8 @@ set(SOURCES
     src/ui/CueConfidenceIndicator.cpp
     src/ui/MacroPreviewWidget.cpp
     src/ui/DCAMappingPanel.cpp
+    src/ui/ActorSetupPanel.cpp
+    src/ui/RemoteControlDialog.cpp
     src/ui/PopOutWindow.cpp
     src/ui/BubbleButton.cpp
     src/ui/BubbleBar.cpp
@@ -207,6 +209,9 @@ set(HEADERS
     src/ui/CueConfidenceIndicator.h
     src/ui/MacroPreviewWidget.h
     src/ui/DCAMappingPanel.h
+    src/ui/ActorSetupPanel.h
+    src/ui/ActorGroupIo.h
+    src/ui/RemoteControlDialog.h
     src/ui/PopOutWindow.h
     src/ui/BubbleButton.h
     src/ui/BubbleBar.h

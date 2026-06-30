@@ -24,6 +24,8 @@ class AppLogger;
 class ConnectionLogBridge;
 class OscRemoteServer;
 class QLabClient;
+class TimecodeTriggerList;
+class ChannelMonitor;
 struct DiscoveredConsole;
 
 class Application : public QObject {
@@ -70,6 +72,10 @@ class Application : public QObject {
 
     // outbound QLab / DAW remote
     [[nodiscard]] QLabClient* qLabClient() { return m_qLabClient; }
+
+    // Phase 5 services
+    [[nodiscard]] TimecodeTriggerList* timecodeTriggers() { return m_timecodeTriggers; }
+    [[nodiscard]] ChannelMonitor* channelMonitor() { return m_channelMonitor; }
 
     // mixer connection
     void connectToMixer(const QString& type, const QString& host, int port);
@@ -132,6 +138,10 @@ class Application : public QObject {
 
     // outbound QLab / DAW remote
     QLabClient* m_qLabClient;
+
+    // Phase 5: timecode-triggered cues + channel silence/clip monitoring
+    TimecodeTriggerList* m_timecodeTriggers;
+    ChannelMonitor* m_channelMonitor;
 };
 
 } // namespace OpenMix

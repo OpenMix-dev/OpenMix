@@ -3,9 +3,13 @@
 #include "QLabClient.h"
 #include "ui/MainWindow.h"
 #include "core/AppLogger.h"
+#include "core/ChannelMonitor.h"
 #include "core/ConnectionLogBridge.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
+#include "core/CueZero.h"
+#include "core/Position.h"
+#include "core/TimecodeTrigger.h"
 #include "core/CueValidator.h"
 #include "core/DCAMapping.h"
 #include "core/DryRunEngine.h"
@@ -66,6 +70,10 @@ Application::Application(QObject* parent) : QObject(parent) {
     // outbound QLab / DAW remote
     m_qLabClient = new QLabClient(this);
 
+    // Phase 5 services
+    m_timecodeTriggers = new TimecodeTriggerList(this);
+    m_channelMonitor = new ChannelMonitor(this);
+
     // application logging
     m_appLogger = new AppLogger(this);
     m_connectionLogBridge = new ConnectionLogBridge(m_appLogger, this);
@@ -92,6 +100,7 @@ void Application::initialize() {
     m_playbackEngine->setCueList(m_show->cueList());
     m_playbackEngine->setDCAMapping(m_show->dcaMapping());
     m_playbackEngine->setActorLibrary(m_show->actorProfileLibrary());
+    m_playbackEngine->setPositionLibrary(m_show->positionLibrary());
 
     if (m_mixer) {
         m_playbackEngine->setMixer(m_mixer);
@@ -101,6 +110,9 @@ void Application::initialize() {
     m_playbackEngine->setGuard(m_playbackGuard);
     m_playbackEngine->setLogger(m_playbackLogger);
     m_playbackEngine->setVerifyCues(true);
+
+    // Cue Zero base levels double as the panic/safe values
+    m_playbackGuard->setDefaultSafeValues(m_show->cueZero()->levels());
 
     connect(m_playbackEngine, &PlaybackEngine::cueDrifted, this,
             [this](int index, const QStringList& paths) {
@@ -180,6 +192,15 @@ void Application::initialize() {
         if (!cue.qLabCue().isEmpty())
             m_qLabClient->triggerCue(cue.qLabCue());
     });
+
+    // timecode-triggered cues: incoming MTC -> trigger list -> fire cue by number
+    connect(m_midiInputManager, &MidiInputManager::timecodeChanged, m_timecodeTriggers,
+            &TimecodeTriggerList::onTimecode);
+    connect(m_timecodeTriggers, &TimecodeTriggerList::triggerFired, this,
+            [this](double cueNumber, const QString&) {
+                m_playbackEngine->goToNumber(cueNumber);
+                m_playbackEngine->go();
+            });
 }
 
 void Application::setupMixerConnection(const QString& type, const QString& host, int port) {
