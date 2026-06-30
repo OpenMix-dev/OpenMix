@@ -78,6 +78,8 @@ endif()
 set(SOURCES
     src/main.cpp
     src/app/Application.cpp
+    src/app/OscRemoteServer.cpp
+    src/app/QLabClient.cpp
     src/core/Cue.cpp
     src/core/CueList.cpp
     src/core/Show.cpp
@@ -90,6 +92,10 @@ set(SOURCES
     src/core/ShortcutManager.cpp
     src/core/OperationMode.cpp
     src/core/DCAMapping.cpp
+    src/core/ActorProfile.cpp
+    src/core/Actor.cpp
+    src/core/ActorProfileLibrary.cpp
+    src/core/FadeEngine.cpp
     src/core/AppLogger.cpp
     src/core/ConnectionLogBridge.cpp
     src/ui/MainWindow.cpp
@@ -158,6 +164,8 @@ set(SOURCES
 # header files
 set(HEADERS
     src/app/Application.h
+    src/app/OscRemoteServer.h
+    src/app/QLabClient.h
     src/core/Cue.h
     src/core/CueList.h
     src/core/Show.h
@@ -170,6 +178,11 @@ set(HEADERS
     src/core/ShortcutManager.h
     src/core/OperationMode.h
     src/core/DCAMapping.h
+    src/core/ActorProfile.h
+    src/core/Actor.h
+    src/core/ActorProfileLibrary.h
+    src/core/FadeCurve.h
+    src/core/FadeEngine.h
     src/core/AppLogger.h
     src/core/ConnectionLogBridge.h
     src/ui/MainWindow.h
@@ -229,6 +242,7 @@ set(HEADERS
 
     src/midi/MidiControlMapping.h
     src/midi/MidiInputManager.h
+    src/midi/MscParser.h
     src/ui/MidiConfigDialog.h
     src/ui/KeyboardShortcutsDialog.h
     src/ui/LogViewerDialog.h

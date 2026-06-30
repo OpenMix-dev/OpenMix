@@ -44,6 +44,12 @@ class MidiInputManager : public QObject {
     void setEnabled(bool enabled);
     bool isEnabled() const { return m_enabled; }
 
+    // MIDI Show Control (cue GO/STOP from incoming sysex)
+    void setMscEnabled(bool enabled) { m_mscEnabled = enabled; }
+    bool isMscEnabled() const { return m_mscEnabled; }
+    void setMscDeviceId(int id) { m_mscDeviceId = id; } // 0-127; 0x7F = all devices
+    int mscDeviceId() const { return m_mscDeviceId; }
+
     // mapping management
     void setMappings(const QVector<MidiMapping>& mappings);
     QVector<MidiMapping> mappings() const { return m_mappings; }
@@ -70,6 +76,7 @@ class MidiInputManager : public QObject {
     void midiMessageReceived(MidiMessageType type, int channel, int noteOrCC, int value);
     void midiLearnReceived(const MidiTrigger& trigger);
     void actionExecuted(MidiAction action);
+    void mscReceived(int command); // a MIDI Show Control command was handled
 
   private slots:
     void onDevicePollTimer();
@@ -77,6 +84,7 @@ class MidiInputManager : public QObject {
   private:
 
     void processMidiMessage(const std::vector<unsigned char>& message);
+    void handleSysex(const std::vector<unsigned char>& message);
     void executeAction(MidiAction action);
     bool tryReconnect();
     int findDeviceIndex(const QString& deviceName) const;
@@ -90,6 +98,8 @@ class MidiInputManager : public QObject {
 
     bool m_enabled = true;
     bool m_autoReconnect = true;
+    bool m_mscEnabled = true;
+    int m_mscDeviceId = 0x7F; // 0x7F = respond to all device IDs
 
     QVector<MidiMapping> m_mappings;
 

@@ -1,90 +1,209 @@
 #include "YamahaProtocol.h"
 #include "../../core/Cue.h"
-#include <QNetworkDatagram>
+#include <QStringList>
 #include <algorithm>
-#include <cstring>
-#include <lo/lo.h>
+#include <cmath>
 
 namespace OpenMix {
 
 YamahaProtocol::YamahaProtocol(const MixerCapabilities& caps, QObject* parent)
     : MixerProtocol(parent), m_capabilities(caps) {
 
-    m_receivePort = caps.defaultPort; // 8000 for Yamaha OSC receive
-    m_transmitPort = 9000;            // Yamaha OSC transmit port
+    QObject::connect(&m_transport, &TcpTransport::connected, this,
+                     &YamahaProtocol::onTransportConnected);
+    QObject::connect(&m_transport, &TcpTransport::disconnected, this,
+                     &YamahaProtocol::onTransportDisconnected);
+    QObject::connect(&m_transport, &TcpTransport::connectionError, this,
+                     &YamahaProtocol::onTransportError);
+    QObject::connect(&m_transport, &TcpTransport::connectionLost, this,
+                     &YamahaProtocol::onTransportConnectionLost);
+    QObject::connect(&m_transport, &TcpTransport::dataReceived, this,
+                     &YamahaProtocol::onDataReceived);
+    QObject::connect(&m_transport, &TcpTransport::reconnecting, this,
+                     &YamahaProtocol::onReconnecting);
 
-    initializeSnapshotParams();
-
-    QObject::connect(&m_receiveSocket, &QUdpSocket::readyRead, this, &YamahaProtocol::onReadyRead);
-
+    m_keepAliveTimer.setInterval(KEEPALIVE_INTERVAL);
     QObject::connect(&m_keepAliveTimer, &QTimer::timeout, this,
                      &YamahaProtocol::onKeepAliveTimeout);
-
-    m_connectionTimer.setSingleShot(true);
-    QObject::connect(&m_connectionTimer, &QTimer::timeout, this,
-                     &YamahaProtocol::onConnectionTimeout);
 
     m_requestTimeoutTimer.setInterval(500);
     QObject::connect(&m_requestTimeoutTimer, &QTimer::timeout, this,
                      &YamahaProtocol::onRequestTimeoutCheck);
-
-    m_reconnectTimer.setSingleShot(true);
-    QObject::connect(&m_reconnectTimer, &QTimer::timeout, this,
-                     &YamahaProtocol::onReconnectAttempt);
 }
 
 YamahaProtocol::~YamahaProtocol() { disconnect(); }
 
-void YamahaProtocol::initializeSnapshotParams() { rebuildSnapshotParams(); }
+// --------------------------------------------------------------------------
+// Pure command framing (no I/O, no state) -- unit tested for exact strings.
+// --------------------------------------------------------------------------
 
-void YamahaProtocol::rebuildSnapshotParams() {
-    m_snapshotParams.clear();
-
-    // input channel fader/on, EQ, and effect-send parameters
-    appendEqSnapshotParams(m_snapshotParams, "/ch/", m_capabilities.inputChannels);
-
-    // DCA parameters, Yamaha uses /dca/X/fader and /dca/X/on (NOT /mute)
-    for (int i = 1; i <= m_capabilities.dcaCount; ++i) {
-        m_snapshotParams.append(QString("/dca/%1/fader").arg(i));
-        m_snapshotParams.append(QString("/dca/%1/on").arg(i));
-    }
+QByteArray YamahaProtocol::scpSet(const QString& address, int idx1, int idx2, int value) {
+    return QStringLiteral("set %1 %2 %3 %4\n")
+        .arg(address)
+        .arg(idx1)
+        .arg(idx2)
+        .arg(value)
+        .toUtf8();
 }
 
-void YamahaProtocol::appendEqSnapshotParams(QStringList& params,
-                                            const QString& channelPrefix,
-                                            int channelCount,
-                                            int channelFieldWidth,
-                                            int maxEffectSends) const {
-    for (int ch = 1; ch <= m_capabilities.inputChannels && ch <= channelCount; ++ch) {
-        QString chPrefix =
-            QString("%1%2").arg(channelPrefix).arg(ch, channelFieldWidth, 10, QChar('0'));
-        params.append(chPrefix + "/mix/fader");
-        params.append(chPrefix + "/mix/on");
-
-        // EQ parameters
-        if (m_capabilities.supportsChannelEQ) {
-            params.append(chPrefix + "/eq/on");
-            for (int band = 1; band <= m_capabilities.eqBandsPerChannel; ++band) {
-                QString bandPrefix = QString("%1/eq/%2").arg(chPrefix).arg(band);
-                params.append(bandPrefix + "/type");
-                params.append(bandPrefix + "/f");
-                params.append(bandPrefix + "/g");
-                params.append(bandPrefix + "/q");
-            }
-        }
-
-        // effect send parameters
-        if (m_capabilities.supportsEffectSends) {
-            int sends = std::min(m_capabilities.effectSendBuses, maxEffectSends);
-            for (int send = 1; send <= sends; ++send) {
-                QString sendPrefix =
-                    QString("%1/mix/%2").arg(chPrefix).arg(send, 2, 10, QChar('0'));
-                params.append(sendPrefix + "/level");
-                params.append(sendPrefix + "/on");
-            }
-        }
-    }
+QByteArray YamahaProtocol::scpSet(const QString& address, int idx1, int idx2,
+                                  const QString& value) {
+    return QStringLiteral("set %1 %2 %3 \"%4\"\n")
+        .arg(address)
+        .arg(idx1)
+        .arg(idx2)
+        .arg(value)
+        .toUtf8();
 }
+
+QByteArray YamahaProtocol::scpGet(const QString& address, int idx1, int idx2) {
+    return QStringLiteral("get %1 %2 %3\n").arg(address).arg(idx1).arg(idx2).toUtf8();
+}
+
+QByteArray YamahaProtocol::scpSceneRecall(int sceneNumber) {
+    return QStringLiteral("ssrecall_ex %1 %2\n").arg(SceneLib).arg(sceneNumber).toUtf8();
+}
+
+// --------------------------------------------------------------------------
+// Pure value scaling.
+// --------------------------------------------------------------------------
+
+int YamahaProtocol::faderLevelToScp(double level) {
+    if (level <= 0.0)
+        return FADER_NEG_INF; // -inf
+    if (level >= 1.0)
+        return FADER_MAX_CENTIDB; // +10 dB
+
+    // Two-segment, linear-in-dB approximation of the Yamaha fader law:
+    //   0.00 .. 0.75 -> -138 dB .. 0 dB   (throw up to unity)
+    //   0.75 .. 1.00 ->    0 dB .. +10 dB (top of throw)
+    // The real console taper is finer near unity; this is a documented approx.
+    double db;
+    if (level >= 0.75)
+        db = (level - 0.75) / 0.25 * 10.0;
+    else
+        db = (level / 0.75) * 138.0 - 138.0;
+
+    int centi = static_cast<int>(std::lround(db * 100.0));
+    return std::clamp(centi, FADER_MIN_CENTIDB, FADER_MAX_CENTIDB);
+}
+
+int YamahaProtocol::dbToCentiDb(double db) { return static_cast<int>(std::lround(db * 100.0)); }
+
+int YamahaProtocol::hzToScpFreq(double hz) { return static_cast<int>(std::lround(hz * 10.0)); }
+
+int YamahaProtocol::qToScp(double q) { return static_cast<int>(std::lround(q * 1000.0)); }
+
+int YamahaProtocol::preampGainToScp(double gainDb) const {
+    // CL/QL/Rivage: head-amp gain in centi-dB, range -6 dB..+66 dB.
+    return std::clamp(dbToCentiDb(gainDb), -600, 6600);
+}
+
+// --------------------------------------------------------------------------
+// Semantic command builders.
+// --------------------------------------------------------------------------
+
+QByteArray YamahaProtocol::buildChannelFader(int ch, double level) const {
+    return scpSet(AddrFaderLevel, ch, 0, faderLevelToScp(level));
+}
+
+QByteArray YamahaProtocol::buildChannelMute(int ch, bool muted) const {
+    // Fader/On: 1 = channel ON (unmuted), 0 = muted.
+    return scpSet(AddrFaderOn, ch, 0, muted ? 0 : 1);
+}
+
+QByteArray YamahaProtocol::buildChannelPreamp(int ch, double gainDb) const {
+    return scpSet(AddrHaGain, ch, 0, preampGainToScp(gainDb));
+}
+
+QByteArray YamahaProtocol::buildChannelHpfOn(int ch, bool on) const {
+    return scpSet(AddrHpfOn, ch, 0, on ? 1 : 0);
+}
+
+QByteArray YamahaProtocol::buildChannelHpfFreq(int ch, double freqHz) const {
+    return scpSet(AddrHpfFreq, ch, 0, hzToScpFreq(freqHz));
+}
+
+QByteArray YamahaProtocol::buildChannelEqOn(int ch, bool on) const {
+    return scpSet(AddrEqOn, ch, 0, on ? 1 : 0);
+}
+
+QByteArray YamahaProtocol::buildChannelEqBandBypass(int ch, int band, bool on) const {
+    // Band/Bypass: 1 = bypassed, 0 = active, so "on" inverts.
+    return scpSet(AddrEqBandBypass, ch, band, on ? 0 : 1);
+}
+
+QByteArray YamahaProtocol::buildChannelEqBandFreq(int ch, int band, double freqHz) const {
+    return scpSet(AddrEqBandFreq, ch, band, hzToScpFreq(freqHz));
+}
+
+QByteArray YamahaProtocol::buildChannelEqBandGain(int ch, int band, double gainDb) const {
+    return scpSet(AddrEqBandGain, ch, band, std::clamp(dbToCentiDb(gainDb), -1800, 1800));
+}
+
+QByteArray YamahaProtocol::buildChannelEqBandQ(int ch, int band, double q) const {
+    return scpSet(AddrEqBandQ, ch, band, std::clamp(qToScp(q), 100, 16000));
+}
+
+QByteArray YamahaProtocol::buildChannelDynamicsThreshold(int ch, double thresholdDb) const {
+    // Dyna2 (compressor) threshold is deci-dB, range -54 dB..0 dB.
+    int deci = static_cast<int>(std::lround(thresholdDb * 10.0));
+    return scpSet(AddrDynaThreshold, ch, 0, std::clamp(deci, -540, 0));
+}
+
+// --------------------------------------------------------------------------
+// Semantic setters (send when connected, and cache).
+// --------------------------------------------------------------------------
+
+// public setters take a 1-based channel (MixerProtocol contract); the SCP
+// builders use the 0-based input-channel index.
+void YamahaProtocol::setChannelFader(int ch, double level) {
+    sendCommand(buildChannelFader(ch - 1, level));
+}
+
+void YamahaProtocol::setChannelMute(int ch, bool muted) {
+    sendCommand(buildChannelMute(ch - 1, muted));
+}
+
+void YamahaProtocol::setChannelPreamp(int ch, double gainDb) {
+    sendCommand(buildChannelPreamp(ch - 1, gainDb));
+}
+
+void YamahaProtocol::setChannelHpf(int ch, bool on, double freqHz) {
+    sendCommand(buildChannelHpfOn(ch - 1, on));
+    if (freqHz > 0.0)
+        sendCommand(buildChannelHpfFreq(ch - 1, freqHz));
+}
+
+void YamahaProtocol::setChannelEqOn(int ch, bool on) { sendCommand(buildChannelEqOn(ch - 1, on)); }
+
+void YamahaProtocol::setChannelEqBand(int ch, int band, bool on, int type, double freqHz,
+                                      double gainDb, double q) {
+    // Yamaha PEQ bands are parametric; per-band shelf "type" is toggled by the
+    // console rather than addressed as a band node over SCP, so `type` is not
+    // transmitted by this driver.
+    Q_UNUSED(type);
+    sendCommand(buildChannelEqBandBypass(ch - 1, band, on));
+    sendCommand(buildChannelEqBandFreq(ch - 1, band, freqHz));
+    sendCommand(buildChannelEqBandGain(ch - 1, band, gainDb));
+    sendCommand(buildChannelEqBandQ(ch - 1, band, q));
+}
+
+void YamahaProtocol::setChannelDynamics(int ch, bool on, double thresholdDb, double ratio,
+                                        double attackMs, double releaseMs, double makeupDb) {
+    // SCP exposes the compressor (Dyna2) threshold; on/off, ratio, attack,
+    // release and makeup are not addressable via this driver.
+    Q_UNUSED(on);
+    Q_UNUSED(ratio);
+    Q_UNUSED(attackMs);
+    Q_UNUSED(releaseMs);
+    Q_UNUSED(makeupDb);
+    sendCommand(buildChannelDynamicsThreshold(ch - 1, thresholdDb));
+}
+
+// --------------------------------------------------------------------------
+// Connection lifecycle.
+// --------------------------------------------------------------------------
 
 bool YamahaProtocol::connect(const QString& host, int port) {
     if (m_connectionState == ConnectionState::Connected ||
@@ -93,454 +212,322 @@ bool YamahaProtocol::connect(const QString& host, int port) {
     }
 
     m_host = host;
-    m_port = port > 0 ? port : m_receivePort;
-    m_reconnectAttempts = 0;
+    m_port = port > 0 ? port : SCP_PORT; // SCP is always 49280
+    m_rxBuffer.clear();
 
     setConnectionState(ConnectionState::Connecting);
-    setStatus(QString("Connecting to %1:%2...").arg(host).arg(m_transmitPort));
+    setStatus(QString("Connecting to %1:%2...").arg(m_host).arg(m_port));
 
-    // create OSC address for sending to transmit port
-    m_oscAddress = lo_address_new(host.toUtf8().constData(),
-                                  QString::number(m_transmitPort).toUtf8().constData());
-    if (!m_oscAddress) {
-        setStatus("Failed to create OSC address");
-        setConnectionState(ConnectionState::Disconnected);
-        emit connectionError("Failed to create OSC address");
-        return false;
-    }
-
-    // bind receive socket to receive port
-    if (!m_receiveSocket.bind(QHostAddress::Any, m_port)) {
-        lo_address_free(m_oscAddress);
-        m_oscAddress = nullptr;
-        setStatus("Failed to bind UDP receive socket");
-        setConnectionState(ConnectionState::Disconnected);
-        emit connectionError("Failed to bind UDP socket on port " + QString::number(m_port));
-        return false;
-    }
-
-    // send model query to verify connection
-    m_waitingForModel = true;
-    sendOscMessage("/sys/model");
-    m_connectionTimer.start(m_connectionTimeoutMs);
-
-    return true;
+    m_transport.setReconnectEnabled(true);
+    return m_transport.connect(m_host, m_port); // async; result via signals
 }
 
 void YamahaProtocol::disconnect() {
     m_keepAliveTimer.stop();
-    m_connectionTimer.stop();
-    m_reconnectTimer.stop();
     m_requestTimeoutTimer.stop();
 
-    if (m_oscAddress) {
-        lo_address_free(m_oscAddress);
-        m_oscAddress = nullptr;
-    }
+    m_transport.setReconnectEnabled(false);
+    m_transport.disconnect();
 
-    m_receiveSocket.close();
-
+    m_rxBuffer.clear();
     m_parameterCache.clear();
     m_pendingRequests.clear();
-    m_latencyHistory.clear();
     m_latencyMs = 0;
-    m_reconnectAttempts = 0;
-    m_waitingForModel = false;
+    m_lastResponseTime = 0;
 
     setConnectionState(ConnectionState::Disconnected);
     setStatus("Disconnected");
     emit disconnected();
 }
 
-void YamahaProtocol::sendParameter(const QString& path, const QVariant& value) {
-    if (m_connectionState != ConnectionState::Connected) {
+void YamahaProtocol::onTransportConnected() {
+    setConnectionState(ConnectionState::Connected);
+    setStatus(QString("Connected to %1:%2").arg(m_host).arg(m_port));
+
+    m_lastResponseTime = QDateTime::currentMSecsSinceEpoch();
+    m_keepAliveTimer.start();
+    m_requestTimeoutTimer.start();
+
+    // Identify the console; doubles as an initial liveness probe.  Connection
+    // itself is established the moment the socket connects (per SCP practice).
+    sendCommand(QByteArray("devinfo productname\n"));
+
+    emit connected();
+}
+
+void YamahaProtocol::onTransportDisconnected() {
+    m_keepAliveTimer.stop();
+    m_requestTimeoutTimer.stop();
+    setConnectionState(ConnectionState::Disconnected);
+    setStatus("Disconnected");
+    emit disconnected();
+}
+
+void YamahaProtocol::onTransportError(const QString& error) {
+    setStatus("Connection error: " + error);
+    emit connectionError(error);
+}
+
+void YamahaProtocol::onTransportConnectionLost() {
+    m_keepAliveTimer.stop();
+    setConnectionState(ConnectionState::Reconnecting);
+    setStatus("Connection lost - reconnecting...");
+    emit connectionLost();
+}
+
+void YamahaProtocol::onReconnecting(int attempt, int maxAttempts) {
+    setConnectionState(ConnectionState::Reconnecting);
+    setStatus(QString("Reconnecting (attempt %1/%2)...").arg(attempt).arg(maxAttempts));
+}
+
+// --------------------------------------------------------------------------
+// Incoming data.
+// --------------------------------------------------------------------------
+
+void YamahaProtocol::onDataReceived(const QByteArray& data) {
+    m_rxBuffer.append(data);
+
+    int nl;
+    while ((nl = m_rxBuffer.indexOf('\n')) >= 0) {
+        QByteArray line = m_rxBuffer.left(nl);
+        m_rxBuffer.remove(0, nl + 1);
+        if (line.endsWith('\r'))
+            line.chop(1);
+        parseScpLine(line);
+    }
+
+    if (m_rxBuffer.size() > MAX_RX_BUFFER)
+        m_rxBuffer.clear(); // guard against a peer that never sends LF
+}
+
+void YamahaProtocol::parseScpLine(const QByteArray& rawLine) {
+    const QString line = QString::fromUtf8(rawLine).trimmed();
+    if (line.isEmpty())
+        return;
+
+    m_lastResponseTime = QDateTime::currentMSecsSinceEpoch();
+
+    // Tokenize on whitespace, but keep "quoted strings" as single tokens.
+    QStringList tokens;
+    {
+        bool inQuotes = false;
+        QString cur;
+        for (const QChar c : line) {
+            if (c == '"') {
+                inQuotes = !inQuotes;
+                continue;
+            }
+            if (c.isSpace() && !inQuotes) {
+                if (!cur.isEmpty()) {
+                    tokens.append(cur);
+                    cur.clear();
+                }
+            } else {
+                cur.append(c);
+            }
+        }
+        if (!cur.isEmpty())
+            tokens.append(cur);
+    }
+    if (tokens.isEmpty())
+        return;
+
+    const QString& status = tokens.first();
+    // Per-command "ERROR" lines are routine (e.g. querying an unsupported node)
+    // and are ignored here rather than surfaced as connection errors.
+    if (status != "OK" && status != "OKm" && status != "NOTIFY" && status != "NOTIFYm")
+        return;
+
+    // Device identification: e.g.  OK devinfo productname "CL5"
+    if (tokens.size() >= 4 && tokens.at(1) == "devinfo" && tokens.at(2) == "productname") {
+        setStatus(QString("Connected to %1 (%2:%3)").arg(tokens.at(3)).arg(m_host).arg(m_port));
         return;
     }
 
+    // Find the parameter address (the "MIXER:..." token).
+    int ai = -1;
+    for (int i = 1; i < tokens.size(); ++i) {
+        if (tokens.at(i).startsWith("MIXER:")) {
+            ai = i;
+            break;
+        }
+    }
+    if (ai < 0)
+        return;
+
+    const QString address = tokens.at(ai);
+
+    // Value: for "set"/"get" it follows address + idx1 + idx2; for scene-style
+    // lines (ssrecall_ex MIXER:Lib/Scene <n>) it follows the address directly.
+    QVariant value;
+    auto parseToken = [](const QString& t) -> QVariant {
+        bool ok = false;
+        int iv = t.toInt(&ok);
+        return ok ? QVariant(iv) : QVariant(t);
+    };
+    if (tokens.size() > ai + 3)
+        value = parseToken(tokens.at(ai + 3));
+    else if (tokens.size() > ai + 1)
+        value = parseToken(tokens.at(ai + 1));
+
+    if (m_pendingRequests.contains(address)) {
+        const YamahaPendingRequest req = m_pendingRequests.take(address);
+        updateLatency(m_lastResponseTime - req.sentTime);
+        if (req.callback)
+            req.callback(address, value, true);
+    }
+
+    if (value.isValid()) {
+        m_parameterCache[address] = value;
+        emit parameterChanged(address, value);
+    }
+}
+
+// --------------------------------------------------------------------------
+// Parameter API.
+// --------------------------------------------------------------------------
+
+void YamahaProtocol::sendParameter(const QString& path, const QVariant& value) {
+    if (m_connectionState != ConnectionState::Connected)
+        return;
+
+    // `path` is treated as a raw SCP target ("<address> <idx1> <idx2>", or just
+    // an address for which 0 0 is assumed).
+    const QString target = path.contains(' ') ? path : (path + " 0 0");
+
+    QString valueStr;
     switch (value.typeId()) {
-    case QMetaType::Float:
-    case QMetaType::Double:
-        sendOscMessage(path, value.toFloat());
+    case QMetaType::Bool:
+        valueStr = value.toBool() ? "1" : "0";
         break;
     case QMetaType::Int:
-    case QMetaType::Bool:
-        sendOscMessage(path, value.toInt());
+    case QMetaType::LongLong:
+        valueStr = QString::number(value.toLongLong());
+        break;
+    case QMetaType::Double:
+    case QMetaType::Float:
+        valueStr = QString::number(std::lround(value.toDouble()));
         break;
     case QMetaType::QString:
-        sendOscMessage(path, value.toString());
+        valueStr = "\"" + value.toString() + "\"";
         break;
     default:
-        sendOscMessage(path, value.toFloat());
+        valueStr = QString::number(std::lround(value.toDouble()));
         break;
     }
 
+    sendCommand(("set " + target + " " + valueStr + "\n").toUtf8());
     m_parameterCache[path] = value;
 }
 
 QVariant YamahaProtocol::getParameter(const QString& path) { return m_parameterCache.value(path); }
 
 void YamahaProtocol::requestParameter(const QString& path) {
-    if (m_connectionState != ConnectionState::Connected) {
+    if (m_connectionState != ConnectionState::Connected)
         return;
-    }
+
+    const QString target = path.contains(' ') ? path : (path + " 0 0");
+    const QString address = path.section(' ', 0, 0);
 
     YamahaPendingRequest req;
-    req.path = path;
-    req.timestamp = QDateTime::currentDateTime();
+    req.address = address;
     req.sentTime = QDateTime::currentMSecsSinceEpoch();
     req.callback = nullptr;
-    m_pendingRequests[path] = req;
+    m_pendingRequests[address] = req;
 
-    sendOscMessage(path);
+    sendCommand(("get " + target + "\n").toUtf8());
 }
 
 void YamahaProtocol::requestParameterAsync(const QString& path, ParameterCallback callback) {
     if (m_connectionState != ConnectionState::Connected) {
-        if (callback) {
+        if (callback)
             callback(path, QVariant(), false);
-        }
         return;
     }
 
-    YamahaPendingRequest req;
-    req.path = path;
-    req.timestamp = QDateTime::currentDateTime();
-    req.sentTime = QDateTime::currentMSecsSinceEpoch();
-    req.callback = callback;
-    m_pendingRequests[path] = req;
+    const QString target = path.contains(' ') ? path : (path + " 0 0");
+    const QString address = path.section(' ', 0, 0);
 
-    sendOscMessage(path);
+    YamahaPendingRequest req;
+    req.address = address;
+    req.sentTime = QDateTime::currentMSecsSinceEpoch();
+    req.callback = std::move(callback);
+    m_pendingRequests[address] = req;
+
+    sendCommand(("get " + target + "\n").toUtf8());
 }
 
 void YamahaProtocol::recallSnapshot(const Cue& cue) {
-    if (m_connectionState != ConnectionState::Connected) {
+    if (m_connectionState != ConnectionState::Connected)
         return;
-    }
 
-    QJsonObject params = cue.parameters();
-    for (const auto& [path, value] : params.asKeyValueRange()) {
+    const QJsonObject params = cue.parameters();
+    for (const auto& [path, value] : params.asKeyValueRange())
         sendParameter(path.toString(), value.toVariant());
-    }
 }
 
 void YamahaProtocol::recallScene(int sceneNumber) {
-    if (m_connectionState != ConnectionState::Connected) {
+    if (m_connectionState != ConnectionState::Connected)
         return;
-    }
 
-    // Yamaha scene recall: /scene/recall with scene number
-    sendOscMessage("/scene/recall", sceneNumber);
+    sendCommand(scpSceneRecall(sceneNumber));
+    emit sceneChanged(sceneNumber);
 }
 
 void YamahaProtocol::refresh() {
-    if (m_connectionState != ConnectionState::Connected) {
+    if (m_connectionState != ConnectionState::Connected)
         return;
-    }
 
-    for (const QString& param : m_snapshotParams) {
-        requestParameter(param);
+    // Re-query input-channel fader level / on so cached state matches console.
+    const int n = std::max(0, m_capabilities.inputChannels);
+    for (int ch = 0; ch < n; ++ch) {
+        sendCommand(scpGet(AddrFaderLevel, ch, 0));
+        sendCommand(scpGet(AddrFaderOn, ch, 0));
     }
 }
 
-void YamahaProtocol::onReadyRead() {
-    while (m_receiveSocket.hasPendingDatagrams()) {
-        QNetworkDatagram datagram = m_receiveSocket.receiveDatagram();
-        parseOscMessage(datagram.data());
-    }
-}
+// --------------------------------------------------------------------------
+// Timers / housekeeping.
+// --------------------------------------------------------------------------
 
 void YamahaProtocol::onKeepAliveTimeout() {
-    if (m_connectionState == ConnectionState::Connected) {
-        qint64 now = QDateTime::currentMSecsSinceEpoch();
-        if (m_lastResponseTime > 0 && (now - m_lastResponseTime) > (KEEPALIVE_INTERVAL * 3)) {
-            setStatus("Connection lost - no response from mixer");
-            emit connectionLost();
-            startReconnection();
-            return;
-        }
-
-        // query model as keep-alive
-        sendOscMessage("/sys/model");
-    }
-}
-
-void YamahaProtocol::onConnectionTimeout() {
-    if (m_connectionState == ConnectionState::Connecting) {
-        setStatus("Connection timeout");
-        emit connectionError("Connection timeout - no response from mixer");
-        startReconnection();
-    } else if (m_connectionState == ConnectionState::Reconnecting) {
-        if (m_reconnectAttempts >= m_maxReconnectAttempts) {
-            setStatus("Reconnection failed - max attempts reached");
-            setConnectionState(ConnectionState::Disconnected);
-            emit connectionError("Failed to reconnect after maximum attempts");
-        } else {
-            int shift = std::min(m_reconnectAttempts, 10);
-            int delay = std::min(m_reconnectDelayMs * (1 << shift), 30000);
-            m_reconnectTimer.start(delay);
-        }
-    }
+    if (m_connectionState == ConnectionState::Connected)
+        sendCommand(QByteArray("devinfo productname\n"));
 }
 
 void YamahaProtocol::onRequestTimeoutCheck() {
-    if (m_connectionState != ConnectionState::Connected) {
+    if (m_pendingRequests.isEmpty())
         return;
-    }
 
-    QDateTime now = QDateTime::currentDateTime();
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
     QStringList timedOut;
-
-    for (const auto& [path, req] : m_pendingRequests.asKeyValueRange()) {
-        if (req.timestamp.msecsTo(now) > m_requestTimeoutMs) {
-            timedOut.append(path);
-        }
+    for (const auto& [address, req] : m_pendingRequests.asKeyValueRange()) {
+        if (now - req.sentTime > REQUEST_TIMEOUT_MS)
+            timedOut.append(address);
     }
 
-    for (const QString& path : timedOut) {
-        YamahaPendingRequest req = m_pendingRequests.take(path);
-        if (req.callback) {
-            req.callback(path, QVariant(), false);
-        }
-        emit requestTimeout(path);
+    for (const QString& address : timedOut) {
+        const YamahaPendingRequest req = m_pendingRequests.take(address);
+        if (req.callback)
+            req.callback(address, QVariant(), false);
+        emit requestTimeout(address);
     }
 }
 
-void YamahaProtocol::onReconnectAttempt() {
-    if (m_reconnectAttempts >= m_maxReconnectAttempts) {
-        setStatus("Reconnection failed - max attempts reached");
-        setConnectionState(ConnectionState::Disconnected);
-        emit connectionError("Failed to reconnect after maximum attempts");
+void YamahaProtocol::sendCommand(const QByteArray& cmd) {
+    if (cmd.isEmpty() || !m_transport.isConnected())
         return;
-    }
-
-    m_reconnectAttempts++;
-    setStatus(QString("Reconnecting (attempt %1/%2)...")
-                  .arg(m_reconnectAttempts)
-                  .arg(m_maxReconnectAttempts));
-
-    // clean up old connection
-    if (m_oscAddress) {
-        lo_address_free(m_oscAddress);
-        m_oscAddress = nullptr;
-    }
-    m_receiveSocket.close();
-
-    // recreate connection
-    m_oscAddress = lo_address_new(m_host.toUtf8().constData(),
-                                  QString::number(m_transmitPort).toUtf8().constData());
-    if (!m_oscAddress) {
-        int shift = std::min(m_reconnectAttempts - 1, 10);
-        int delay = std::min(m_reconnectDelayMs * (1 << shift), 30000);
-        m_reconnectTimer.start(delay);
-        return;
-    }
-
-    if (!m_receiveSocket.bind(QHostAddress::Any, m_port)) {
-        lo_address_free(m_oscAddress);
-        m_oscAddress = nullptr;
-        int shift = std::min(m_reconnectAttempts - 1, 10);
-        int delay = std::min(m_reconnectDelayMs * (1 << shift), 30000);
-        m_reconnectTimer.start(delay);
-        return;
-    }
-
-    m_waitingForModel = true;
-    sendOscMessage("/sys/model");
-    m_connectionTimer.start(m_connectionTimeoutMs);
-}
-
-void YamahaProtocol::sendOscMessage(const QString& path) {
-    if (!m_oscAddress) {
-        return;
-    }
-    lo_send(m_oscAddress, path.toUtf8().constData(), nullptr);
-}
-
-void YamahaProtocol::sendOscMessage(const QString& path, float value) {
-    if (!m_oscAddress) {
-        return;
-    }
-    lo_send(m_oscAddress, path.toUtf8().constData(), "f", value);
-}
-
-void YamahaProtocol::sendOscMessage(const QString& path, int value) {
-    if (!m_oscAddress) {
-        return;
-    }
-    lo_send(m_oscAddress, path.toUtf8().constData(), "i", value);
-}
-
-void YamahaProtocol::sendOscMessage(const QString& path, const QString& value) {
-    if (!m_oscAddress) {
-        return;
-    }
-    lo_send(m_oscAddress, path.toUtf8().constData(), "s", value.toUtf8().constData());
-}
-
-void YamahaProtocol::parseOscMessage(const QByteArray& data) {
-    if (data.size() < 4) {
-        return;
-    }
-
-    // extract path
-    int pathEnd = data.indexOf('\0');
-    if (pathEnd < 0) {
-        return;
-    }
-    QString path = QString::fromUtf8(data.left(pathEnd));
-
-    // skip to type tag (4-byte aligned)
-    int typeStart = ((pathEnd + 4) / 4) * 4;
-    if (typeStart >= data.size()) {
-        processResponse(path, QVariant());
-        return;
-    }
-
-    // find type tag
-    if (data.at(typeStart) != ',') {
-        return;
-    }
-    int typeEnd = data.indexOf('\0', typeStart);
-    if (typeEnd < 0) {
-        return;
-    }
-    QString types = QString::fromUtf8(data.mid(typeStart + 1, typeEnd - typeStart - 1));
-
-    // skip to arguments (4-byte aligned)
-    int argOffset = ((typeEnd + 4) / 4) * 4;
-    if (argOffset > data.size()) {
-        return;
-    }
-
-    if (!types.isEmpty()) {
-        QVariant value = parseOscArgument(data, argOffset, types.at(0).toLatin1());
-        processResponse(path, value);
-    }
-}
-
-QVariant YamahaProtocol::parseOscArgument(const QByteArray& data, int& offset, char type) {
-    switch (type) {
-    case 'f': {
-        if (offset + 4 <= data.size()) {
-            quint32 raw = (static_cast<quint8>(data[offset]) << 24) |
-                          (static_cast<quint8>(data[offset + 1]) << 16) |
-                          (static_cast<quint8>(data[offset + 2]) << 8) |
-                          static_cast<quint8>(data[offset + 3]);
-            float f;
-            std::memcpy(&f, &raw, sizeof(float));
-            offset += 4;
-            return f;
-        }
-        break;
-    }
-    case 'i': {
-        if (offset + 4 <= data.size()) {
-            qint32 i = (static_cast<quint8>(data[offset]) << 24) |
-                       (static_cast<quint8>(data[offset + 1]) << 16) |
-                       (static_cast<quint8>(data[offset + 2]) << 8) |
-                       static_cast<quint8>(data[offset + 3]);
-            offset += 4;
-            return i;
-        }
-        break;
-    }
-    case 's': {
-        int strEnd = data.indexOf('\0', offset);
-        if (strEnd > offset) {
-            QString str = QString::fromUtf8(data.mid(offset, strEnd - offset));
-            offset = ((strEnd + 4) / 4) * 4;
-            return str;
-        }
-        break;
-    }
-    case 'b': {
-        if (offset + 4 <= data.size()) {
-            qint32 size = (static_cast<quint8>(data[offset]) << 24) |
-                          (static_cast<quint8>(data[offset + 1]) << 16) |
-                          (static_cast<quint8>(data[offset + 2]) << 8) |
-                          static_cast<quint8>(data[offset + 3]);
-            if (size < 0)
-                break;
-            offset += 4;
-            if (offset + size <= data.size()) {
-                QByteArray blob = data.mid(offset, size);
-                offset += ((size + 3) / 4) * 4;
-                return blob;
-            }
-        }
-        break;
-    }
-    }
-
-    return QVariant();
-}
-
-void YamahaProtocol::processResponse(const QString& path, const QVariant& value) {
-    qint64 now = QDateTime::currentMSecsSinceEpoch();
-    m_lastResponseTime = now;
-
-    if (path == "/sys/model") {
-        handleModelResponse(value);
-        return;
-    }
-
-    if (m_pendingRequests.contains(path)) {
-        YamahaPendingRequest req = m_pendingRequests.take(path);
-        qint64 roundTrip = now - req.sentTime;
-        updateLatency(roundTrip);
-
-        if (req.callback) {
-            req.callback(path, value, true);
-        }
-    }
-
-    if (value.isValid()) {
-        m_parameterCache[path] = value;
-        emit parameterChanged(path, value);
-    }
-}
-
-void YamahaProtocol::handleModelResponse([[maybe_unused]] const QVariant& value) {
-    m_connectionTimer.stop();
-    m_waitingForModel = false;
-
-    if (m_connectionState == ConnectionState::Connecting ||
-        m_connectionState == ConnectionState::Reconnecting) {
-        setConnectionState(ConnectionState::Connected);
-        setStatus(QString("Connected to %1:%2").arg(m_host).arg(m_transmitPort));
-
-        m_keepAliveTimer.start(KEEPALIVE_INTERVAL);
-        m_requestTimeoutTimer.start();
-        m_reconnectAttempts = 0;
-
-        emit connected();
-    }
-}
-
-void YamahaProtocol::startReconnection() {
-    m_keepAliveTimer.stop();
-    m_connectionTimer.stop();
-    m_requestTimeoutTimer.stop();
-
-    setConnectionState(ConnectionState::Reconnecting);
-    m_reconnectTimer.start(m_reconnectDelayMs);
+    m_transport.send(cmd);
 }
 
 void YamahaProtocol::updateLatency(qint64 roundTripMs) {
-    m_latencyHistory.append(static_cast<int>(roundTripMs));
-
-    while (m_latencyHistory.size() > LATENCY_HISTORY_SIZE) {
-        m_latencyHistory.removeFirst();
-    }
-
-    int sum = 0;
-    for (int lat : m_latencyHistory) {
-        sum += lat;
-    }
-    int newLatency = sum / m_latencyHistory.size();
-
-    if (newLatency != m_latencyMs) {
-        m_latencyMs = newLatency;
+    if (roundTripMs < 0)
+        return;
+    // Simple exponential moving average.
+    const int sample = static_cast<int>(roundTripMs);
+    const int next = m_latencyMs == 0 ? sample : (m_latencyMs * 3 + sample) / 4;
+    if (next != m_latencyMs) {
+        m_latencyMs = next;
         emit latencyChanged(m_latencyMs);
     }
 }

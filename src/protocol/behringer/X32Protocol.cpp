@@ -2,6 +2,8 @@
 #include "../../core/Cue.h"
 #include <QDateTime>
 #include <algorithm>
+#include <array>
+#include <cmath>
 
 namespace OpenMix {
 
@@ -9,6 +11,40 @@ namespace {
 constexpr int MAX_X32_INPUT_CHANNELS = 32;
 constexpr int MAX_X32_EFFECT_SENDS = 16;
 constexpr int MAX_X32_MIX_BUSES = 16;
+
+// X32 OSC encodes most continuous params as a normalized float 0..1 mapped onto
+// the parameter's real range. These helpers convert real-world units to that
+// 0..1 value. The curves are close approximations of the console's mapping; the
+// exact lookup tables can refine the constants without changing call sites.
+QString x32Channel(int channel) { return QString("/ch/%1").arg(channel, 2, 10, QChar('0')); }
+
+float clampUnit(double v) { return static_cast<float>(std::clamp(v, 0.0, 1.0)); }
+
+float linNorm(double v, double lo, double hi) { return clampUnit((v - lo) / (hi - lo)); }
+
+float logNorm(double v, double lo, double hi) {
+    if (v <= lo)
+        return 0.0f;
+    if (v >= hi)
+        return 1.0f;
+    return static_cast<float>(std::log(v / lo) / std::log(hi / lo));
+}
+
+// X32 compressor ratio is an enum index into a fixed table
+int x32RatioIndex(double ratio) {
+    static constexpr std::array<double, 12> ratios = {1.1, 1.3, 1.5, 2.0, 2.5, 3.0,
+                                                      4.0, 5.0, 7.0, 10.0, 20.0, 100.0};
+    int best = 0;
+    double bestDiff = 1e9;
+    for (int i = 0; i < static_cast<int>(ratios.size()); ++i) {
+        double diff = std::abs(ratios[i] - ratio);
+        if (diff < bestDiff) {
+            bestDiff = diff;
+            best = i;
+        }
+    }
+    return best;
+}
 } // namespace
 
 X32Protocol::X32Protocol(const MixerCapabilities& caps, QObject* parent)
@@ -223,6 +259,52 @@ void X32Protocol::recallScene(int sceneNumber) {
 
     // X32 scene recall: /-action/goscene followed by scene number (0-indexed)
     m_transport.send("/-action/goscene", sceneNumber);
+}
+
+void X32Protocol::setChannelFader(int channel, double level) {
+    sendParameter(x32Channel(channel) + "/mix/fader", clampUnit(level));
+}
+
+void X32Protocol::setChannelMute(int channel, bool muted) {
+    // /mix/on: 1 = on (unmuted), 0 = muted
+    sendParameter(x32Channel(channel) + "/mix/on", muted ? 0 : 1);
+}
+
+void X32Protocol::setChannelPreamp(int channel, double gainDb) {
+    // per-channel digital trim, +/-18 dB (head-amp analog gain is patch-dependent)
+    sendParameter(x32Channel(channel) + "/preamp/trim", linNorm(gainDb, -18.0, 18.0));
+}
+
+void X32Protocol::setChannelHpf(int channel, bool on, double freqHz) {
+    const QString ch = x32Channel(channel);
+    sendParameter(ch + "/preamp/hpon", on ? 1 : 0);
+    sendParameter(ch + "/preamp/hpf", logNorm(freqHz, 20.0, 400.0));
+}
+
+void X32Protocol::setChannelEqOn(int channel, bool on) {
+    sendParameter(x32Channel(channel) + "/eq/on", on ? 1 : 0);
+}
+
+void X32Protocol::setChannelEqBand(int channel, int band, bool /*on*/, int type, double freqHz,
+                                   double gainDb, double q) {
+    // X32 EQ has no per-band enable; the band's type selects its shape.
+    const QString prefix = QString("%1/eq/%2").arg(x32Channel(channel)).arg(band);
+    sendParameter(prefix + "/type", type);
+    sendParameter(prefix + "/f", logNorm(freqHz, 20.0, 20000.0));
+    sendParameter(prefix + "/g", linNorm(gainDb, -15.0, 15.0));
+    // X32 Q is descending: norm 0.0 = Q10.0, norm 1.0 = Q0.3
+    sendParameter(prefix + "/q", 1.0f - logNorm(q, 0.3, 10.0));
+}
+
+void X32Protocol::setChannelDynamics(int channel, bool on, double thresholdDb, double ratio,
+                                     double attackMs, double releaseMs, double makeupDb) {
+    const QString ch = x32Channel(channel);
+    sendParameter(ch + "/dyn/on", on ? 1 : 0);
+    sendParameter(ch + "/dyn/thr", linNorm(thresholdDb, -60.0, 0.0));
+    sendParameter(ch + "/dyn/ratio", x32RatioIndex(ratio));
+    sendParameter(ch + "/dyn/attack", linNorm(attackMs, 0.0, 120.0));
+    sendParameter(ch + "/dyn/release", logNorm(releaseMs, 5.0, 4000.0));
+    sendParameter(ch + "/dyn/mgain", linNorm(makeupDb, 0.0, 24.0));
 }
 
 void X32Protocol::refresh() {

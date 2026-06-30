@@ -52,6 +52,17 @@ class WingProtocol : public MixerProtocol {
     // scene recall
     void recallScene(int sceneNumber) override;
 
+    // semantic channel setters (WING uses real-world values, so most pass through)
+    void setChannelFader(int channel, double level) override;
+    void setChannelMute(int channel, bool muted) override;
+    void setChannelPreamp(int channel, double gainDb) override;
+    void setChannelHpf(int channel, bool on, double freqHz) override;
+    void setChannelEqOn(int channel, bool on) override;
+    void setChannelEqBand(int channel, int band, bool on, int type, double freqHz, double gainDb,
+                          double q) override;
+    void setChannelDynamics(int channel, bool on, double thresholdDb, double ratio, double attackMs,
+                            double releaseMs, double makeupDb) override;
+
     // keep-alive
     void refresh() override;
 
@@ -60,6 +71,7 @@ class WingProtocol : public MixerProtocol {
 
     // capabilities
     [[nodiscard]] const MixerCapabilities& capabilities() const override { return m_capabilities; }
+    [[nodiscard]] bool supportsParameterFeedback() const override { return true; }
 
   private slots:
     void onTransportConnected();

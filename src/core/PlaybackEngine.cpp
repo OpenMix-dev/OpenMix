@@ -1,4 +1,6 @@
 #include "PlaybackEngine.h"
+#include "ActorProfile.h"
+#include "ActorProfileLibrary.h"
 #include "CueList.h"
 #include "DCAMapping.h"
 #include "PlaybackGuard.h"
@@ -6,6 +8,8 @@
 #include "protocol/MixerProtocol.h"
 #include <QDateTime>
 #include <QRegularExpression>
+#include <cmath>
+#include <memory>
 
 namespace OpenMix {
 
@@ -25,6 +29,8 @@ void PlaybackEngine::setCueList(CueList* cueList) {
 void PlaybackEngine::setMixer(MixerProtocol* mixer) { m_mixer = mixer; }
 
 void PlaybackEngine::setDCAMapping(DCAMapping* mapping) { m_dcaMapping = mapping; }
+
+void PlaybackEngine::setActorLibrary(ActorProfileLibrary* library) { m_actorLibrary = library; }
 
 void PlaybackEngine::setValidator(CueValidator* validator) { m_validator = validator; }
 
@@ -74,6 +80,9 @@ void PlaybackEngine::go() {
 
     setCurrentIndex(m_standbyIndex);
     emit cueExecuted(m_currentIndex);
+
+    if (cue.type() == CueType::Snapshot)
+        verifyCue(m_currentIndex, cue);
 
     advanceStandby();
 }
@@ -143,6 +152,9 @@ void PlaybackEngine::executeCue(int index) {
     setCurrentIndex(index);
     emit cueExecuted(index);
 
+    if (cue.type() == CueType::Snapshot)
+        verifyCue(index, cue);
+
     if (index + 1 < m_cueList->count()) {
         setStandbyIndex(index + 1);
     }
@@ -205,6 +217,12 @@ void PlaybackEngine::executeCueInternal(const Cue& cue) {
         filteredCue.setParameters(filteredParams);
         m_mixer->recallSnapshot(filteredCue);
 
+        // apply each channel's active actor-voice profile on top
+        expandChannelProfiles(cue);
+
+        // apply per-channel fader levels (faded over cue.fadeTime if set)
+        applyChannelLevels(cue);
+
         // apply DCA overrides (mute & label only)
         applyDCAOverrides(cue, targetDCAs);
 
@@ -262,6 +280,115 @@ void PlaybackEngine::applyDCAOverrides(const Cue& cue, const QSet<int>& targetDC
     }
 }
 
+void PlaybackEngine::expandChannelProfiles(const Cue& cue) {
+    if (!m_mixer)
+        return;
+
+    // apply each channel's active actor-profile voice (gain/HPF/EQ/dynamics).
+    // the active actor on the channel is resolved live, so an understudy swap
+    // changes the applied voice without touching the cue.
+    if (m_actorLibrary) {
+        const QMap<int, QString> profiles = cue.channelProfiles();
+        for (auto it = profiles.constBegin(); it != profiles.constEnd(); ++it) {
+            std::optional<VoiceData> voice = m_actorLibrary->voiceFor(it.key(), it.value());
+            if (voice.has_value())
+                applyVoice(it.key(), *voice);
+        }
+    }
+}
+
+void PlaybackEngine::applyChannelLevels(const Cue& cue) {
+    if (!m_mixer)
+        return;
+
+    const double fadeMs = cue.fadeTime() * 1000.0;
+    const FadeCurve curve = cue.fadeCurve();
+    const QMap<int, double> levels = cue.channelLevels();
+
+    for (auto it = levels.constBegin(); it != levels.constEnd(); ++it) {
+        const int channel = it.key();
+        const double target = it.value();
+        const double from = m_appliedChannelLevels.value(channel, target);
+
+        if (fadeMs > 0.0 && !qFuzzyCompare(from + 1.0, target + 1.0)) {
+            m_fadeEngine.start(QString("ch:%1").arg(channel), from, target, fadeMs, curve,
+                               [this, channel](double v) {
+                                   if (m_mixer)
+                                       m_mixer->setChannelFader(channel, v);
+                               });
+        } else {
+            m_mixer->setChannelFader(channel, target);
+        }
+        m_appliedChannelLevels[channel] = target;
+    }
+}
+
+void PlaybackEngine::applyVoice(int channel, const VoiceData& voice) {
+    if (voice.gainDb.has_value())
+        m_mixer->setChannelPreamp(channel, *voice.gainDb);
+
+    if (voice.hpfOn.has_value() || voice.hpfFreq.has_value())
+        m_mixer->setChannelHpf(channel, voice.hpfOn.value_or(true), voice.hpfFreq.value_or(100.0));
+
+    if (voice.eqOn.has_value())
+        m_mixer->setChannelEqOn(channel, *voice.eqOn);
+    for (const EqBand& b : voice.eqBands)
+        m_mixer->setChannelEqBand(channel, b.band, b.on, b.type, b.freq, b.gain, b.q);
+
+    if (voice.dynOn.has_value())
+        m_mixer->setChannelDynamics(channel, *voice.dynOn, voice.dynThreshold.value_or(-20.0),
+                                    voice.dynRatio.value_or(2.0), voice.dynAttack.value_or(10.0),
+                                    voice.dynRelease.value_or(100.0), voice.dynGain.value_or(0.0));
+}
+
+void PlaybackEngine::verifyCue(int index, const Cue& cue) {
+    if (!m_verifyCues || !m_mixer || !m_mixer->isConnected())
+        return;
+
+    // send-only drivers can't read state back; treat as assumed-landed.
+    if (!m_mixer->supportsParameterFeedback())
+        return;
+
+    // verify the generic snapshot params (sent instantly via recallSnapshot).
+    const QSet<int> targetDCAs = cue.targetsAllDCAs() ? allDCAs() : cue.targetedDCAs();
+    const QJsonObject params = filterParametersForDCAs(cue, targetDCAs);
+
+    // only numeric params (faders/levels/toggles) are verifiable by value;
+    // names/colours are skipped.
+    QStringList toVerify;
+    for (auto it = params.begin(); it != params.end(); ++it) {
+        if (it.value().isDouble())
+            toVerify.append(it.key());
+    }
+
+    if (toVerify.isEmpty()) {
+        emit cueLanded(index);
+        return;
+    }
+
+    struct Accumulator {
+        int remaining;
+        int index;
+        QStringList drifted;
+    };
+    auto acc = std::make_shared<Accumulator>(Accumulator{static_cast<int>(toVerify.size()), index, {}});
+
+    for (const QString& path : toVerify) {
+        const double expected = params.value(path).toDouble();
+        m_mixer->requestParameterAsync(
+            path, [this, acc, expected](const QString& p, const QVariant& value, bool success) {
+                if (!success || std::abs(value.toDouble() - expected) > 0.01)
+                    acc->drifted.append(p);
+                if (--acc->remaining == 0) {
+                    if (acc->drifted.isEmpty())
+                        emit cueLanded(acc->index);
+                    else
+                        emit cueDrifted(acc->index, acc->drifted);
+                }
+            });
+    }
+}
+
 QList<int> PlaybackEngine::getChannelsForDCA(const Cue& cue, int dca) const {
     // check cue-specific mapping first
     if (cue.hasCustomDCAMapping()) {
@@ -293,7 +420,10 @@ QJsonObject PlaybackEngine::filterParametersForDCAs(const Cue& cue,
         QJsonObject filtered;
         static QRegularExpression dcaFaderRegex("^/dca/\\d+/fader$");
 
-        for (auto it = cue.parameters().begin(); it != cue.parameters().end(); ++it) {
+        // bind to a local: parameters() returns by value and QJsonObject::iterator
+        // holds a back-pointer to the object, so iterating the temporary dangles.
+        const QJsonObject params = cue.parameters();
+        for (auto it = params.begin(); it != params.end(); ++it) {
             if (!dcaFaderRegex.match(it.key()).hasMatch()) {
                 filtered[it.key()] = it.value();
             }
@@ -323,7 +453,7 @@ QJsonObject PlaybackEngine::filterParametersForDCAs(const Cue& cue,
 
     static QRegularExpression dcaFaderRegex("^/dca/\\d+/fader$");
 
-    const QJsonObject& params = cue.parameters();
+    const QJsonObject params = cue.parameters();
     for (auto it = params.begin(); it != params.end(); ++it) {
         const QString& path = it.key();
 

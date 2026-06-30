@@ -33,6 +33,9 @@ add_executable(test_show
     ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
 )
 target_link_libraries(test_show PRIVATE
     Qt6::Core
@@ -42,6 +45,98 @@ target_include_directories(test_show PRIVATE
     ${CMAKE_SOURCE_DIR}/src
 )
 add_test(NAME ShowTest COMMAND test_show)
+
+add_executable(test_actor_profiles
+    test_actor_profiles.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
+)
+target_link_libraries(test_actor_profiles PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+target_include_directories(test_actor_profiles PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
+add_test(NAME ActorProfilesTest COMMAND test_actor_profiles)
+
+add_executable(test_playback_profiles
+    test_playback_profiles.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueValidator.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackGuard.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackLogger.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/FadeEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/LoopbackProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+)
+target_link_libraries(test_playback_profiles PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+target_include_directories(test_playback_profiles PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
+add_test(NAME PlaybackProfilesTest COMMAND test_playback_profiles)
+
+add_executable(test_fade_engine
+    test_fade_engine.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/FadeEngine.cpp
+)
+target_link_libraries(test_fade_engine PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+target_include_directories(test_fade_engine PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
+add_test(NAME FadeEngineTest COMMAND test_fade_engine)
+
+add_executable(test_msc test_msc.cpp)
+target_link_libraries(test_msc PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(test_msc PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME MscTest COMMAND test_msc)
+
+add_executable(test_osc_remote
+    test_osc_remote.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/OscRemoteServer.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueValidator.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackGuard.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackLogger.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/FadeEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+)
+target_link_libraries(test_osc_remote PRIVATE Qt6::Core Qt6::Test PkgConfig::LIBLO)
+target_include_directories(test_osc_remote PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME OscRemoteTest COMMAND test_osc_remote)
+
+add_executable(test_qlab_client
+    test_qlab_client.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/QLabClient.cpp
+)
+target_link_libraries(test_qlab_client PRIVATE Qt6::Core Qt6::Test PkgConfig::LIBLO)
+target_include_directories(test_qlab_client PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME QLabClientTest COMMAND test_qlab_client)
 
 add_executable(test_undo_commands
     test_undo_commands.cpp
@@ -83,30 +178,30 @@ if(WIN32)
 endif()
 add_test(NAME AllenHeathParsingTest COMMAND test_allenheath_parsing)
 
-add_executable(test_yamaha_osc
-    test_yamaha_osc.cpp
+add_executable(test_yamaha_scp
+    test_yamaha_scp.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/yamaha/YamahaProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/yamaha/YamahaCLProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/yamaha/YamahaQLProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/yamaha/YamahaTFProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/yamaha/YamahaDM7Protocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/transport/TcpTransport.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
 )
-target_link_libraries(test_yamaha_osc PRIVATE
+# Yamaha now speaks SCP over TCP (TcpTransport) and no longer needs liblo.
+target_link_libraries(test_yamaha_scp PRIVATE
     Qt6::Core
     Qt6::Network
     Qt6::Test
 )
-if(WIN32)
-    target_include_directories(test_yamaha_osc PRIVATE ${LIBLO_INCLUDE_DIRS})
-    target_link_libraries(test_yamaha_osc PRIVATE ${LIBLO_LIBRARIES})
-else()
-    target_link_libraries(test_yamaha_osc PRIVATE PkgConfig::LIBLO)
-endif()
-target_include_directories(test_yamaha_osc PRIVATE
+target_include_directories(test_yamaha_scp PRIVATE
     ${CMAKE_SOURCE_DIR}/src
 )
 if(WIN32)
-    target_compile_definitions(test_yamaha_osc PRIVATE NOMINMAX)
+    target_compile_definitions(test_yamaha_scp PRIVATE NOMINMAX)
 endif()
-add_test(NAME YamahaOscTest COMMAND test_yamaha_osc)
+add_test(NAME YamahaScpTest COMMAND test_yamaha_scp)

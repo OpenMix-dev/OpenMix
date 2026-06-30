@@ -1,4 +1,5 @@
 #include "MidiInputManager.h"
+#include "MscParser.h"
 #include "core/PlaybackEngine.h"
 #include "core/PlaybackGuard.h"
 
@@ -61,7 +62,8 @@ bool MidiInputManager::openDevice(int deviceIndex) {
     try {
         m_midiIn->openPort(deviceIndex);
         m_midiIn->setCallback(&MidiInputManager::midiCallback, this);
-        m_midiIn->ignoreTypes(true, true, true); // ignore sysex, timing, active sensing
+        // receive sysex (for MIDI Show Control); still ignore timing + active sensing
+        m_midiIn->ignoreTypes(false, true, true);
 
         m_currentDeviceName = QString::fromStdString(m_midiIn->getPortName(deviceIndex));
         m_savedDeviceName = m_currentDeviceName;
@@ -240,6 +242,12 @@ void MidiInputManager::processMidiMessage(const std::vector<unsigned char>& mess
     if (message.size() < 2)
         return;
 
+    // System Exclusive — MIDI Show Control frames drive the playback engine
+    if (message[0] == 0xF0) {
+        handleSysex(message);
+        return;
+    }
+
     unsigned char status = message[0];
     int channel = status & 0x0F;
     int statusType = status & 0xF0;
@@ -294,6 +302,39 @@ void MidiInputManager::processMidiMessage(const std::vector<unsigned char>& mess
             break; // only execute first matching mapping
         }
     }
+}
+
+void MidiInputManager::handleSysex(const std::vector<unsigned char>& message) {
+    if (!m_enabled || !m_mscEnabled || !m_engine)
+        return;
+
+    const MscMessage msc = parseMsc(message);
+    if (!msc.valid)
+        return;
+
+    // device-id filter: 0x7F = "all devices"
+    if (m_mscDeviceId != 0x7F && msc.deviceId != 0x7F && msc.deviceId != m_mscDeviceId)
+        return;
+
+    switch (msc.command) {
+    case Msc::GO:
+    case Msc::TIMED_GO: // timed-go is fired immediately (no fade-from-MSC support yet)
+        if (msc.cueNumber.has_value())
+            m_engine->goToNumber(*msc.cueNumber);
+        m_engine->go();
+        break;
+    case Msc::STOP:
+    case Msc::ALL_OFF:
+        m_engine->stop();
+        break;
+    case Msc::RESUME:
+        m_engine->go();
+        break;
+    default:
+        break;
+    }
+
+    emit mscReceived(msc.command);
 }
 
 void MidiInputManager::executeAction(MidiAction action) {

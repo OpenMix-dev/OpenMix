@@ -20,9 +20,11 @@ MixerConfig MixerConfig::fromJson(const QJsonObject& json) {
     return config;
 }
 
-Show::Show(QObject* parent) : QObject(parent), m_cueList(this), m_dcaMapping(this) {
+Show::Show(QObject* parent)
+    : QObject(parent), m_cueList(this), m_dcaMapping(this), m_actorProfileLibrary(this) {
     connectCueListSignals();
     connectDcaMappingSignals();
+    connectActorLibrarySignals();
     newShow();
 }
 
@@ -63,6 +65,10 @@ void Show::connectDcaMappingSignals() {
     connect(&m_dcaMapping, &DCAMapping::mappingCleared, this, &Show::checkModifiedState);
 }
 
+void Show::connectActorLibrarySignals() {
+    connect(&m_actorProfileLibrary, &ActorProfileLibrary::changed, this, &Show::checkModifiedState);
+}
+
 void Show::newShow() {
     m_name = tr("Untitled Show");
     m_author.clear();
@@ -73,22 +79,29 @@ void Show::newShow() {
     m_mixerConfig.port = 10023;
     m_cueList.clear();
     m_dcaMapping.clear();
+    m_actorProfileLibrary.clear();
     m_isDirty = false;
 }
 
 QJsonObject Show::toJson() const {
     QJsonObject json;
-    json["version"] = "1.1";
+    json["version"] = "1.2";
     json["name"] = m_name;
     json["author"] = m_author;
     json["notes"] = m_notes;
     json["mixer"] = m_mixerConfig.toJson();
     json["cues"] = m_cueList.toJson();
     json["dcaMapping"] = m_dcaMapping.toJson();
+    json["actors"] = m_actorProfileLibrary.toJson();
     return json;
 }
 
 void Show::fromJson(const QJsonObject& json) {
+    // version is read for forward/backward compat; 1.0/1.1 shows simply lack the
+    // newer sections and fall back to cleared defaults below.
+    const QString version = json["version"].toString("1.0");
+    Q_UNUSED(version);
+
     m_name = json["name"].toString("Untitled Show");
     m_author = json["author"].toString();
     m_notes = json["notes"].toString();
@@ -99,6 +112,13 @@ void Show::fromJson(const QJsonObject& json) {
         m_dcaMapping.loadFromJson(json["dcaMapping"].toObject());
     } else {
         m_dcaMapping.clear();
+    }
+
+    // actor profile library (added in show version 1.2)
+    if (json.contains("actors")) {
+        m_actorProfileLibrary.loadFromJson(json["actors"].toObject());
+    } else {
+        m_actorProfileLibrary.clear();
     }
 
     m_isDirty = false;

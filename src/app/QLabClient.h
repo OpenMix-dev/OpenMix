@@ -1,0 +1,60 @@
+#pragma once
+
+#include <QObject>
+#include <QString>
+#include <lo/lo.h>
+
+namespace OpenMix {
+
+// Outbound DAW remote: fires cues in QLab (or any OSC-controllable playback app)
+// when an OpenMix cue carrying a linked QLab cue id is executed. Mirrors
+// TheatreMix's dawRemote / qLabCue feature, including an optional pre-roll delay.
+class QLabClient : public QObject {
+    Q_OBJECT
+
+  public:
+    static constexpr int QLAB_DEFAULT_PORT = 53000;
+
+    explicit QLabClient(QObject* parent = nullptr);
+    ~QLabClient() override;
+
+    void setTarget(const QString& host, int port);
+    [[nodiscard]] QString host() const { return m_host; }
+    [[nodiscard]] int port() const { return m_port; }
+
+    void setEnabled(bool enabled) { m_enabled = enabled; }
+    [[nodiscard]] bool isEnabled() const { return m_enabled; }
+
+    void setPreRollMs(int ms) { m_preRollMs = ms < 0 ? 0 : ms; }
+    [[nodiscard]] int preRollMs() const { return m_preRollMs; }
+
+    // optional QLab workspace id; when set, addresses are /workspace/<id>/...
+    void setWorkspaceId(const QString& id) { m_workspaceId = id; }
+    [[nodiscard]] QString workspaceId() const { return m_workspaceId; }
+
+    void loadFromSettings();
+    void saveToSettings();
+
+  public slots:
+    // fire a specific QLab cue by number/id (respects the pre-roll delay)
+    void triggerCue(const QString& cueId);
+    // GO on the QLab workspace
+    void go();
+
+  signals:
+    void sent(const QString& address);
+
+  private:
+    void rebuildAddress();
+    void send(const QString& address);
+    [[nodiscard]] QString prefix() const; // "" or "/workspace/<id>"
+
+    lo_address m_address = nullptr;
+    QString m_host = QStringLiteral("127.0.0.1");
+    int m_port = QLAB_DEFAULT_PORT;
+    bool m_enabled = false;
+    int m_preRollMs = 0;
+    QString m_workspaceId;
+};
+
+} // namespace OpenMix

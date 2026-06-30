@@ -22,6 +22,8 @@ class MidiInputManager;
 class ConsoleDiscoveryService;
 class AppLogger;
 class ConnectionLogBridge;
+class OscRemoteServer;
+class QLabClient;
 struct DiscoveredConsole;
 
 class Application : public QObject {
@@ -62,6 +64,12 @@ class Application : public QObject {
 
     // application logging
     [[nodiscard]] AppLogger* appLogger() { return m_appLogger; }
+
+    // inbound OSC remote control (QLab / stage-manager)
+    [[nodiscard]] OscRemoteServer* oscRemoteServer() { return m_oscRemoteServer; }
+
+    // outbound QLab / DAW remote
+    [[nodiscard]] QLabClient* qLabClient() { return m_qLabClient; }
 
     // mixer connection
     void connectToMixer(const QString& type, const QString& host, int port);
@@ -118,6 +126,12 @@ class Application : public QObject {
     // application logging
     AppLogger* m_appLogger;
     ConnectionLogBridge* m_connectionLogBridge;
+
+    // inbound OSC remote control
+    OscRemoteServer* m_oscRemoteServer;
+
+    // outbound QLab / DAW remote
+    QLabClient* m_qLabClient;
 };
 
 } // namespace OpenMix

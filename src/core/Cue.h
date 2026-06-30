@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FadeCurve.h"
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QMap>
@@ -80,6 +81,12 @@ class Cue {
         m_autoFollowCondition = condition;
     }
 
+    // fade transition applied to fader/level moves on fire (0 = instant)
+    [[nodiscard]] double fadeTime() const noexcept { return m_fadeTime; }
+    void setFadeTime(double seconds) { m_fadeTime = seconds; }
+    [[nodiscard]] FadeCurve fadeCurve() const noexcept { return m_fadeCurve; }
+    void setFadeCurve(FadeCurve curve) { m_fadeCurve = curve; }
+
     // DCA targeting
     [[nodiscard]] QSet<int> targetedDCAs() const { return m_targetedDCAs; }
     void setTargetedDCAs(const QSet<int>& dcas) { m_targetedDCAs = dcas; }
@@ -132,6 +139,10 @@ class Cue {
     [[nodiscard]] QString group() const { return m_group; }
     void setGroup(const QString& group) { m_group = group; }
 
+    // linked QLab cue id fired on execute (outbound DAW remote)
+    [[nodiscard]] QString qLabCue() const { return m_qLabCue; }
+    void setQLabCue(const QString& cueId) { m_qLabCue = cueId; }
+
     [[nodiscard]] QStringList tags() const { return m_tags; }
     void setTags(const QStringList& tags) { m_tags = tags; }
     void addTag(const QString& tag) {
@@ -145,6 +156,19 @@ class Cue {
     void setParameter(const QString& path, const QVariant& value);
     [[nodiscard]] QVariant parameter(const QString& path) const;
     void clearParameters() { m_parameters = QJsonObject(); }
+
+    // per-channel active actor-profile slot (channel -> slot id). On fire, the
+    // active actor on each channel has its stored voice for that slot applied.
+    [[nodiscard]] QMap<int, QString> channelProfiles() const { return m_channelProfiles; }
+    void setChannelProfiles(const QMap<int, QString>& profiles) { m_channelProfiles = profiles; }
+    void setChannelProfile(int channel, const QString& slot) { m_channelProfiles[channel] = slot; }
+    void removeChannelProfile(int channel) { m_channelProfiles.remove(channel); }
+
+    // per-channel fader level override (channel -> 0..1)
+    [[nodiscard]] QMap<int, double> channelLevels() const { return m_channelLevels; }
+    void setChannelLevels(const QMap<int, double>& levels) { m_channelLevels = levels; }
+    void setChannelLevel(int channel, double level) { m_channelLevels[channel] = level; }
+    void removeChannelLevel(int channel) { m_channelLevels.remove(channel); }
 
     QJsonObject toJson() const;
     [[nodiscard]] static Cue fromJson(const QJsonObject& json);
@@ -162,6 +186,9 @@ class Cue {
     bool m_autoFollow;
     double m_autoFollowDelay;
     AutoFollowCondition m_autoFollowCondition;
+
+    double m_fadeTime = 0.0; // fade duration (seconds); 0 = instant
+    FadeCurve m_fadeCurve = FadeCurve::EaseInOut;
 
     // DCA targeting
     QSet<int> m_targetedDCAs;              // empty = all DCAs
@@ -181,8 +208,12 @@ class Cue {
 
     QString m_group;
     QStringList m_tags;
+    QString m_qLabCue; // linked QLab cue id (DAW remote)
 
     QJsonObject m_parameters;
+
+    QMap<int, QString> m_channelProfiles; // channel -> active profile slot id
+    QMap<int, double> m_channelLevels;    // channel -> fader level override (0..1)
 };
 
 } // namespace OpenMix

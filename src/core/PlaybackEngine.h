@@ -1,7 +1,9 @@
 #pragma once
 
 #include "CueValidator.h"
+#include "FadeEngine.h"
 #include <QJsonObject>
+#include <QMap>
 #include <QObject>
 #include <QSet>
 #include <QTimer>
@@ -14,6 +16,8 @@ class DCAMapping;
 class MixerProtocol;
 class PlaybackGuard;
 class PlaybackLogger;
+class ActorProfileLibrary;
+struct VoiceData;
 
 enum class PlaybackState { Stopped, Running };
 
@@ -26,6 +30,15 @@ class PlaybackEngine : public QObject {
     void setCueList(CueList* cueList);
     void setMixer(MixerProtocol* mixer);
     void setDCAMapping(DCAMapping* mapping);
+    void setActorLibrary(ActorProfileLibrary* library);
+
+    // drives timed fader fades; exposed so the UI (and tests) can observe/step it
+    [[nodiscard]] FadeEngine* fadeEngine() { return &m_fadeEngine; }
+
+    // when enabled, after a cue applies, read changed params back from the console
+    // and emit cueLanded / cueDrifted (no-op on send-only drivers)
+    void setVerifyCues(bool enabled) { m_verifyCues = enabled; }
+    [[nodiscard]] bool verifyCues() const noexcept { return m_verifyCues; }
 
     void setValidator(CueValidator* validator);
     [[nodiscard]] CueValidator* validator() const noexcept { return m_validator; }
@@ -70,6 +83,8 @@ class PlaybackEngine : public QObject {
     void standbyCueChanged(int index);
     void cueExecuted(int index);
     void cueCompleted(int index);
+    void cueLanded(int index);
+    void cueDrifted(int index, const QStringList& paths);
     void autoFollowArmed(bool armed);
     void macroChildExecuted(const QString& parentId, const QString& childId);
 
@@ -98,9 +113,20 @@ class PlaybackEngine : public QObject {
     QJsonObject filterParametersForDCAs(const Cue& cue, const QSet<int>& targetDCAs) const;
     QSet<int> allDCAs() const;
 
+    // actor voice profiles: apply each channel's active profile + level on fire
+    void expandChannelProfiles(const Cue& cue);
+    void applyVoice(int channel, const VoiceData& voice);
+    void applyChannelLevels(const Cue& cue); // fade-aware per-channel fader moves
+    void verifyCue(int index, const Cue& cue);
+
     CueList* m_cueList = nullptr;
     MixerProtocol* m_mixer = nullptr;
     DCAMapping* m_dcaMapping = nullptr;
+    ActorProfileLibrary* m_actorLibrary = nullptr;
+
+    FadeEngine m_fadeEngine;
+    QMap<int, double> m_appliedChannelLevels; // last-applied fader per channel (fade source)
+    bool m_verifyCues = false;
     PlaybackState m_state = PlaybackState::Stopped;
     int m_currentIndex = -1;
     int m_standbyIndex = -1;

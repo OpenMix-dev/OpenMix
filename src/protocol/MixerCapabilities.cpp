@@ -214,7 +214,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "Yamaha TF1";
         caps.protocolId = "tf1";
-        caps.defaultPort = 8000;
+        caps.defaultPort = 49280;
         caps.dcaCount = 8;
         caps.inputChannels = 16;
         caps.mixBuses = 20;
@@ -233,7 +233,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "Yamaha TF3";
         caps.protocolId = "tf3";
-        caps.defaultPort = 8000;
+        caps.defaultPort = 49280;
         caps.dcaCount = 8;
         caps.inputChannels = 24;
         caps.mixBuses = 20;
@@ -252,7 +252,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "Yamaha TF5";
         caps.protocolId = "tf5";
-        caps.defaultPort = 8000;
+        caps.defaultPort = 49280;
         caps.dcaCount = 8;
         caps.inputChannels = 32;
         caps.mixBuses = 20;
@@ -271,7 +271,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "Yamaha QL1";
         caps.protocolId = "ql1";
-        caps.defaultPort = 8000;
+        caps.defaultPort = 49280;
         caps.dcaCount = 8;
         caps.inputChannels = 32;
         caps.mixBuses = 16;
@@ -291,7 +291,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "Yamaha QL5";
         caps.protocolId = "ql5";
-        caps.defaultPort = 8000;
+        caps.defaultPort = 49280;
         caps.dcaCount = 8;
         caps.inputChannels = 64;
         caps.mixBuses = 16;
@@ -311,7 +311,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "Yamaha CL1";
         caps.protocolId = "cl1";
-        caps.defaultPort = 8000;
+        caps.defaultPort = 49280;
         caps.dcaCount = 16;
         caps.inputChannels = 48;
         caps.mixBuses = 24;
@@ -330,7 +330,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "Yamaha CL3";
         caps.protocolId = "cl3";
-        caps.defaultPort = 8000;
+        caps.defaultPort = 49280;
         caps.dcaCount = 16;
         caps.inputChannels = 64;
         caps.mixBuses = 24;
@@ -349,7 +349,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "Yamaha CL5";
         caps.protocolId = "cl5";
-        caps.defaultPort = 8000;
+        caps.defaultPort = 49280;
         caps.dcaCount = 16;
         caps.inputChannels = 72;
         caps.mixBuses = 24;
@@ -368,7 +368,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "Yamaha DM7";
         caps.protocolId = "dm7";
-        caps.defaultPort = 8000;
+        caps.defaultPort = 49280;
         caps.dcaCount = 24;
         caps.inputChannels = 120;
         caps.mixBuses = 48;

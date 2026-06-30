@@ -225,6 +225,73 @@ void WingProtocol::recallScene(int sceneNumber) {
     m_transport.send("/action/scenes/recall", sceneNumber);
 }
 
+namespace {
+QString wingChannel(int channel) { return QString("/ch/%1").arg(channel); }
+
+// WING faders carry real-world dB; map a normalized 0..1 level onto the fader
+// taper (raw 0.75 = 0 dB, 1.0 = +10 dB, 0.0 = -inf). Approximate.
+float wingFaderDb(double level) {
+    level = std::clamp(level, 0.0, 1.0);
+    if (level <= 0.0)
+        return -144.0f;
+    if (level >= 0.75)
+        return static_cast<float>((level - 0.75) / 0.25 * 10.0);
+    return static_cast<float>(level / 0.75 * 90.0 - 90.0);
+}
+
+// WING STD EQ exposes named bands l,1,2,3,4,h (not numbered 1..N)
+QString wingEqBand(int band) {
+    static const char* tokens[] = {"l", "1", "2", "3", "4", "h"};
+    int idx = std::clamp(band - 1, 0, 5);
+    return tokens[idx];
+}
+} // namespace
+
+void WingProtocol::setChannelFader(int channel, double level) {
+    sendParameter(wingChannel(channel) + "/fdr", wingFaderDb(level));
+}
+
+void WingProtocol::setChannelMute(int channel, bool muted) {
+    // WING /mute polarity is the opposite of X32: 1 = muted, 0 = unmuted
+    sendParameter(wingChannel(channel) + "/mute", muted ? 1 : 0);
+}
+
+void WingProtocol::setChannelPreamp(int channel, double gainDb) {
+    // per-channel head-amp gain (real dB), follows the patched source
+    sendParameter(wingChannel(channel) + "/in/set/$g", static_cast<float>(gainDb));
+}
+
+void WingProtocol::setChannelHpf(int channel, bool on, double freqHz) {
+    // WING's HPF is the channel low-cut filter
+    const QString ch = wingChannel(channel);
+    sendParameter(ch + "/flt/lc", on ? 1 : 0);
+    sendParameter(ch + "/flt/lcf", static_cast<float>(freqHz));
+}
+
+void WingProtocol::setChannelEqOn(int channel, bool on) {
+    sendParameter(wingChannel(channel) + "/eq/on", on ? 1 : 0);
+}
+
+void WingProtocol::setChannelEqBand(int channel, int band, bool /*on*/, int /*type*/, double freqHz,
+                                    double gainDb, double q) {
+    // WING named bands carry real-world values: /ch/N/eq/<tok>{g,f,q}
+    const QString prefix = wingChannel(channel) + "/eq/" + wingEqBand(band);
+    sendParameter(prefix + "g", static_cast<float>(gainDb));
+    sendParameter(prefix + "f", static_cast<float>(freqHz));
+    sendParameter(prefix + "q", static_cast<float>(q));
+}
+
+void WingProtocol::setChannelDynamics(int channel, bool on, double thresholdDb, double ratio,
+                                      double attackMs, double releaseMs, double makeupDb) {
+    const QString ch = wingChannel(channel);
+    sendParameter(ch + "/dyn/on", on ? 1 : 0);
+    sendParameter(ch + "/dyn/thr", static_cast<float>(thresholdDb));
+    sendParameter(ch + "/dyn/ratio", static_cast<float>(ratio));
+    sendParameter(ch + "/dyn/att", static_cast<float>(attackMs));
+    sendParameter(ch + "/dyn/rel", static_cast<float>(releaseMs));
+    sendParameter(ch + "/dyn/gain", static_cast<float>(makeupDb));
+}
+
 void WingProtocol::refresh() {
     if (m_connectionState != ConnectionState::Connected)
         return;

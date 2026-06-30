@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ActorProfileLibrary.h"
 #include "CueList.h"
 #include "DCAMapping.h"
 #include <QJsonObject>
@@ -49,6 +50,11 @@ class Show : public QObject {
     [[nodiscard]] DCAMapping* dcaMapping() { return &m_dcaMapping; }
     [[nodiscard]] const DCAMapping* dcaMapping() const { return &m_dcaMapping; }
 
+    [[nodiscard]] ActorProfileLibrary* actorProfileLibrary() { return &m_actorProfileLibrary; }
+    [[nodiscard]] const ActorProfileLibrary* actorProfileLibrary() const {
+        return &m_actorProfileLibrary;
+    }
+
     [[nodiscard]] MixerConfig mixerConfig() const { return m_mixerConfig; }
     void setMixerConfig(const MixerConfig& config) { m_mixerConfig = config; checkModifiedState(); }
 
@@ -64,6 +70,7 @@ class Show : public QObject {
   private:
     void connectCueListSignals();
     void connectDcaMappingSignals();
+    void connectActorLibrarySignals();
 
     QString m_name;
     QString m_author;
@@ -72,6 +79,7 @@ class Show : public QObject {
     CueList m_cueList;
     MixerConfig m_mixerConfig;
     DCAMapping m_dcaMapping;
+    ActorProfileLibrary m_actorProfileLibrary;
     bool m_isDirty = false;
 };
 

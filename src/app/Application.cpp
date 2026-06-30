@@ -1,4 +1,6 @@
 #include "Application.h"
+#include "OscRemoteServer.h"
+#include "QLabClient.h"
 #include "ui/MainWindow.h"
 #include "core/AppLogger.h"
 #include "core/ConnectionLogBridge.h"
@@ -58,6 +60,12 @@ Application::Application(QObject* parent) : QObject(parent) {
     m_discoveryService->registerStrategy(std::make_shared<BehringerWingProbeStrategy>());
     m_discoveryService->registerStrategy(std::make_shared<YamahaOscProbeStrategy>());
 
+    // inbound OSC remote control (QLab / stage-manager)
+    m_oscRemoteServer = new OscRemoteServer(this);
+
+    // outbound QLab / DAW remote
+    m_qLabClient = new QLabClient(this);
+
     // application logging
     m_appLogger = new AppLogger(this);
     m_connectionLogBridge = new ConnectionLogBridge(m_appLogger, this);
@@ -83,6 +91,7 @@ Application::~Application() {
 void Application::initialize() {
     m_playbackEngine->setCueList(m_show->cueList());
     m_playbackEngine->setDCAMapping(m_show->dcaMapping());
+    m_playbackEngine->setActorLibrary(m_show->actorProfileLibrary());
 
     if (m_mixer) {
         m_playbackEngine->setMixer(m_mixer);
@@ -91,6 +100,18 @@ void Application::initialize() {
     m_playbackEngine->setValidator(m_cueValidator);
     m_playbackEngine->setGuard(m_playbackGuard);
     m_playbackEngine->setLogger(m_playbackLogger);
+    m_playbackEngine->setVerifyCues(true);
+
+    connect(m_playbackEngine, &PlaybackEngine::cueDrifted, this,
+            [this](int index, const QStringList& paths) {
+                if (m_appLogger) {
+                    m_appLogger->log(LogLevel::Warning, LogSource::Playback,
+                                     QString("Cue %1 drift on %2 parameter(s): %3")
+                                         .arg(index)
+                                         .arg(paths.size())
+                                         .arg(paths.join(", ")));
+                }
+            });
 
     m_dryRunEngine->setCueList(m_show->cueList());
     m_dryRunEngine->setValidator(m_cueValidator);
@@ -131,6 +152,34 @@ void Application::initialize() {
     m_midiInputManager->setPlaybackEngine(m_playbackEngine);
     m_midiInputManager->setPlaybackGuard(m_playbackGuard);
     m_midiInputManager->loadFromSettings();
+
+    // inbound OSC remote control: /cue/go, /ctrl/fadeall, next/prev/goto
+    m_oscRemoteServer->setPlaybackEngine(m_playbackEngine);
+    connect(m_oscRemoteServer, &OscRemoteServer::fadeAllRequested, this, [this]() {
+        if (m_playbackGuard)
+            m_playbackGuard->panic();
+    });
+    m_oscRemoteServer->loadFromSettings();
+    if (m_oscRemoteServer->start(m_oscRemoteServer->port())) {
+        m_appLogger->log(LogLevel::Info, LogSource::System,
+                         QString("OSC remote control listening on port %1")
+                             .arg(m_oscRemoteServer->port()));
+    } else {
+        m_appLogger->log(LogLevel::Warning, LogSource::System,
+                         QString("OSC remote control could not bind port %1")
+                             .arg(m_oscRemoteServer->port()));
+    }
+
+    // outbound QLab/DAW remote: fire a linked QLab cue when a cue executes
+    m_qLabClient->loadFromSettings();
+    connect(m_playbackEngine, &PlaybackEngine::cueExecuted, this, [this](int index) {
+        if (!m_qLabClient->isEnabled() || index < 0 || !m_show->cueList() ||
+            index >= m_show->cueList()->count())
+            return;
+        const Cue& cue = m_show->cueList()->at(index);
+        if (!cue.qLabCue().isEmpty())
+            m_qLabClient->triggerCue(cue.qLabCue());
+    });
 }
 
 void Application::setupMixerConnection(const QString& type, const QString& host, int port) {

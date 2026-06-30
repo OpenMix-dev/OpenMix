@@ -39,9 +39,29 @@ class MixerProtocol : public QObject {
 
     virtual void recallSnapshot(const Cue& cue) = 0;
     virtual void recallScene(int sceneNumber) = 0;
+
+    // semantic per-channel setters used by actor-voice recall and timed fades.
+    // Default to no-op so drivers opt in; network OSC drivers (X32/Wing) override.
+    // channel is 1-based; level is normalized 0..1; other units are real-world
+    // (dB, Hz, ms) and the driver scales them to the console wire format.
+    virtual void setChannelFader(int channel, double level);
+    virtual void setChannelMute(int channel, bool muted);
+    virtual void setChannelPreamp(int channel, double gainDb);
+    virtual void setChannelHpf(int channel, bool on, double freqHz);
+    virtual void setChannelEqOn(int channel, bool on);
+    virtual void setChannelEqBand(int channel, int band, bool on, int type, double freqHz,
+                                  double gainDb, double q);
+    virtual void setChannelDynamics(int channel, bool on, double thresholdDb, double ratio,
+                                    double attackMs, double releaseMs, double makeupDb);
+
     virtual void refresh() = 0;
     virtual int latencyMs() const = 0;
     virtual const MixerCapabilities& capabilities() const;
+
+    // true if the driver can read parameter values back from the console (so cue
+    // landing can be verified). Send-only drivers (e.g. Allen & Heath MIDI/ACE)
+    // return false and are treated as "assumed landed" rather than drifted.
+    [[nodiscard]] virtual bool supportsParameterFeedback() const { return false; }
 
   signals:
     void connected();

@@ -190,6 +190,10 @@ QJsonObject Cue::toJson() const {
     json["autoFollow"] = m_autoFollow;
     json["autoFollowDelay"] = m_autoFollowDelay;
     json["autoFollowCondition"] = autoFollowConditionToString(m_autoFollowCondition);
+    if (m_fadeTime > 0.0) {
+        json["fadeTime"] = m_fadeTime;
+        json["fadeCurve"] = fadeCurveToString(m_fadeCurve);
+    }
     json["parameters"] = m_parameters;
 
     // DCA targeting
@@ -258,12 +262,33 @@ QJsonObject Cue::toJson() const {
     if (!m_group.isEmpty()) {
         json["group"] = m_group;
     }
+    if (!m_qLabCue.isEmpty()) {
+        json["qLabCue"] = m_qLabCue;
+    }
     if (!m_tags.isEmpty()) {
         QJsonArray tagsArray;
         for (const QString& tag : m_tags) {
             tagsArray.append(tag);
         }
         json["tags"] = tagsArray;
+    }
+
+    // per-channel actor-profile slots: { "<channel>": "<slot>" }
+    if (!m_channelProfiles.isEmpty()) {
+        QJsonObject profilesObj;
+        for (auto it = m_channelProfiles.constBegin(); it != m_channelProfiles.constEnd(); ++it) {
+            profilesObj[QString::number(it.key())] = it.value();
+        }
+        json["channelProfiles"] = profilesObj;
+    }
+
+    // per-channel level overrides: { "<channel>": level }
+    if (!m_channelLevels.isEmpty()) {
+        QJsonObject levelsObj;
+        for (auto it = m_channelLevels.constBegin(); it != m_channelLevels.constEnd(); ++it) {
+            levelsObj[QString::number(it.key())] = it.value();
+        }
+        json["channelLevels"] = levelsObj;
     }
 
     return json;
@@ -282,6 +307,8 @@ Cue Cue::fromJson(const QJsonObject& json) {
     cue.m_autoFollow = json["autoFollow"].toBool();
     cue.m_autoFollowDelay = json["autoFollowDelay"].toDouble();
     cue.m_autoFollowCondition = stringToAutoFollowCondition(json["autoFollowCondition"].toString());
+    cue.m_fadeTime = json["fadeTime"].toDouble(0.0);
+    cue.m_fadeCurve = stringToFadeCurve(json["fadeCurve"].toString());
     cue.m_parameters = json["parameters"].toObject();
 
     // DCA targeting
@@ -347,10 +374,27 @@ Cue Cue::fromJson(const QJsonObject& json) {
     cue.m_stopBehavior = stringToStopBehavior(json["stopBehavior"].toString());
 
     cue.m_group = json["group"].toString();
+    cue.m_qLabCue = json["qLabCue"].toString();
     if (json.contains("tags")) {
         QJsonArray tagsArray = json["tags"].toArray();
         for (const QJsonValue& val : tagsArray) {
             cue.m_tags.append(val.toString());
+        }
+    }
+
+    // per-channel actor-profile slots
+    if (json.contains("channelProfiles")) {
+        const QJsonObject profilesObj = json["channelProfiles"].toObject();
+        for (auto it = profilesObj.constBegin(); it != profilesObj.constEnd(); ++it) {
+            cue.m_channelProfiles[it.key().toInt()] = it.value().toString();
+        }
+    }
+
+    // per-channel level overrides
+    if (json.contains("channelLevels")) {
+        const QJsonObject levelsObj = json["channelLevels"].toObject();
+        for (auto it = levelsObj.constBegin(); it != levelsObj.constEnd(); ++it) {
+            cue.m_channelLevels[it.key().toInt()] = it.value().toDouble();
         }
     }
 
