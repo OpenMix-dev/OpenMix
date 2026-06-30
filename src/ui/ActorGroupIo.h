@@ -9,8 +9,8 @@
 #include <QStringList>
 
 // Serialization helpers for exchanging actors between shows: "actor values"
-// (the whole cast) and "actor groups" (a named subset), mirroring TheatreMix's
-// import/export and load/save-group actions in its Actor Setup dialog.
+// (the whole cast) and "actor groups" (a named subset), for import/export and
+// load/save-group actions.
 //
 // Header-only and free of any widget/Qt-GUI dependency so it links into headless
 // unit tests. The on-disk format wraps the same per-actor JSON the core model

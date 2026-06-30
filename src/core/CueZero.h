@@ -9,7 +9,7 @@ namespace OpenMix {
 
 class MixerProtocol;
 
-// Cue Zero (TheatreMix): the show's base / reset state. Recalling it returns the
+// Cue Zero: the show's base / reset state. Recalling it returns the
 // console to a known starting point before the first real cue -- an optional
 // base scene plus a set of "level" parameters and "label" (name) parameters.
 // Its parameters double as PlaybackGuard safe-values (what PANIC restores to).

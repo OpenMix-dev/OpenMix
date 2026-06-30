@@ -43,8 +43,8 @@ namespace OpenMix {
 // ---------------------------------------------------------------------------
 // VoiceEditorWidget: edits one VoiceData (a channel "voice"). Every parameter
 // group is gated by a "Set ..." checkbox so the resulting VoiceData only carries
-// the fields the operator actually opted into (matching the optional<> model and
-// TheatreMix's partial-voice semantics). Plain QWidget (no signals) — change
+// the fields the operator actually opted into (matching the optional<> model).
+// Plain QWidget (no signals) — change
 // notification is delivered through the onChanged callback so no moc is needed.
 // ---------------------------------------------------------------------------
 class VoiceEditorWidget : public QWidget {

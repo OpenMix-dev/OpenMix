@@ -70,7 +70,7 @@ Application::Application(QObject* parent) : QObject(parent) {
     // outbound QLab / DAW remote
     m_qLabClient = new QLabClient(this);
 
-    // Phase 5 services
+    // timecode triggers + channel monitor
     m_timecodeTriggers = new TimecodeTriggerList(this);
     m_channelMonitor = new ChannelMonitor(this);
 

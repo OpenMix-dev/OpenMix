@@ -73,7 +73,7 @@ class Application : public QObject {
     // outbound QLab / DAW remote
     [[nodiscard]] QLabClient* qLabClient() { return m_qLabClient; }
 
-    // Phase 5 services
+    // timecode triggers + channel monitor
     [[nodiscard]] TimecodeTriggerList* timecodeTriggers() { return m_timecodeTriggers; }
     [[nodiscard]] ChannelMonitor* channelMonitor() { return m_channelMonitor; }
 
@@ -139,7 +139,7 @@ class Application : public QObject {
     // outbound QLab / DAW remote
     QLabClient* m_qLabClient;
 
-    // Phase 5: timecode-triggered cues + channel silence/clip monitoring
+    // timecode-triggered cues + channel silence/clip monitoring
     TimecodeTriggerList* m_timecodeTriggers;
     ChannelMonitor* m_channelMonitor;
 };

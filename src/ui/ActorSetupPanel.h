@@ -19,7 +19,7 @@ class Actor;
 class ActorProfileLibrary;
 class VoiceEditorWidget;
 
-// Cast-management panel mirroring TheatreMix's Actor Setup dialog: an actor tree
+// Cast-management panel: an actor tree
 // with add/remove/move controls, a per-actor voice editor (gain/HPF/EQ/dynamics)
 // for each profile slot plus the spare-mic backup voice, profile-slot management,
 // a backup-channel toggle, copy/paste/import/export of actor values, and

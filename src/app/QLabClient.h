@@ -7,8 +7,7 @@
 namespace OpenMix {
 
 // Outbound DAW remote: fires cues in QLab (or any OSC-controllable playback app)
-// when an OpenMix cue carrying a linked QLab cue id is executed. Mirrors
-// TheatreMix's dawRemote / qLabCue feature, including an optional pre-roll delay.
+// when a cue carrying a linked QLab cue id is executed, with an optional pre-roll.
 class QLabClient : public QObject {
     Q_OBJECT
 

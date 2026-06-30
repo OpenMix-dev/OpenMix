@@ -10,7 +10,7 @@
 
 namespace OpenMix {
 
-// A named spatial position (TheatreMix "positions"): a reusable pan/delay
+// A named spatial position: a reusable pan/delay
 // preset that a cue can assign to one or more input channels so an actor's
 // voice images to a consistent place in the room.
 class Position {

@@ -13,7 +13,7 @@ namespace OpenMix {
 // Yamaha SCP (Remote Control Protocol) driver.
 //
 // ASCII line protocol over TCP port 49280, used by CL / QL / Rivage / DM7
-// consoles (the same transport TheatreMix drives).  Commands are LF-terminated
+// consoles.  Commands are LF-terminated
 // text lines:
 //
 //   set <address> <idx1> <idx2> <value>\n

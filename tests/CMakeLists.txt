@@ -226,7 +226,7 @@ if(WIN32)
 endif()
 add_test(NAME YamahaScpTest COMMAND test_yamaha_scp)
 
-# --- Phase 5 backend: positions, cue zero, timecode, channel monitoring ---
+# --- positions, cue zero, timecode, channel monitoring ---
 
 add_executable(test_position
     test_position.cpp

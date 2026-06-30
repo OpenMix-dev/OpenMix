@@ -25,8 +25,8 @@ struct TimecodeTrigger {
 
 // Registry of timecode triggers. Fed incoming timecode via onTimecode() (wire it
 // to MidiInputManager::timecodeChanged); emits triggerFired() with the target cue
-// number as timecode crosses each trigger's point, so the orchestrator can route
-// it to PlaybackEngine (goToNumber + go). TheatreMix's "timecode" cue list.
+// number as timecode crosses each trigger's point, so the caller can route it to
+// PlaybackEngine (goToNumber + go).
 class TimecodeTriggerList : public QObject {
     Q_OBJECT
 

@@ -44,7 +44,7 @@ struct VoiceData {
 };
 
 // An actor's stored voice for one profile slot: the main voice plus a backup copy
-// (spare-mic safe set, mirroring TheatreMix's /backup/* data).
+// (spare-mic safe set).
 class ActorProfile {
   public:
     [[nodiscard]] const VoiceData& main() const { return m_main; }
