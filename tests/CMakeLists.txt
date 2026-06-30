@@ -184,6 +184,20 @@ if(WIN32)
 endif()
 add_test(NAME AllenHeathParsingTest COMMAND test_allenheath_parsing)
 
+add_executable(test_allenheath_midi
+    test_allenheath_midi.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/AllenHeathMidiProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/transport/TcpTransport.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+)
+target_link_libraries(test_allenheath_midi PRIVATE Qt6::Core Qt6::Network Qt6::Test)
+target_include_directories(test_allenheath_midi PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME AllenHeathMidiTest COMMAND test_allenheath_midi)
+
 add_executable(test_yamaha_scp
     test_yamaha_scp.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/yamaha/YamahaProtocol.cpp
