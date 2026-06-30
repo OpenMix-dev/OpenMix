@@ -12,7 +12,7 @@ class TestCueZero : public QObject {
   private slots:
     void apply_pushesSceneLevelsAndLabels() {
         LoopbackProtocol mixer(MixerCapabilities::forConsole(ConsoleType::Loopback));
-        mixer.connect("", 0); // loopback connects synchronously
+        QVERIFY(mixer.connect("", 0)); // loopback connects synchronously
         QVERIFY(mixer.isConnected());
 
         CueZero cz;
@@ -36,7 +36,7 @@ class TestCueZero : public QObject {
 
     void apply_noSceneWhenBaseSceneUnset() {
         LoopbackProtocol mixer(MixerCapabilities::forConsole(ConsoleType::Loopback));
-        mixer.connect("", 0);
+        QVERIFY(mixer.connect("", 0));
 
         CueZero cz;
         cz.setLevel("/ch/03/mix/fader", 0.8);

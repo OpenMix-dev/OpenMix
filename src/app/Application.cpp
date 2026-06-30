@@ -213,6 +213,10 @@ void Application::setupMixerConnection(const QString& type, const QString& host,
     connect(m_mixer, &MixerProtocol::connected, this, [this]() { emit mixerConnected(); });
     connect(m_mixer, &MixerProtocol::disconnected, this, [this]() { emit mixerDisconnected(); });
 
+    // live console metering -> channel silence/clip monitor
+    connect(m_mixer, &MixerProtocol::channelMeter, m_channelMonitor,
+            [this](int channel, float level) { m_channelMonitor->onLevel(channel, level); });
+
     m_mixer->connect(host, port);
 
     QSettings settings;

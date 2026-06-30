@@ -228,15 +228,21 @@ void WingProtocol::recallScene(int sceneNumber) {
 namespace {
 QString wingChannel(int channel) { return QString("/ch/%1").arg(channel); }
 
-// WING faders carry real-world dB; map a normalized 0..1 level onto the fader
-// taper (raw 0.75 = 0 dB, 1.0 = +10 dB, 0.0 = -inf). Approximate.
+// WING faders carry real-world dB; map a normalized 0..1 level onto the exact
+// X32/WING fader law (piecewise-linear in dB, per the Maillot/WING references):
+//   0.0000-0.0625 -> -inf..-60, 0.0625-0.25 -> -60..-30,
+//   0.25-0.5      -> -30..-10,  0.5-1.0      -> -10..+10  (0.75 = 0 dB).
 float wingFaderDb(double level) {
     level = std::clamp(level, 0.0, 1.0);
     if (level <= 0.0)
-        return -144.0f;
-    if (level >= 0.75)
-        return static_cast<float>((level - 0.75) / 0.25 * 10.0);
-    return static_cast<float>(level / 0.75 * 90.0 - 90.0);
+        return -144.0f; // -inf floor
+    if (level < 0.0625)
+        return static_cast<float>(-60.0 - (0.0625 - level) / 0.0625 * 84.0);
+    if (level < 0.25)
+        return static_cast<float>(level * 160.0 - 70.0);
+    if (level < 0.5)
+        return static_cast<float>(level * 80.0 - 50.0);
+    return static_cast<float>(level * 40.0 - 30.0);
 }
 
 // WING STD EQ exposes named bands l,1,2,3,4,h (not numbered 1..N)

@@ -74,6 +74,10 @@ class MixerProtocol : public QObject {
     void parameterChanged(const QString& path, const QVariant& value);
     void requestTimeout(const QString& path);
 
+    // live input-channel meter level (channel 1-based, level 0..1 linear). Emitted
+    // by drivers that subscribe to console metering; feeds the ChannelMonitor.
+    void channelMeter(int channel, float level);
+
     void latencyChanged(int ms);
     void sceneChanged(int sceneNumber);
 };

@@ -1,9 +1,11 @@
 #include "X32Protocol.h"
 #include "../../core/Cue.h"
 #include <QDateTime>
+#include <QtEndian>
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstring>
 
 namespace OpenMix {
 
@@ -360,6 +362,7 @@ void X32Protocol::onKeepAliveTimeout() {
         }
 
         m_transport.send("/xremote");
+        m_transport.send(QString("/meters"), QString("/meters/1"));
     }
 }
 
@@ -439,6 +442,11 @@ void X32Protocol::processResponse(const QString& path, const QVariant& value) {
         return;
     }
 
+    if (path == "/meters/1") {
+        parseMeters(value.toByteArray());
+        return;
+    }
+
     if (m_pendingRequests.contains(path)) {
         X32PendingRequest req = m_pendingRequests.take(path);
         qint64 roundTrip = now - req.sentTime;
@@ -452,6 +460,25 @@ void X32Protocol::processResponse(const QString& path, const QVariant& value) {
     if (value.isValid()) {
         m_parameterCache[path] = value;
         emit parameterChanged(path, value);
+    }
+}
+
+void X32Protocol::parseMeters(const QByteArray& blob) {
+    // /meters/1 blob content: [uint32 LE count][count * float32 LE], each a
+    // linear input-channel level 0..1. Map the first N to channels 1..N.
+    if (blob.size() < 4)
+        return;
+    const auto* bytes = reinterpret_cast<const uchar*>(blob.constData());
+    const int count = static_cast<int>(qFromLittleEndian<quint32>(bytes));
+    const int maxCh = std::min(count, m_capabilities.inputChannels);
+    for (int i = 0; i < maxCh; ++i) {
+        const int off = 4 + i * 4;
+        if (off + 4 > blob.size())
+            break;
+        const quint32 raw = qFromLittleEndian<quint32>(bytes + off);
+        float level = 0.0f;
+        std::memcpy(&level, &raw, sizeof(float));
+        emit channelMeter(i + 1, level);
     }
 }
 
@@ -469,6 +496,8 @@ void X32Protocol::handleXinfoResponse([[maybe_unused]] const QVariant& value) {
         m_reconnectAttempts = 0;
 
         m_transport.send("/xremote");
+        // subscribe to input-channel meters (bank 1); renewed on keep-alive
+        m_transport.send(QString("/meters"), QString("/meters/1"));
         emit connected();
     }
 }

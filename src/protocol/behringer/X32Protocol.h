@@ -99,6 +99,7 @@ class X32Protocol : public MixerProtocol {
     void startReconnection();
     void updateLatency(qint64 roundTripMs);
     void processResponse(const QString& path, const QVariant& value);
+    void parseMeters(const QByteArray& blob);
 
     MixerCapabilities m_capabilities;
     OscTransport m_transport;
