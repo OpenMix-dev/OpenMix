@@ -21,6 +21,7 @@ namespace OpenMix {
 class Application;
 class ActorProfileLibrary;
 class Cue;
+class CollapsibleSection;
 
 class CueEditor : public QWidget {
     Q_OBJECT
@@ -115,7 +116,7 @@ class CueEditor : public QWidget {
         QCheckBox* enable;
         QCheckBox* muted;
     };
-    QGroupBox* m_fxMutesGroup = nullptr;
+    CollapsibleSection* m_fxMutesGroup = nullptr;
     QVector<FxMuteWidgets> m_fxMuteWidgets;
 
     // L/R gangs (show-level) + soundcheck (check) mode toggle
@@ -124,16 +125,16 @@ class CueEditor : public QWidget {
 
     // per-channel actor profile slot + level
     ActorProfileLibrary* m_actorLibrary = nullptr;
-    QGroupBox* m_channelProfilesGroup = nullptr;
+    CollapsibleSection* m_channelProfilesGroup = nullptr;
     QTableWidget* m_channelTable = nullptr;
 
     // DCA targeting widgets
-    QGroupBox* m_dcaTargetingGroup;
+    CollapsibleSection* m_dcaTargetingGroup = nullptr;
     QCheckBox* m_targetAllDCAsCheck;
     QVector<QCheckBox*> m_dcaTargetChecks;
 
     // DCA overrides (mute/label per DCA)
-    QGroupBox* m_dcaOverridesGroup;
+    CollapsibleSection* m_dcaOverridesGroup = nullptr;
     struct DCAOverrideWidgets {
         QCheckBox* enableMute;
         QCheckBox* muteValue;

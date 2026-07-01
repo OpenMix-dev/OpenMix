@@ -1,4 +1,5 @@
 #include "CueEditor.h"
+#include "CollapsibleSection.h"
 #include "app/Application.h"
 #include "core/Actor.h"
 #include "core/ActorProfileLibrary.h"
@@ -55,22 +56,6 @@ CueEditor::CueEditor(Application* app, QWidget* parent) : QWidget(parent), m_app
     updateGangsUI();
 }
 
-namespace {
-// Turn a group box into a collapsible section: the title checkbox hides the
-// body so a long editor pane stays compact. Secondary sections start collapsed.
-void makeCollapsible(QGroupBox* box, bool collapsed) {
-    box->setCheckable(true);
-    box->setChecked(!collapsed);
-    auto applyBody = [box](bool open) {
-        const auto kids = box->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly);
-        for (QWidget* w : kids)
-            w->setVisible(open);
-    };
-    applyBody(!collapsed);
-    QObject::connect(box, &QGroupBox::toggled, box, [applyBody](bool on) { applyBody(on); });
-}
-} // namespace
-
 void CueEditor::setupUi() {
     setMinimumWidth(280);
     setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
@@ -81,8 +66,8 @@ void CueEditor::setupUi() {
     m_mainLayout = new QVBoxLayout(content);
 
     // basic properties group
-    QGroupBox* basicGroup = new QGroupBox(tr("Cue Properties"), this);
-    QFormLayout* basicLayout = new QFormLayout(basicGroup);
+    auto* basicGroup = new CollapsibleSection(tr("Cue Properties"), this);
+    QFormLayout* basicLayout = new QFormLayout();
 
     m_numberSpin = new QDoubleSpinBox(this);
     m_numberSpin->setRange(0.0, 9999.9);
@@ -114,12 +99,13 @@ void CueEditor::setupUi() {
     m_skipCheck = new QCheckBox(tr("Skip on standby advance"), this);
     basicLayout->addRow(tr("Skip:"), m_skipCheck);
 
-    makeCollapsible(basicGroup, false); // primary info stays open
+    basicGroup->setContentLayout(basicLayout);
+    basicGroup->setExpanded(true); // primary info stays open
     m_mainLayout->addWidget(basicGroup);
 
     // timing group
-    QGroupBox* timingGroup = new QGroupBox(tr("Auto-Follow"), this);
-    QFormLayout* timingLayout = new QFormLayout(timingGroup);
+    auto* timingGroup = new CollapsibleSection(tr("Auto-Follow"), this);
+    QFormLayout* timingLayout = new QFormLayout();
 
     m_autoFollowCheck = new QCheckBox(tr("Enable"), this);
     timingLayout->addRow(tr("Auto-follow:"), m_autoFollowCheck);
@@ -132,12 +118,12 @@ void CueEditor::setupUi() {
     m_autoFollowDelaySpin->setEnabled(false);
     timingLayout->addRow(tr("Delay:"), m_autoFollowDelaySpin);
 
-    makeCollapsible(timingGroup, true);
+    timingGroup->setContentLayout(timingLayout);
     m_mainLayout->addWidget(timingGroup);
 
     // fade transition group
-    QGroupBox* fadeGroup = new QGroupBox(tr("Fade Transition"), this);
-    QFormLayout* fadeLayout = new QFormLayout(fadeGroup);
+    auto* fadeGroup = new CollapsibleSection(tr("Fade Transition"), this);
+    QFormLayout* fadeLayout = new QFormLayout();
 
     m_fadeTimeSpin = new QDoubleSpinBox(this);
     m_fadeTimeSpin->setRange(0.0, 600.0);
@@ -154,17 +140,16 @@ void CueEditor::setupUi() {
     m_fadeCurveCombo->addItem(tr("Ease Out"), static_cast<int>(FadeCurve::EaseOut));
     fadeLayout->addRow(tr("Curve:"), m_fadeCurveCombo);
 
-    makeCollapsible(fadeGroup, true);
+    fadeGroup->setContentLayout(fadeLayout);
     m_mainLayout->addWidget(fadeGroup);
 
     // DCA targeting section
     createDCATargetingSection();
-    makeCollapsible(m_dcaTargetingGroup, true);
     m_mainLayout->addWidget(m_dcaTargetingGroup);
 
     // DCA overrides section
-    m_dcaOverridesGroup = new QGroupBox(tr("DCA Overrides (Mute/Label)"), this);
-    QVBoxLayout* overridesLayout = new QVBoxLayout(m_dcaOverridesGroup);
+    m_dcaOverridesGroup = new CollapsibleSection(tr("DCA Overrides (Mute/Label)"), this);
+    QVBoxLayout* overridesLayout = new QVBoxLayout();
 
     // no inner scroll here: the whole editor is already scrollable, so let the
     // overrides expand inline rather than nesting a second scrollbar
@@ -219,32 +204,30 @@ void CueEditor::setupUi() {
     overridesContentLayout->addStretch();
     overridesLayout->addWidget(overridesContent);
 
-    makeCollapsible(m_dcaOverridesGroup, true);
+    m_dcaOverridesGroup->setContentLayout(overridesLayout);
     m_mainLayout->addWidget(m_dcaOverridesGroup);
 
     // per-channel actor profile + level
     createChannelProfilesSection();
-    makeCollapsible(m_channelProfilesGroup, true);
     m_mainLayout->addWidget(m_channelProfilesGroup);
 
     // per-FX-unit mutes + console snippets
     createFxMutesSection();
-    makeCollapsible(m_fxMutesGroup, true);
     m_mainLayout->addWidget(m_fxMutesGroup);
 
     // linked QLab (DAW remote) cue
-    QGroupBox* qlabGroup = new QGroupBox(tr("QLab / DAW Remote"), this);
-    QFormLayout* qlabLayout = new QFormLayout(qlabGroup);
+    auto* qlabGroup = new CollapsibleSection(tr("QLab / DAW Remote"), this);
+    QFormLayout* qlabLayout = new QFormLayout();
     m_qLabCueEdit = new QLineEdit(this);
     m_qLabCueEdit->setPlaceholderText(tr("QLab cue number / id"));
     m_qLabCueEdit->setToolTip(tr("Fire this QLab cue when the OpenMix cue executes"));
     qlabLayout->addRow(tr("QLab cue:"), m_qLabCueEdit);
-    makeCollapsible(qlabGroup, true);
+    qlabGroup->setContentLayout(qlabLayout);
     m_mainLayout->addWidget(qlabGroup);
 
     // L/R gangs (show-level) + soundcheck (check) mode toggle
-    QGroupBox* rehearsalGroup = new QGroupBox(tr("Gangs && Rehearsal"), this);
-    QFormLayout* rehearsalLayout = new QFormLayout(rehearsalGroup);
+    auto* rehearsalGroup = new CollapsibleSection(tr("Gangs && Rehearsal"), this);
+    QFormLayout* rehearsalLayout = new QFormLayout();
     m_gangEdit = new QLineEdit(rehearsalGroup);
     m_gangEdit->setPlaceholderText(tr("L/R pairs, e.g. 1-2, 3-4"));
     m_gangEdit->setToolTip(tr("Ganged channel pairs; a level on one mirrors to its partner"));
@@ -252,19 +235,19 @@ void CueEditor::setupUi() {
     m_checkModeCheck =
         new QCheckBox(tr("Soundcheck mode (GO holds on current cue)"), rehearsalGroup);
     rehearsalLayout->addRow(tr("Rehearsal:"), m_checkModeCheck);
-    makeCollapsible(rehearsalGroup, true);
+    rehearsalGroup->setContentLayout(rehearsalLayout);
     m_mainLayout->addWidget(rehearsalGroup);
 
     // notes group
-    QGroupBox* notesGroup = new QGroupBox(tr("Notes"), this);
-    QVBoxLayout* notesLayout = new QVBoxLayout(notesGroup);
+    auto* notesGroup = new CollapsibleSection(tr("Notes"), this);
+    QVBoxLayout* notesLayout = new QVBoxLayout();
 
     m_notesEdit = new QTextEdit(this);
     m_notesEdit->setPlaceholderText(tr("Enter cue notes..."));
     m_notesEdit->setMaximumHeight(120);
     notesLayout->addWidget(m_notesEdit);
 
-    makeCollapsible(notesGroup, true);
+    notesGroup->setContentLayout(notesLayout);
     m_mainLayout->addWidget(notesGroup);
 
     m_mainLayout->addStretch();
@@ -305,8 +288,8 @@ void CueEditor::setupUi() {
 }
 
 void CueEditor::createFxMutesSection() {
-    m_fxMutesGroup = new QGroupBox(tr("FX Mutes && Snippets"), this);
-    QVBoxLayout* layout = new QVBoxLayout(m_fxMutesGroup);
+    m_fxMutesGroup = new CollapsibleSection(tr("FX Mutes && Snippets"), this);
+    QVBoxLayout* layout = new QVBoxLayout();
     layout->setContentsMargins(4, 4, 4, 4);
 
     QFormLayout* snippetForm = new QFormLayout();
@@ -343,11 +326,12 @@ void CueEditor::createFxMutesSection() {
         m_fxMuteWidgets.append(widgets);
     }
     layout->addLayout(grid);
+    m_fxMutesGroup->setContentLayout(layout);
 }
 
 void CueEditor::createChannelProfilesSection() {
-    m_channelProfilesGroup = new QGroupBox(tr("Channel Profiles && Levels"), this);
-    QVBoxLayout* layout = new QVBoxLayout(m_channelProfilesGroup);
+    m_channelProfilesGroup = new CollapsibleSection(tr("Channel Profiles && Levels"), this);
+    QVBoxLayout* layout = new QVBoxLayout();
     layout->setContentsMargins(4, 4, 4, 4);
 
     QLabel* hint = new QLabel(
@@ -366,6 +350,7 @@ void CueEditor::createChannelProfilesSection() {
     m_channelTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_channelTable->setMaximumHeight(340);
     layout->addWidget(m_channelTable);
+    m_channelProfilesGroup->setContentLayout(layout);
 }
 
 void CueEditor::addBottomWidget(QWidget* widget) {
@@ -375,8 +360,8 @@ void CueEditor::addBottomWidget(QWidget* widget) {
 }
 
 void CueEditor::createDCATargetingSection() {
-    m_dcaTargetingGroup = new QGroupBox(tr("Target DCAs"), this);
-    QVBoxLayout* layout = new QVBoxLayout(m_dcaTargetingGroup);
+    m_dcaTargetingGroup = new CollapsibleSection(tr("Target DCAs"), this);
+    QVBoxLayout* layout = new QVBoxLayout();
 
     m_targetAllDCAsCheck = new QCheckBox(tr("Target All DCAs"), this);
     m_targetAllDCAsCheck->setChecked(true);
@@ -423,6 +408,8 @@ void CueEditor::createDCATargetingSection() {
         }
         onTargetedDCAsChanged();
     });
+
+    m_dcaTargetingGroup->setContentLayout(layout);
 }
 
 bool CueEditor::hasFocus() const { return m_nameEdit->hasFocus() || m_notesEdit->hasFocus(); }

@@ -116,6 +116,7 @@ set(SOURCES
     src/ui/MainWindow.cpp
     src/ui/CueListView.cpp
     src/ui/CueEditor.cpp
+    src/ui/CollapsibleSection.cpp
     src/ui/ConnectionPanel.cpp
     src/ui/CueTableModel.cpp
     src/ui/CueFilterProxyModel.cpp
@@ -232,6 +233,7 @@ set(HEADERS
     src/ui/MainWindow.h
     src/ui/CueListView.h
     src/ui/CueEditor.h
+    src/ui/CollapsibleSection.h
     src/ui/ConnectionPanel.h
     src/ui/CueTableModel.h
     src/ui/CueFilterProxyModel.h
