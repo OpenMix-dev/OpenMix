@@ -50,6 +50,7 @@ class MainWindow : public QMainWindow {
     void saveShow();
     void saveShowAs();
     void exportNotes();
+    void discardNotes();
 
     // edit menu actions
     void addCue();
@@ -172,6 +173,7 @@ class MainWindow : public QMainWindow {
     QAction* m_saveAction;
     QAction* m_saveAsAction;
     QAction* m_exportNotesAction;
+    QAction* m_discardNotesAction;
     QAction* m_exitAction;
 
     // edit actions

@@ -135,6 +135,10 @@ void MainWindow::createActions() {
     m_exportNotesAction->setToolTip(tr("Export cue notes to a text file"));
     connect(m_exportNotesAction, &QAction::triggered, this, &MainWindow::exportNotes);
 
+    m_discardNotesAction = new QAction(tr("&Discard Notes"), this);
+    m_discardNotesAction->setToolTip(tr("Clear the notes from every cue"));
+    connect(m_discardNotesAction, &QAction::triggered, this, &MainWindow::discardNotes);
+
     m_exitAction = new QAction(Icons::appExit(), tr("E&xit"), this);
     m_exitAction->setShortcut(QKeySequence::Quit);
     m_exitAction->setToolTip(tr("Exit the application"));
@@ -442,6 +446,7 @@ void MainWindow::createMenus() {
     m_fileMenu->addAction(m_saveAsAction);
     m_fileMenu->addSeparator();
     m_fileMenu->addAction(m_exportNotesAction);
+    m_fileMenu->addAction(m_discardNotesAction);
     m_fileMenu->addSeparator();
     m_fileMenu->addAction(m_exitAction);
 
@@ -1389,6 +1394,23 @@ void MainWindow::showEditHistoryDialog() {
 void MainWindow::showChannelUtilizationDialog() {
     ChannelUtilizationDialog dialog(m_app, this);
     dialog.exec();
+}
+
+void MainWindow::discardNotes() {
+    if (QMessageBox::question(this, tr("Discard Notes"),
+                              tr("Clear the notes from every cue? This cannot be undone.")) !=
+        QMessageBox::Yes)
+        return;
+
+    CueList* list = m_app->show()->cueList();
+    for (int i = 0; i < list->count(); ++i) {
+        if (list->at(i).notes().isEmpty())
+            continue;
+        Cue cue = list->at(i);
+        cue.setNotes(QString());
+        list->updateCue(i, cue);
+    }
+    m_cueEditor->setCue(m_cueListView->selectedCueIndex());
 }
 
 void MainWindow::exportNotes() {
