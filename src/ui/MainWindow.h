@@ -94,6 +94,7 @@ class MainWindow : public QMainWindow {
     void showRemoteControlDialog();
     void showKeyboardShortcutsDialog();
     void showSettingsDialog();
+    void showFxSetupDialog();
     void showLogViewerDialog();
     void showEditHistoryDialog();
     void exportCuesToCsv();
@@ -219,6 +220,7 @@ class MainWindow : public QMainWindow {
     QAction* m_midiControllerAction;
     QAction* m_remoteControlAction;
     QAction* m_appSettingsAction;
+    QAction* m_fxSetupAction;
 
     // help actions
     QAction* m_aboutAction;

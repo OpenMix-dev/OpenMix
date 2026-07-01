@@ -6,6 +6,7 @@
 #include "CueEditor.h"
 #include "ActiveCueInfoPanel.h"
 #include "AllocateSpareDialog.h"
+#include "FxSetupDialog.h"
 #include "ChannelUtilisationDialog.h"
 #include "CueListView.h"
 #include "CueTableModel.h"
@@ -347,6 +348,10 @@ void MainWindow::createActions() {
         tr("Console behavior, scribble highlight, channel monitor, and QLab settings"));
     connect(m_appSettingsAction, &QAction::triggered, this, &MainWindow::showSettingsDialog);
 
+    m_fxSetupAction = new QAction(tr("&FX Setup..."), this);
+    m_fxSetupAction->setToolTip(tr("Manage FX units and channel assignments"));
+    connect(m_fxSetupAction, &QAction::triggered, this, &MainWindow::showFxSetupDialog);
+
     // help actions
     m_aboutAction = new QAction(tr("&About OpenMix"), this);
     m_aboutAction->setToolTip(tr("About this application"));
@@ -519,6 +524,7 @@ void MainWindow::createMenus() {
     m_settingsMenu->addAction(m_midiControllerAction);
     m_settingsMenu->addAction(m_remoteControlAction);
     m_settingsMenu->addSeparator();
+    m_settingsMenu->addAction(m_fxSetupAction);
     m_settingsMenu->addAction(m_appSettingsAction);
 
     m_helpMenu = menuBar()->addMenu(tr("&Help"));
@@ -1240,6 +1246,11 @@ void MainWindow::showKeyboardShortcutsDialog() {
 
 void MainWindow::showLogViewerDialog() {
     LogViewerDialog dialog(m_app->appLogger(), this);
+    dialog.exec();
+}
+
+void MainWindow::showFxSetupDialog() {
+    FxSetupDialog dialog(m_app, this);
     dialog.exec();
 }
 
