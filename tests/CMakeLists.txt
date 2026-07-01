@@ -30,6 +30,7 @@ add_test(NAME CueListTest COMMAND test_cuelist)
 add_executable(test_show
     test_show.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/SpareBackup.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
@@ -58,6 +59,7 @@ add_executable(test_actor_profiles
     ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/SpareBackup.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Ensemble.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueZero.cpp
@@ -286,6 +288,7 @@ add_executable(test_ensembles
     test_ensembles.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Ensemble.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/SpareBackup.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
@@ -323,6 +326,7 @@ add_executable(test_show_control
     ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/SpareBackup.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueValidator.cpp
     ${CMAKE_SOURCE_DIR}/src/core/PlaybackGuard.cpp
@@ -352,6 +356,7 @@ add_executable(test_tmix_import
     ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/SpareBackup.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
     ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
@@ -376,6 +381,7 @@ add_executable(test_channel_utilisation
     ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/SpareBackup.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
     ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
@@ -392,3 +398,16 @@ target_include_directories(test_channel_utilisation PRIVATE
     ${CMAKE_SOURCE_DIR}/src
 )
 add_test(NAME ChannelUtilisationTest COMMAND test_channel_utilisation)
+
+add_executable(test_spare_backup
+    test_spare_backup.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/SpareBackup.cpp
+)
+target_link_libraries(test_spare_backup PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+target_include_directories(test_spare_backup PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
+add_test(NAME SpareBackupTest COMMAND test_spare_backup)

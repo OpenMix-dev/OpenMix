@@ -84,6 +84,7 @@ set(SOURCES
     src/core/Cue.cpp
     src/core/CueList.cpp
     src/core/Show.cpp
+    src/core/SpareBackup.cpp
     src/core/PlaybackEngine.cpp
     src/core/UndoCommands.cpp
     src/core/CueValidator.cpp
@@ -186,6 +187,7 @@ set(HEADERS
     src/core/Cue.h
     src/core/CueList.h
     src/core/Show.h
+    src/core/SpareBackup.h
     src/core/PlaybackEngine.h
     src/core/UndoCommands.h
     src/core/CueValidator.h

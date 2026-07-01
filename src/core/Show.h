@@ -6,6 +6,7 @@
 #include "DCAMapping.h"
 #include "Ensemble.h"
 #include "Position.h"
+#include "SpareBackup.h"
 #include <QJsonObject>
 #include <QList>
 #include <QObject>
@@ -74,6 +75,9 @@ class Show : public QObject {
     [[nodiscard]] CueZero* cueZero() { return &m_cueZero; }
     [[nodiscard]] const CueZero* cueZero() const { return &m_cueZero; }
 
+    [[nodiscard]] SpareBackup* spareBackup() { return &m_spareBackup; }
+    [[nodiscard]] const SpareBackup* spareBackup() const { return &m_spareBackup; }
+
     // recall the show's Cue Zero base state onto a connected mixer
     void applyCueZero(MixerProtocol* mixer) const { m_cueZero.apply(mixer); }
 
@@ -140,6 +144,7 @@ class Show : public QObject {
     PositionLibrary m_positionLibrary;
     EnsembleLibrary m_ensembleLibrary;
     CueZero m_cueZero;
+    SpareBackup m_spareBackup;
     bool m_isDirty = false;
 };
 
