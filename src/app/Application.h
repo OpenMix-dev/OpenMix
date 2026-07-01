@@ -16,7 +16,6 @@ class PlaybackGuard;
 class PlaybackLogger;
 class DryRunEngine;
 class ShortcutManager;
-class OperationModeManager;
 class CrashRecovery;
 class MidiInputManager;
 class ConsoleDiscoveryService;
@@ -54,7 +53,6 @@ class Application : public QObject {
 
     // operator experience
     [[nodiscard]] ShortcutManager* shortcutManager() { return m_shortcutManager; }
-    [[nodiscard]] OperationModeManager* operationModeManager() { return m_operationModeManager; }
 
     // recovery
     [[nodiscard]] CrashRecovery* crashRecovery() { return m_crashRecovery; }
@@ -122,7 +120,6 @@ class Application : public QObject {
 
     // operator experience
     ShortcutManager* m_shortcutManager;
-    OperationModeManager* m_operationModeManager;
 
     // recovery
     CrashRecovery* m_crashRecovery;

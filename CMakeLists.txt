@@ -95,7 +95,6 @@ set(SOURCES
     src/core/PlaybackLogger.cpp
     src/core/DryRunEngine.cpp
     src/core/ShortcutManager.cpp
-    src/core/OperationMode.cpp
     src/core/DCAMapping.cpp
     src/core/ActorProfile.cpp
     src/core/Actor.cpp
@@ -204,7 +203,6 @@ set(HEADERS
     src/core/PlaybackLogger.h
     src/core/DryRunEngine.h
     src/core/ShortcutManager.h
-    src/core/OperationMode.h
     src/core/DCAMapping.h
     src/core/ActorProfile.h
     src/core/Actor.h

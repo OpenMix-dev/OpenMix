@@ -13,7 +13,6 @@
 #include "core/CueValidator.h"
 #include "core/DCAMapping.h"
 #include "core/DryRunEngine.h"
-#include "core/OperationMode.h"
 #include "core/PlaybackEngine.h"
 #include "core/PlaybackGuard.h"
 #include "core/PlaybackLogger.h"
@@ -53,7 +52,6 @@ Application::Application(QObject* parent) : QObject(parent) {
     m_dryRunEngine = new DryRunEngine(this);
 
     m_shortcutManager = new ShortcutManager(this);
-    m_operationModeManager = new OperationModeManager(this);
 
     m_crashRecovery = new CrashRecovery(this);
 
@@ -174,7 +172,6 @@ void Application::initialize() {
     });
 
     m_shortcutManager->loadFromSettings();
-    m_operationModeManager->loadFromSettings();
 
     // MIDI input setup
     m_midiInputManager->setPlaybackEngine(m_playbackEngine);
