@@ -126,6 +126,10 @@ void MainWindow::createActions() {
     m_saveAsAction->setToolTip(tr("Save the show with a new name (Ctrl+Shift+S)"));
     connect(m_saveAsAction, &QAction::triggered, this, &MainWindow::saveShowAs);
 
+    m_exportNotesAction = new QAction(tr("Export &Notes..."), this);
+    m_exportNotesAction->setToolTip(tr("Export cue notes to a text file"));
+    connect(m_exportNotesAction, &QAction::triggered, this, &MainWindow::exportNotes);
+
     m_exitAction = new QAction(Icons::appExit(), tr("E&xit"), this);
     m_exitAction->setShortcut(QKeySequence::Quit);
     m_exitAction->setToolTip(tr("Exit the application"));
@@ -402,6 +406,8 @@ void MainWindow::createMenus() {
     m_fileMenu->addSeparator();
     m_fileMenu->addAction(m_saveAction);
     m_fileMenu->addAction(m_saveAsAction);
+    m_fileMenu->addSeparator();
+    m_fileMenu->addAction(m_exportNotesAction);
     m_fileMenu->addSeparator();
     m_fileMenu->addAction(m_exitAction);
 
@@ -1213,6 +1219,35 @@ void MainWindow::showEditHistoryDialog() {
 void MainWindow::showChannelUtilisationDialog() {
     ChannelUtilisationDialog dialog(m_app, this);
     dialog.exec();
+}
+
+void MainWindow::exportNotes() {
+    QString filePath = QFileDialog::getSaveFileName(this, tr("Export Notes"), QString(),
+                                                    tr("Text Files (*.txt)"));
+    if (filePath.isEmpty())
+        return;
+    if (!filePath.endsWith(".txt", Qt::CaseInsensitive))
+        filePath += ".txt";
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("Error"), tr("Could not write %1").arg(filePath));
+        return;
+    }
+
+    QTextStream out(&file);
+    out << m_app->show()->name() << " - Cue Notes\n\n";
+    const CueList* list = m_app->show()->cueList();
+    for (int i = 0; i < list->count(); ++i) {
+        const Cue& cue = list->at(i);
+        if (cue.notes().isEmpty())
+            continue;
+        out << QString::number(cue.number(), 'f', 2);
+        if (!cue.name().isEmpty())
+            out << " - " << cue.name();
+        out << '\n' << cue.notes() << "\n\n";
+    }
+    file.close();
 }
 
 void MainWindow::exportCuesToCsv() {
