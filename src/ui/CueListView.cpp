@@ -377,6 +377,24 @@ void CueListView::fillDown() {
     selectSourceRow(idx + 1);
 }
 
+void CueListView::cloneOffsets() {
+    int idx = selectedCueIndex();
+    CueList* cueList = m_app->show()->cueList();
+    if (idx < 0 || idx + 1 >= cueList->count())
+        return;
+    const QMap<int, double> levels = cueList->at(idx).channelLevels();
+    if (levels.isEmpty())
+        return;
+
+    Cue oldCue = cueList->at(idx + 1);
+    Cue newCue = oldCue;
+    for (auto it = levels.begin(); it != levels.end(); ++it)
+        newCue.setChannelLevel(it.key(), it.value());
+    m_app->undoStack()->push(new EditCueCommand(cueList, idx + 1, oldCue, newCue));
+    cueList->updateCue(idx + 1, newCue);
+    selectSourceRow(idx + 1);
+}
+
 void CueListView::jumpToSelectedCue() {
     int idx = selectedCueIndex();
     if (idx < 0)

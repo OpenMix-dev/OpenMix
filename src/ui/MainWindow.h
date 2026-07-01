@@ -182,6 +182,7 @@ class MainWindow : public QMainWindow {
     QAction* m_pasteMergeAction;
     QAction* m_pasteSwapAction;
     QAction* m_fillDownAction;
+    QAction* m_cloneOffsetsAction;
     QAction* m_jumpToSelectedAction;
     QAction* m_jumpAction;
     QAction* m_lockEditingAction;

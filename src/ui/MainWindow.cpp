@@ -194,6 +194,11 @@ void MainWindow::createActions() {
     m_fillDownAction->setToolTip(tr("Copy the selected cue's content into the next cue"));
     connect(m_fillDownAction, &QAction::triggered, this, [this]() { m_cueListView->fillDown(); });
 
+    m_cloneOffsetsAction = new QAction(tr("Cl&one Offsets"), this);
+    m_cloneOffsetsAction->setToolTip(tr("Copy the selected cue's level offsets to the next cue"));
+    connect(m_cloneOffsetsAction, &QAction::triggered, this,
+            [this]() { m_cueListView->cloneOffsets(); });
+
     m_jumpToSelectedAction = new QAction(tr("&Jump to Selected Cue"), this);
     m_jumpToSelectedAction->setToolTip(tr("Set the selected cue as standby without firing"));
     connect(m_jumpToSelectedAction, &QAction::triggered, this,
@@ -433,6 +438,7 @@ void MainWindow::createMenus() {
     m_editMenu->addAction(m_pasteMergeAction);
     m_editMenu->addAction(m_pasteSwapAction);
     m_editMenu->addAction(m_fillDownAction);
+    m_editMenu->addAction(m_cloneOffsetsAction);
     m_editMenu->addSeparator();
     m_editMenu->addAction(m_renumberAction);
     m_editMenu->addAction(m_jumpToSelectedAction);
@@ -1068,6 +1074,7 @@ void MainWindow::updateActions() {
     m_pasteMergeAction->setEnabled(editable && hasSelection && m_cueListView->hasClipboardCue());
     m_pasteSwapAction->setEnabled(editable && hasSelection && m_cueListView->hasClipboardCue());
     m_fillDownAction->setEnabled(editable && hasSelection);
+    m_cloneOffsetsAction->setEnabled(editable && hasSelection);
     m_jumpToSelectedAction->setEnabled(hasSelection);
     m_jumpAction->setEnabled(hasCues);
 }
