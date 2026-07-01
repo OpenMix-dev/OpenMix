@@ -5,6 +5,7 @@
 #include "theme/Icons.h"
 
 #include <QDoubleSpinBox>
+#include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -79,9 +80,9 @@ void TimecodePanel::setupUi() {
     connect(m_table, &QTableWidget::cellChanged, this, &TimecodePanel::onCellChanged);
     mainLayout->addWidget(m_table, 1);
 
-    // add-trigger controls
+    // add-trigger controls: timecode spins on one row, cue + Add on the next
     QGroupBox* addGroup = new QGroupBox(tr("Add Trigger"), this);
-    QHBoxLayout* addLayout = new QHBoxLayout(addGroup);
+    QFormLayout* addForm = new QFormLayout(addGroup);
 
     auto makeSpin = [this](int max, const QString& suffix) {
         QSpinBox* spin = new QSpinBox(this);
@@ -94,21 +95,25 @@ void TimecodePanel::setupUi() {
     m_minutesSpin = makeSpin(59, tr("m"));
     m_secondsSpin = makeSpin(59, tr("s"));
     m_framesSpin = makeSpin(29, tr("f"));
-    addLayout->addWidget(m_hoursSpin);
-    addLayout->addWidget(m_minutesSpin);
-    addLayout->addWidget(m_secondsSpin);
-    addLayout->addWidget(m_framesSpin);
+    QHBoxLayout* tcRow = new QHBoxLayout();
+    tcRow->addWidget(m_hoursSpin);
+    tcRow->addWidget(m_minutesSpin);
+    tcRow->addWidget(m_secondsSpin);
+    tcRow->addWidget(m_framesSpin);
+    tcRow->addStretch();
+    addForm->addRow(tr("Timecode:"), tcRow);
 
-    addLayout->addWidget(new QLabel(tr("Cue:"), this));
     m_cueSpin = new QDoubleSpinBox(this);
     m_cueSpin->setRange(0.0, 99999.0);
     m_cueSpin->setDecimals(2);
     m_cueSpin->setSingleStep(1.0);
-    addLayout->addWidget(m_cueSpin);
-
     m_addButton = new QPushButton(Icons::listAdd(), tr("Add"), this);
     connect(m_addButton, &QPushButton::clicked, this, &TimecodePanel::addTrigger);
-    addLayout->addWidget(m_addButton);
+    QHBoxLayout* cueRow = new QHBoxLayout();
+    cueRow->addWidget(m_cueSpin);
+    cueRow->addStretch();
+    cueRow->addWidget(m_addButton);
+    addForm->addRow(tr("Cue:"), cueRow);
 
     mainLayout->addWidget(addGroup);
 

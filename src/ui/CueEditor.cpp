@@ -56,10 +56,13 @@ CueEditor::CueEditor(Application* app, QWidget* parent) : QWidget(parent), m_app
 }
 
 void CueEditor::setupUi() {
-    setMinimumSize(280, 500);
+    setMinimumWidth(280);
     setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
 
-    m_mainLayout = new QVBoxLayout(this);
+    // the editor sections live inside a scroll area so a short pane scrolls
+    // rather than crushing the groups on top of each other
+    QWidget* content = new QWidget(this);
+    m_mainLayout = new QVBoxLayout(content);
 
     // basic properties group
     QGroupBox* basicGroup = new QGroupBox(tr("Cue Properties"), this);
@@ -220,7 +223,7 @@ void CueEditor::setupUi() {
     m_mainLayout->addWidget(qlabGroup);
 
     // L/R gangs (show-level) + soundcheck (check) mode toggle
-    QGroupBox* rehearsalGroup = new QGroupBox(tr("Gangs & Rehearsal"), this);
+    QGroupBox* rehearsalGroup = new QGroupBox(tr("Gangs && Rehearsal"), this);
     QFormLayout* rehearsalLayout = new QFormLayout(rehearsalGroup);
     m_gangEdit = new QLineEdit(rehearsalGroup);
     m_gangEdit->setPlaceholderText(tr("L/R pairs, e.g. 1-2, 3-4"));
@@ -243,6 +246,16 @@ void CueEditor::setupUi() {
     m_mainLayout->addWidget(notesGroup);
 
     m_mainLayout->addStretch();
+
+    QScrollArea* scroll = new QScrollArea(this);
+    scroll->setWidget(content);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+    QVBoxLayout* outerLayout = new QVBoxLayout(this);
+    outerLayout->setContentsMargins(0, 0, 0, 0);
+    outerLayout->addWidget(scroll);
 
     // connect signals
     connect(m_numberSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
@@ -270,7 +283,7 @@ void CueEditor::setupUi() {
 }
 
 void CueEditor::createFxMutesSection() {
-    m_fxMutesGroup = new QGroupBox(tr("FX Mutes & Snippets"), this);
+    m_fxMutesGroup = new QGroupBox(tr("FX Mutes && Snippets"), this);
     QVBoxLayout* layout = new QVBoxLayout(m_fxMutesGroup);
     layout->setContentsMargins(4, 4, 4, 4);
 
@@ -311,7 +324,7 @@ void CueEditor::createFxMutesSection() {
 }
 
 void CueEditor::createChannelProfilesSection() {
-    m_channelProfilesGroup = new QGroupBox(tr("Channel Profiles & Levels"), this);
+    m_channelProfilesGroup = new QGroupBox(tr("Channel Profiles && Levels"), this);
     QVBoxLayout* layout = new QVBoxLayout(m_channelProfilesGroup);
     layout->setContentsMargins(4, 4, 4, 4);
 
@@ -334,10 +347,9 @@ void CueEditor::createChannelProfilesSection() {
 }
 
 void CueEditor::addBottomWidget(QWidget* widget) {
-    if (m_mainLayout && widget) {
-        // insert before stretch
-        m_mainLayout->addWidget(widget);
-    }
+    // add below the scroll area so it stays fixed while the sections scroll
+    if (widget && layout())
+        layout()->addWidget(widget);
 }
 
 void CueEditor::createDCATargetingSection() {
