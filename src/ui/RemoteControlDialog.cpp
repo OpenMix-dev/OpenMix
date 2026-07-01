@@ -4,6 +4,7 @@
 #include "app/CuePlayerClient.h"
 #include "app/QLabClient.h"
 #include "app/ReaperClient.h"
+#include "app/ScsClient.h"
 #include "midi/MidiInputManager.h"
 
 #include <QCheckBox>
@@ -117,6 +118,22 @@ void RemoteControlDialog::setupUi() {
     cpForm->addRow(tr("Port:"), m_cuePlayerPort);
     layout->addWidget(cpBox);
 
+    // --- Show Cue System (SCS) --------------------------------------------
+    auto* scsBox = new QGroupBox(tr("Show Cue System (SCS)"), this);
+    auto* scsForm = new QFormLayout(scsBox);
+    m_scsEnabled = new QCheckBox(tr("Fire SCS GO on cue fire"), scsBox);
+    m_scsHost = new QLineEdit(scsBox);
+    m_scsHost->setPlaceholderText(tr("127.0.0.1"));
+    m_scsPort = new QSpinBox(scsBox);
+    m_scsPort->setRange(1, 65535);
+    m_scsPassword = new QLineEdit(scsBox);
+    m_scsPassword->setPlaceholderText(tr("(optional control password)"));
+    scsForm->addRow(m_scsEnabled);
+    scsForm->addRow(tr("Host:"), m_scsHost);
+    scsForm->addRow(tr("Port:"), m_scsPort);
+    scsForm->addRow(tr("Password:"), m_scsPassword);
+    layout->addWidget(scsBox);
+
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &RemoteControlDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, this, &RemoteControlDialog::reject);
@@ -158,6 +175,13 @@ void RemoteControlDialog::loadValues() {
         m_cuePlayerEnabled->setChecked(cp->isEnabled());
         m_cuePlayerHost->setText(cp->host());
         m_cuePlayerPort->setValue(cp->port());
+    }
+
+    if (ScsClient* scs = m_app->scsClient()) {
+        m_scsEnabled->setChecked(scs->isEnabled());
+        m_scsHost->setText(scs->host());
+        m_scsPort->setValue(scs->port());
+        m_scsPassword->setText(scs->password());
     }
 }
 
@@ -212,6 +236,15 @@ void RemoteControlDialog::applyValues() {
                           : m_cuePlayerHost->text().trimmed(),
                       m_cuePlayerPort->value());
         cp->saveToSettings();
+    }
+
+    if (ScsClient* scs = m_app->scsClient()) {
+        scs->setEnabled(m_scsEnabled->isChecked());
+        scs->setTarget(m_scsHost->text().trimmed().isEmpty() ? QStringLiteral("127.0.0.1")
+                                                             : m_scsHost->text().trimmed(),
+                       m_scsPort->value());
+        scs->setPassword(m_scsPassword->text());
+        scs->saveToSettings();
     }
 }
 

@@ -25,6 +25,7 @@ class OscRemoteServer;
 class QLabClient;
 class ReaperClient;
 class CuePlayerClient;
+class ScsClient;
 class TimecodeTriggerList;
 class ChannelMonitor;
 class ScribbleController;
@@ -75,6 +76,7 @@ class Application : public QObject {
     [[nodiscard]] QLabClient* qLabClient() { return m_qLabClient; }
     [[nodiscard]] ReaperClient* reaperClient() { return m_reaperClient; }
     [[nodiscard]] CuePlayerClient* cuePlayerClient() { return m_cuePlayerClient; }
+    [[nodiscard]] ScsClient* scsClient() { return m_scsClient; }
 
     // timecode triggers + channel monitor
     [[nodiscard]] TimecodeTriggerList* timecodeTriggers() { return m_timecodeTriggers; }
@@ -151,6 +153,7 @@ class Application : public QObject {
     QLabClient* m_qLabClient;
     ReaperClient* m_reaperClient;
     CuePlayerClient* m_cuePlayerClient;
+    ScsClient* m_scsClient;
 
     bool m_recordFadersActive = false;
 

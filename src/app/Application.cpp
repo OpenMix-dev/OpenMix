@@ -1,6 +1,7 @@
 #include "Application.h"
 #include "OscRemoteServer.h"
 #include "CuePlayerClient.h"
+#include "ScsClient.h"
 #include "QLabClient.h"
 #include "ReaperClient.h"
 #include "ui/MainWindow.h"
@@ -73,6 +74,7 @@ Application::Application(QObject* parent) : QObject(parent) {
     m_qLabClient = new QLabClient(this);
     m_reaperClient = new ReaperClient(this);
     m_cuePlayerClient = new CuePlayerClient(this);
+    m_scsClient = new ScsClient(this);
 
     // timecode triggers + channel monitor
     m_timecodeTriggers = new TimecodeTriggerList(this);
@@ -215,6 +217,13 @@ void Application::initialize() {
     connect(m_playbackEngine, &PlaybackEngine::cueExecuted, this, [this](int index) {
         if (m_cuePlayerClient->isEnabled() && index >= 0)
             m_cuePlayerClient->play();
+    });
+
+    // Show Cue System (SCS): fire the master GO on each cue fire
+    m_scsClient->loadFromSettings();
+    connect(m_playbackEngine, &PlaybackEngine::cueExecuted, this, [this](int index) {
+        if (m_scsClient->isEnabled() && index >= 0)
+            m_scsClient->go();
     });
 
     // REAPER virtual sound check: drop/jump a marker on each cue fire

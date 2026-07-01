@@ -58,6 +58,11 @@ class RemoteControlDialog : public QDialog {
     QCheckBox* m_cuePlayerEnabled = nullptr;
     QLineEdit* m_cuePlayerHost = nullptr;
     QSpinBox* m_cuePlayerPort = nullptr;
+
+    QCheckBox* m_scsEnabled = nullptr;
+    QLineEdit* m_scsHost = nullptr;
+    QSpinBox* m_scsPort = nullptr;
+    QLineEdit* m_scsPassword = nullptr;
 };
 
 } // namespace OpenMix

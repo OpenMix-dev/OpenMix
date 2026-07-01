@@ -193,6 +193,14 @@ target_include_directories(test_undo_commands PRIVATE
 )
 add_test(NAME UndoCommandsTest COMMAND test_undo_commands)
 
+add_executable(test_scs_client
+    test_scs_client.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/ScsClient.cpp
+)
+target_link_libraries(test_scs_client PRIVATE Qt6::Core Qt6::Test PkgConfig::LIBLO)
+target_include_directories(test_scs_client PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME ScsClientTest COMMAND test_scs_client)
+
 add_executable(test_digico_protocol
     test_digico_protocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/digico/DiGiCoProtocol.cpp
