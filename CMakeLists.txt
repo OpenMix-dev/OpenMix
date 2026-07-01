@@ -83,6 +83,7 @@ set(SOURCES
     src/app/Application.cpp
     src/app/OscRemoteServer.cpp
     src/app/QLabClient.cpp
+    src/app/ReaperClient.cpp
     src/core/Cue.cpp
     src/core/CueList.cpp
     src/core/Show.cpp
@@ -191,6 +192,7 @@ set(HEADERS
     src/app/Application.h
     src/app/OscRemoteServer.h
     src/app/QLabClient.h
+    src/app/ReaperClient.h
     src/core/Cue.h
     src/core/CueList.h
     src/core/Show.h

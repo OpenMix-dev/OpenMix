@@ -2,6 +2,7 @@
 #include "app/Application.h"
 #include "app/OscRemoteServer.h"
 #include "app/QLabClient.h"
+#include "app/ReaperClient.h"
 #include "midi/MidiInputManager.h"
 
 #include <QCheckBox>
@@ -77,6 +78,25 @@ void RemoteControlDialog::setupUi() {
     qlabForm->addRow(tr("Workspace:"), m_qlabWorkspace);
     layout->addWidget(qlabBox);
 
+    // --- REAPER virtual sound check ---------------------------------------
+    auto* reaperBox = new QGroupBox(tr("REAPER (Virtual Sound Check)"), this);
+    auto* reaperForm = new QFormLayout(reaperBox);
+    m_reaperEnabled = new QCheckBox(tr("Link to REAPER"), reaperBox);
+    m_reaperHost = new QLineEdit(reaperBox);
+    m_reaperHost->setPlaceholderText(tr("REAPER IP address"));
+    m_reaperPort = new QSpinBox(reaperBox);
+    m_reaperPort->setRange(1, 65535);
+    m_reaperRecord = new QCheckBox(tr("Record markers (unchecked jumps to them)"), reaperBox);
+    m_reaperPreRoll = new QSpinBox(reaperBox);
+    m_reaperPreRoll->setRange(0, 60);
+    m_reaperPreRoll->setSuffix(tr(" s"));
+    reaperForm->addRow(m_reaperEnabled);
+    reaperForm->addRow(tr("Host:"), m_reaperHost);
+    reaperForm->addRow(tr("Port:"), m_reaperPort);
+    reaperForm->addRow(m_reaperRecord);
+    reaperForm->addRow(tr("Marker pre-roll:"), m_reaperPreRoll);
+    layout->addWidget(reaperBox);
+
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &RemoteControlDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, this, &RemoteControlDialog::reject);
@@ -102,6 +122,14 @@ void RemoteControlDialog::loadValues() {
         m_qlabPort->setValue(qlab->port());
         m_qlabPreRoll->setValue(qlab->preRollMs());
         m_qlabWorkspace->setText(qlab->workspaceId());
+    }
+
+    if (ReaperClient* reaper = m_app->reaperClient()) {
+        m_reaperEnabled->setChecked(reaper->isEnabled());
+        m_reaperHost->setText(reaper->host());
+        m_reaperPort->setValue(reaper->port());
+        m_reaperRecord->setChecked(reaper->recordMode());
+        m_reaperPreRoll->setValue(reaper->preRollSeconds());
     }
 }
 
@@ -134,6 +162,17 @@ void RemoteControlDialog::applyValues() {
         qlab->setPreRollMs(m_qlabPreRoll->value());
         qlab->setWorkspaceId(m_qlabWorkspace->text().trimmed());
         qlab->saveToSettings();
+    }
+
+    if (ReaperClient* reaper = m_app->reaperClient()) {
+        reaper->setEnabled(m_reaperEnabled->isChecked());
+        reaper->setTarget(m_reaperHost->text().trimmed().isEmpty()
+                              ? QStringLiteral("127.0.0.1")
+                              : m_reaperHost->text().trimmed(),
+                          m_reaperPort->value());
+        reaper->setRecordMode(m_reaperRecord->isChecked());
+        reaper->setPreRollSeconds(m_reaperPreRoll->value());
+        reaper->saveToSettings();
     }
 }
 

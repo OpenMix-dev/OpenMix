@@ -1,6 +1,7 @@
 #include "Application.h"
 #include "OscRemoteServer.h"
 #include "QLabClient.h"
+#include "ReaperClient.h"
 #include "ui/MainWindow.h"
 #include "core/AppLogger.h"
 #include "core/ChannelMonitor.h"
@@ -69,6 +70,7 @@ Application::Application(QObject* parent) : QObject(parent) {
 
     // outbound QLab / DAW remote
     m_qLabClient = new QLabClient(this);
+    m_reaperClient = new ReaperClient(this);
 
     // timecode triggers + channel monitor
     m_timecodeTriggers = new TimecodeTriggerList(this);
@@ -204,6 +206,16 @@ void Application::initialize() {
         const Cue& cue = m_show->cueList()->at(index);
         if (!cue.qLabCue().isEmpty())
             m_qLabClient->triggerCue(cue.qLabCue());
+    });
+
+    // REAPER virtual sound check: drop/jump a marker on each cue fire
+    m_reaperClient->loadFromSettings();
+    connect(m_playbackEngine, &PlaybackEngine::cueExecuted, this, [this](int index) {
+        if (!m_reaperClient->isEnabled() || index < 0 || !m_show->cueList() ||
+            index >= m_show->cueList()->count())
+            return;
+        const Cue& cue = m_show->cueList()->at(index);
+        m_reaperClient->onCueFired(cue.number(), cue.name());
     });
 
     // timecode-triggered cues: incoming MTC -> trigger list -> fire cue by number

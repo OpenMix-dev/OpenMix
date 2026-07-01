@@ -158,6 +158,14 @@ target_link_libraries(test_qlab_client PRIVATE Qt6::Core Qt6::Test PkgConfig::LI
 target_include_directories(test_qlab_client PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME QLabClientTest COMMAND test_qlab_client)
 
+add_executable(test_reaper_client
+    test_reaper_client.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/ReaperClient.cpp
+)
+target_link_libraries(test_reaper_client PRIVATE Qt6::Core Qt6::Test PkgConfig::LIBLO)
+target_include_directories(test_reaper_client PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME ReaperClientTest COMMAND test_reaper_client)
+
 add_executable(test_undo_commands
     test_undo_commands.cpp
     ${CMAKE_SOURCE_DIR}/src/core/UndoCommands.cpp
