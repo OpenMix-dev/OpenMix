@@ -6,6 +6,7 @@
 #include "CueEditor.h"
 #include "ActiveCueInfoPanel.h"
 #include "AllocateSpareDialog.h"
+#include "HelpDialog.h"
 #include "FxSetupDialog.h"
 #include "WelcomeDialog.h"
 #include "ChannelUtilisationDialog.h"
@@ -354,6 +355,14 @@ void MainWindow::createActions() {
     connect(m_fxSetupAction, &QAction::triggered, this, &MainWindow::showFxSetupDialog);
 
     // help actions
+    m_quickStartAction = new QAction(tr("&Quick Start"), this);
+    m_quickStartAction->setToolTip(tr("Get up and running in a few steps"));
+    connect(m_quickStartAction, &QAction::triggered, this, &MainWindow::showQuickStart);
+
+    m_featureGuideAction = new QAction(tr("&Feature Guide"), this);
+    m_featureGuideAction->setToolTip(tr("Tour of the panels and features"));
+    connect(m_featureGuideAction, &QAction::triggered, this, &MainWindow::showFeatureGuide);
+
     m_aboutAction = new QAction(tr("&About OpenMix"), this);
     m_aboutAction->setToolTip(tr("About this application"));
     connect(m_aboutAction, &QAction::triggered, [this]() {
@@ -529,6 +538,9 @@ void MainWindow::createMenus() {
     m_settingsMenu->addAction(m_appSettingsAction);
 
     m_helpMenu = menuBar()->addMenu(tr("&Help"));
+    m_helpMenu->addAction(m_quickStartAction);
+    m_helpMenu->addAction(m_featureGuideAction);
+    m_helpMenu->addSeparator();
     m_helpMenu->addAction(m_aboutAction);
 }
 
@@ -1278,6 +1290,56 @@ void MainWindow::showKeyboardShortcutsDialog() {
 
 void MainWindow::showLogViewerDialog() {
     LogViewerDialog dialog(m_app->appLogger(), this);
+    dialog.exec();
+}
+
+void MainWindow::showQuickStart() {
+    const QString html = tr(
+        "<h2>Quick Start</h2>"
+        "<ol>"
+        "<li><b>Connect your console.</b> Open <i>View &rarr; Connection</i> (F7). Scan for an "
+        "OSC-capable console, or pick the protocol and enter its IP and port, then Connect.</li>"
+        "<li><b>Set up your cast.</b> In <i>View &rarr; Actor Setup</i> (F9) add actors, assign "
+        "each to a channel, and store their voice (gain, HPF, EQ, dynamics) plus a backup "
+        "voice for a spare mic.</li>"
+        "<li><b>Build cues.</b> <i>Edit &rarr; Add Cue</i>, then use the Cue Editor: DCA "
+        "targeting and labels, per-channel profiles, levels and positions, fade time and "
+        "curve, FX mutes and console snippets.</li>"
+        "<li><b>Run the show.</b> Press <b>Space</b> to GO. <b>Up/Down</b> move the standby cue "
+        "without firing; <i>Edit &rarr; Jump to Selected Cue</i> sets standby to any cue.</li>"
+        "<li><b>Stay safe.</b> <b>Shift+Esc</b> panics to the Cue Zero safe values. "
+        "<i>Edit &rarr; Lock Editing</i> prevents accidental edits during a performance.</li>"
+        "</ol>"
+        "<p>Already have a show file? <i>File &rarr; Import Show File&hellip;</i> reads a "
+        "<tt>.tmix</tt> database directly.</p>");
+    HelpDialog dialog(tr("Quick Start"), html, this);
+    dialog.exec();
+}
+
+void MainWindow::showFeatureGuide() {
+    const QString html = tr(
+        "<h2>Feature Guide</h2>"
+        "<h3>Cues</h3>"
+        "<p>The cue list is the spine of the show. The Cue Editor edits everything a cue does; "
+        "the Edit menu adds clone, copy / paste / paste-merge / paste-swap, fill down, clone "
+        "offsets, jump and renumber.</p>"
+        "<h3>Cast &amp; voices</h3>"
+        "<p>Actor Setup (F9) holds per-actor voice profiles with a backup copy. Ensembles "
+        "(F10) group channels onto a shared profile slot. Spare Backup "
+        "(<i>Playback &rarr; Allocate Spare&hellip;</i>) covers a failed mic and switches its "
+        "backup voice to a reserved channel, now or on the next cue.</p>"
+        "<h3>Console control</h3>"
+        "<p>DCA Mapping (F5) assigns channels and buses to DCAs. Positions (F11) store "
+        "pan / delay presets a cue can recall per channel. FX Setup names FX units and their "
+        "channel sends. Cue Zero holds the base/reset state.</p>"
+        "<h3>External control</h3>"
+        "<p>Settings &rarr; Remote Control covers MIDI Show Control, inbound OSC, and outbound "
+        "QLab/DAW with pre-roll. Timecode Triggers (F12) fire cues at an incoming timecode.</p>"
+        "<h3>Monitoring &amp; reporting</h3>"
+        "<p>Mixer Feedback (F6) and Active Cue Info track live state. Channel Utilisation shows "
+        "which cues touch each channel; Export to CSV and Export Notes produce paperwork; Edit "
+        "History browses the undo stack.</p>");
+    HelpDialog dialog(tr("Feature Guide"), html, this);
     dialog.exec();
 }
 

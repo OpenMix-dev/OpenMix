@@ -97,6 +97,8 @@ class MainWindow : public QMainWindow {
     void showSettingsDialog();
     void showFxSetupDialog();
     void showLogViewerDialog();
+    void showQuickStart();
+    void showFeatureGuide();
     void showEditHistoryDialog();
     void exportCuesToCsv();
     void showChannelUtilisationDialog();
@@ -224,6 +226,8 @@ class MainWindow : public QMainWindow {
     QAction* m_fxSetupAction;
 
     // help actions
+    QAction* m_quickStartAction;
+    QAction* m_featureGuideAction;
     QAction* m_aboutAction;
 
     // status bar
