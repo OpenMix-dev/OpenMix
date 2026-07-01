@@ -57,6 +57,47 @@ class TestDeletePlayingCue : public QObject {
         QCOMPARE(model.rowCount(), 3);
         QCOMPARE(model.currentCueIndex(), 2); // shifted down
     }
+
+    void moveCurrentSelectedRow() {
+        CueList list;
+        for (int i = 1; i <= 5; ++i) {
+            Cue c;
+            c.setNumber(i);
+            list.addCue(c);
+        }
+        CueTableModel model(&list);
+        CueFilterProxyModel proxy;
+        proxy.setSourceModel(&model);
+        QTableView view;
+        view.setModel(&proxy);
+
+        model.setCurrentCueIndex(1);
+        view.selectRow(1);
+
+        list.moveCue(1, 3); // drag the current row down
+        QCoreApplication::processEvents();
+
+        QCOMPARE(model.rowCount(), 5);
+        QCOMPARE(model.currentCueIndex(), 3); // highlight follows the move
+    }
+
+    void insertShiftsHighlight() {
+        CueList list;
+        for (int i = 1; i <= 3; ++i) {
+            Cue c;
+            c.setNumber(i);
+            list.addCue(c);
+        }
+        CueTableModel model(&list);
+        model.setCurrentCueIndex(1);
+
+        Cue extra;
+        extra.setNumber(99);
+        list.insertCue(0, extra); // insert before the current row
+
+        QCOMPARE(model.rowCount(), 4);
+        QCOMPARE(model.currentCueIndex(), 2); // shifted down by the insert
+    }
 };
 
 QTEST_MAIN(TestDeletePlayingCue)

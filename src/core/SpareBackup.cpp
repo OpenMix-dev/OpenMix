@@ -84,7 +84,11 @@ QJsonObject SpareBackup::toJson() const {
 void SpareBackup::loadFromJson(const QJsonObject& json) {
     m_spareChannel = json.value("spareChannel").toInt(-1);
     m_allocatedChannel = json.value("allocatedChannel").toInt(-1);
-    m_state = static_cast<State>(json.value("state").toInt(0));
+    const int stateInt = json.value("state").toInt(0);
+    m_state = (stateInt >= static_cast<int>(State::Inactive) &&
+               stateInt <= static_cast<int>(State::Active))
+                  ? static_cast<State>(stateInt)
+                  : State::Inactive;
     if (m_spareChannel < 0) {
         m_allocatedChannel = -1;
         m_state = State::Inactive;

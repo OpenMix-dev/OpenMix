@@ -48,10 +48,12 @@ class CueList : public QObject {
     void fromJson(const QJsonArray& json);
 
   signals:
+    void cueAboutToBeAdded(int index); // emitted before the cue is inserted
     void cueAdded(int index);
     void cueAboutToBeRemoved(int index); // emitted before the cue is erased
     void cueRemoved(int index);
     void cueUpdated(int index);
+    void cueAboutToBeMoved(int fromIndex, int toIndex); // emitted before the move
     void cueMoved(int fromIndex, int toIndex);
     void listCleared();
     void listLoaded();

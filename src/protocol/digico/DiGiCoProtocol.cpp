@@ -247,18 +247,27 @@ void DiGiCoProtocol::refresh() {
 void DiGiCoProtocol::parseProtocolData(const QByteArray& data) {
     m_receiveBuffer.append(data);
 
+    // guard against a hostile/desynced peer: a frame larger than this is
+    // implausible for this protocol, so drop the buffer rather than grow it
+    constexpr qint64 kMaxFrame = 1 << 20; // 1 MiB
+
     // Walk complete frames: tag(4) + length(4, BE) + body(length).
     while (m_receiveBuffer.size() >= 8) {
-        quint32 length = qFromBigEndian<quint32>(
+        const quint32 length = qFromBigEndian<quint32>(
             reinterpret_cast<const uchar*>(m_receiveBuffer.constData() + 4));
+        const qint64 total = qint64(8) + length; // 64-bit: never wraps
 
-        if (static_cast<quint32>(m_receiveBuffer.size()) < 8 + length)
+        if (length > kMaxFrame) {
+            m_receiveBuffer.clear(); // lost frame sync; discard
             break;
+        }
+        if (m_receiveBuffer.size() < total)
+            break; // wait for the rest of the frame
 
-        QByteArray frame = m_receiveBuffer.left(8 + length);
+        QByteArray frame = m_receiveBuffer.left(static_cast<int>(total));
         QByteArray tag = m_receiveBuffer.left(4);
-        QByteArray body = m_receiveBuffer.mid(8, length);
-        m_receiveBuffer.remove(0, 8 + length);
+        QByteArray body = m_receiveBuffer.mid(8, static_cast<int>(length));
+        m_receiveBuffer.remove(0, static_cast<int>(total));
 
         // Keep the link alive by echoing the console's heartbeat frame.
         if (tag == "EEVT" && body.contains("KeepAlive"))

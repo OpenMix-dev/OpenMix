@@ -14,11 +14,15 @@ const QString CueTableModel::s_mimeType = QStringLiteral("application/x-openmix-
 CueTableModel::CueTableModel(CueList* cueList, QObject* parent)
     : QAbstractTableModel(parent), m_cueList(cueList) {
     if (m_cueList) {
+        connect(m_cueList, &CueList::cueAboutToBeAdded, this,
+                &CueTableModel::onCueAboutToBeAdded);
         connect(m_cueList, &CueList::cueAdded, this, &CueTableModel::onCueAdded);
         connect(m_cueList, &CueList::cueAboutToBeRemoved, this,
                 &CueTableModel::onCueAboutToBeRemoved);
         connect(m_cueList, &CueList::cueRemoved, this, &CueTableModel::onCueRemoved);
         connect(m_cueList, &CueList::cueUpdated, this, &CueTableModel::onCueUpdated);
+        connect(m_cueList, &CueList::cueAboutToBeMoved, this,
+                &CueTableModel::onCueAboutToBeMoved);
         connect(m_cueList, &CueList::cueMoved, this, &CueTableModel::onCueMoved);
         connect(m_cueList, &CueList::listCleared, this, &CueTableModel::onListCleared);
         connect(m_cueList, &CueList::listLoaded, this, &CueTableModel::onListLoaded);
@@ -384,9 +388,18 @@ const Cue* CueTableModel::cueAt(int row) const {
     return &m_cueList->at(row);
 }
 
-void CueTableModel::onCueAdded(int index) {
+void CueTableModel::onCueAboutToBeAdded(int index) {
     beginInsertRows(QModelIndex(), index, index);
+}
+
+void CueTableModel::onCueAdded(int index) {
     endInsertRows();
+
+    // shift highlights for rows that moved down by the insertion
+    if (m_currentIndex >= index)
+        ++m_currentIndex;
+    if (m_standbyIndex >= index)
+        ++m_standbyIndex;
 }
 
 void CueTableModel::onCueAboutToBeRemoved(int index) {
@@ -415,16 +428,15 @@ void CueTableModel::onCueUpdated(int index) {
     emit dataChanged(this->index(index, 0), this->index(index, ColCount - 1));
 }
 
-void CueTableModel::onCueMoved(int from, int to) {
-    // use moveRows from Qt to update the view
-    // CueList already moved the item, this just notifies the view
-    // so selections/scroll position/other visual states stay in sync
-    //
-    // destinationChild is the row before the moved rows, so
-    // moving down → to + 1, moving up → to
-    int destRow = (from < to) ? to + 1 : to;
-
+void CueTableModel::onCueAboutToBeMoved(int from, int to) {
+    // beginMoveRows must bracket the move before the list is reordered.
+    // destinationChild is the row before the moved rows: moving down → to + 1,
+    // moving up → to
+    const int destRow = (from < to) ? to + 1 : to;
     beginMoveRows(QModelIndex(), from, from, QModelIndex(), destRow);
+}
+
+void CueTableModel::onCueMoved(int from, int to) {
     endMoveRows();
 
     // adjust highlight indices

@@ -180,9 +180,12 @@ int CueListView::selectedCueIndex() const {
     if (!current.isValid())
         return -1;
 
-    // map from proxy to source
+    // map from proxy to source, and never hand back an out-of-range row
     QModelIndex sourceIndex = m_proxyModel->mapToSource(current);
-    return sourceIndex.row();
+    const int row = sourceIndex.row();
+    if (row < 0 || !m_model->cueList() || row >= m_model->cueList()->count())
+        return -1;
+    return row;
 }
 
 void CueListView::setCurrentCueHighlight(int index) {

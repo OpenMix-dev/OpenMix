@@ -42,8 +42,10 @@ Cue* CueList::findByNumber(double number) {
 }
 
 void CueList::addCue(const Cue& cue) {
+    const int index = m_cues.size();
+    emit cueAboutToBeAdded(index);
     m_cues.append(cue);
-    emit cueAdded(m_cues.size() - 1);
+    emit cueAdded(index);
 }
 
 void CueList::insertCue(int index, const Cue& cue) {
@@ -51,6 +53,7 @@ void CueList::insertCue(int index, const Cue& cue) {
         index = 0;
     if (index > m_cues.size())
         index = m_cues.size();
+    emit cueAboutToBeAdded(index);
     m_cues.insert(index, cue);
     emit cueAdded(index);
 }
@@ -84,6 +87,7 @@ void CueList::moveCue(int fromIndex, int toIndex) {
     if (fromIndex == toIndex)
         return;
 
+    emit cueAboutToBeMoved(fromIndex, toIndex);
     Cue cue = m_cues.takeAt(fromIndex);
     m_cues.insert(toIndex, cue);
     emit cueMoved(fromIndex, toIndex);

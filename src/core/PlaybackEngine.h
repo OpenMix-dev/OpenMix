@@ -183,6 +183,11 @@ class PlaybackEngine : public QObject {
     int m_currentIndex = -1;
     int m_standbyIndex = -1;
 
+    // guards against runaway recursion from self/cyclic GoTo auto-execute or
+    // macro cycles (a crafted show file can create these)
+    int m_fireDepth = 0;
+    static constexpr int kMaxFireDepth = 50;
+
     QTimer m_autoFollowTimer;
     bool m_autoFollowArmed = false;
 

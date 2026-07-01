@@ -272,6 +272,17 @@ void PlaybackEngine::executeCueInternal(const Cue& cue) {
     if (!m_mixer)
         return;
 
+    // stop cyclic GoTo/macro chains before they overflow the stack
+    if (m_fireDepth >= kMaxFireDepth) {
+        qWarning("PlaybackEngine: cue fire recursion limit reached; aborting chain");
+        return;
+    }
+    ++m_fireDepth;
+    struct DepthGuard {
+        int& depth;
+        ~DepthGuard() { --depth; }
+    } depthGuard{m_fireDepth};
+
     // resolve which DCAs to target
     QSet<int> targetDCAs = cue.targetsAllDCAs() ? allDCAs() : cue.targetedDCAs();
 

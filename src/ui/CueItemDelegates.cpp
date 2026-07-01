@@ -84,10 +84,15 @@ void CueNumberDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
     if (m_cueList) {
         const auto existingIndex = m_cueList->indexOfNumber(newNumber);
         if (existingIndex && *existingIndex != index.row()) {
-            QMessageBox::warning(
-                qobject_cast<QWidget*>(editor->parent()), QObject::tr("Cue Number Conflict"),
-                QObject::tr("Cue %1 already exists. Please choose a different number.")
-                    .arg(newNumber, 0, 'f', 1));
+            // defer the modal: showing it here would pump the event loop during
+            // Qt's editor-commit and can destroy the editor underneath us
+            const double dup = newNumber;
+            QTimer::singleShot(0, [dup]() {
+                QMessageBox::warning(
+                    nullptr, QObject::tr("Cue Number Conflict"),
+                    QObject::tr("Cue %1 already exists. Please choose a different number.")
+                        .arg(dup, 0, 'f', 1));
+            });
             return;
         }
     }
