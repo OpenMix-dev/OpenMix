@@ -369,3 +369,26 @@ target_include_directories(test_tmix_import PRIVATE
     ${CMAKE_SOURCE_DIR}/src
 )
 add_test(NAME TmixImportTest COMMAND test_tmix_import)
+
+add_executable(test_channel_utilisation
+    test_channel_utilisation.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ChannelUtilisation.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueZero.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Ensemble.cpp
+)
+target_link_libraries(test_channel_utilisation PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+target_include_directories(test_channel_utilisation PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
+add_test(NAME ChannelUtilisationTest COMMAND test_channel_utilisation)

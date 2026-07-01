@@ -4,6 +4,7 @@
 #include "BubbleButton.h"
 #include "ConnectionPanel.h"
 #include "CueEditor.h"
+#include "ChannelUtilisationDialog.h"
 #include "CueListView.h"
 #include "CueTableModel.h"
 #include "CueZeroDialog.h"
@@ -294,6 +295,11 @@ void MainWindow::createActions() {
     m_exportCsvAction->setToolTip(tr("Export the cue list to a CSV file"));
     connect(m_exportCsvAction, &QAction::triggered, this, &MainWindow::exportCuesToCsv);
 
+    m_channelUtilisationAction = new QAction(tr("Channel &Utilisation"), this);
+    m_channelUtilisationAction->setToolTip(tr("Show which cues use each input channel"));
+    connect(m_channelUtilisationAction, &QAction::triggered, this,
+            &MainWindow::showChannelUtilisationDialog);
+
     m_showLogViewerAction = new QAction(tr("Application &Log..."), this);
     m_showLogViewerAction->setShortcut(Qt::Key_F8);
     m_showLogViewerAction->setToolTip(tr("Show application log (F8)"));
@@ -436,6 +442,7 @@ void MainWindow::createMenus() {
     m_viewMenu->addAction(m_cueZeroAction);
     m_viewMenu->addSeparator();
     m_viewMenu->addAction(m_editHistoryAction);
+    m_viewMenu->addAction(m_channelUtilisationAction);
     m_viewMenu->addAction(m_exportCsvAction);
     m_viewMenu->addAction(m_showLogViewerAction);
 
@@ -1148,6 +1155,11 @@ void MainWindow::showEditHistoryDialog() {
     QUndoView* view = new QUndoView(m_app->undoStack(), &dialog);
     view->setEmptyLabel(tr("<clean>"));
     layout->addWidget(view);
+    dialog.exec();
+}
+
+void MainWindow::showChannelUtilisationDialog() {
+    ChannelUtilisationDialog dialog(m_app, this);
     dialog.exec();
 }
 
