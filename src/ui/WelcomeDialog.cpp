@@ -36,7 +36,11 @@ void WelcomeDialog::setupUi() {
     title->setFont(titleFont);
     mainLayout->addWidget(title);
 
-    QLabel* subtitle = new QLabel(tr("Theatre mixing console control"), this);
+    QLabel* subtitle = new QLabel(
+        tr("Stage mixing software for live theatre that lets engineers program, automate, and "
+           "run cues seamlessly across 30+ digital mixing consoles."),
+        this);
+    subtitle->setWordWrap(true);
     subtitle->setEnabled(false); // muted
     mainLayout->addWidget(subtitle);
     mainLayout->addSpacing(16);

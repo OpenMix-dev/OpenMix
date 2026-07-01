@@ -115,7 +115,7 @@ void MainWindow::createActions() {
     m_openAction->setToolTip(tr("Open an existing show (Ctrl+O)"));
     connect(m_openAction, &QAction::triggered, this, &MainWindow::openShow);
 
-    m_importTmixAction = new QAction(tr("&Import TheatreMix Show..."), this);
+    m_importTmixAction = new QAction(tr("&Import Show File..."), this);
     m_importTmixAction->setToolTip(tr("Import a .tmix show file"));
     connect(m_importTmixAction, &QAction::triggered, this, &MainWindow::importTmixShow);
 
@@ -360,9 +360,9 @@ void MainWindow::createActions() {
         QMessageBox::about(
             this, tr("About OpenMix"),
             tr("<h3>OpenMix</h3>"
-               "<p>Open Source Theatre Sound Mixing Control</p>"
                "<p>Version 0.1.0</p>"
-               "<p>A live-sound mixing control application for theatre productions.</p>"));
+               "<p>Stage mixing software for live theatre that lets engineers program, "
+               "automate, and run cues seamlessly across 30+ digital mixing consoles.</p>"));
     });
 }
 
@@ -869,7 +869,7 @@ void MainWindow::importTmixShow() {
         return;
 
     QString filePath = QFileDialog::getOpenFileName(
-        this, tr("Import TheatreMix Show"), QString(), tr("TheatreMix Show (*.tmix *.x32tc)"));
+        this, tr("Import Show File"), QString(), tr("Show Files (*.tmix *.x32tc)"));
 
     if (filePath.isEmpty())
         return;

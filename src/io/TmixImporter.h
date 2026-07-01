@@ -6,7 +6,7 @@ namespace OpenMix {
 
 class Show;
 
-// Imports a TheatreMix-format .tmix show file (a SQLite database) into a Show.
+// Imports a .tmix show file (a SQLite database) into a Show.
 // The show is cleared first, then populated from the file's config, actors,
 // profiles, positions, ensembles and cues tables. Best-effort: missing tables
 // or columns are skipped rather than treated as errors.
