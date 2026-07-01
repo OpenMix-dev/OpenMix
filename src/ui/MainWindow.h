@@ -81,6 +81,7 @@ class MainWindow : public QMainWindow {
     void showMidiConfigDialog();
     void showRemoteControlDialog();
     void showKeyboardShortcutsDialog();
+    void showSettingsDialog();
     void showLogViewerDialog();
 
     // bubble bar interaction
@@ -174,6 +175,7 @@ class MainWindow : public QMainWindow {
     QAction* m_keyboardShortcutsAction;
     QAction* m_midiControllerAction;
     QAction* m_remoteControlAction;
+    QAction* m_appSettingsAction;
 
     // help actions
     QAction* m_aboutAction;

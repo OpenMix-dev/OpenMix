@@ -12,6 +12,7 @@
 #include "MixerFeedbackPanel.h"
 #include "PopOutWindow.h"
 #include "RemoteControlDialog.h"
+#include "SettingsDialog.h"
 #include "app/Application.h"
 #include "core/AppLogger.h"
 #include "core/CueList.h"
@@ -224,6 +225,11 @@ void MainWindow::createActions() {
     m_remoteControlAction->setToolTip(tr("Configure MSC, inbound OSC, and QLab remote control"));
     connect(m_remoteControlAction, &QAction::triggered, this, &MainWindow::showRemoteControlDialog);
 
+    m_appSettingsAction = new QAction(tr("Settings..."), this);
+    m_appSettingsAction->setToolTip(
+        tr("Console behavior, scribble highlight, channel monitor, and QLab settings"));
+    connect(m_appSettingsAction, &QAction::triggered, this, &MainWindow::showSettingsDialog);
+
     // help actions
     m_aboutAction = new QAction(tr("&About OpenMix"), this);
     m_aboutAction->setToolTip(tr("About this application"));
@@ -277,6 +283,7 @@ void MainWindow::registerShortcuts() {
     sm->registerAction("settings.keyboardShortcuts", m_keyboardShortcutsAction, QKeySequence());
     sm->registerAction("settings.midiController", m_midiControllerAction, QKeySequence());
     sm->registerAction("settings.remoteControl", m_remoteControlAction, QKeySequence());
+    sm->registerAction("settings.appSettings", m_appSettingsAction, QKeySequence());
 
     // help actions
     sm->registerAction("help.about", m_aboutAction, QKeySequence());
@@ -326,6 +333,8 @@ void MainWindow::createMenus() {
     m_settingsMenu->addAction(m_keyboardShortcutsAction);
     m_settingsMenu->addAction(m_midiControllerAction);
     m_settingsMenu->addAction(m_remoteControlAction);
+    m_settingsMenu->addSeparator();
+    m_settingsMenu->addAction(m_appSettingsAction);
 
     m_helpMenu = menuBar()->addMenu(tr("&Help"));
     m_helpMenu->addAction(m_aboutAction);
@@ -893,6 +902,11 @@ void MainWindow::showMidiConfigDialog() {
 
 void MainWindow::showRemoteControlDialog() {
     RemoteControlDialog dialog(m_app, this);
+    dialog.exec();
+}
+
+void MainWindow::showSettingsDialog() {
+    SettingsDialog dialog(m_app, this);
     dialog.exec();
 }
 

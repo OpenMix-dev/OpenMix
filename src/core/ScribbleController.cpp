@@ -4,6 +4,7 @@
 #include "ActorProfileLibrary.h"
 #include "Cue.h"
 #include "CueList.h"
+#include "DCAMapping.h"
 #include "protocol/MixerProtocol.h"
 
 #include <QSet>
@@ -48,6 +49,22 @@ void ScribbleController::setEnabled(bool enabled) {
         refreshNames();
 }
 
+void ScribbleController::setHighlightEnabled(bool enabled) {
+    if (m_highlightEnabled == enabled)
+        return;
+    m_highlightEnabled = enabled;
+
+    if (m_highlightEnabled) {
+        updateHighlight(m_currentCueIndex);
+    } else if (m_mixer) {
+        // restore every highlighted strip to the Normal state color
+        const int normal = m_stateColors[static_cast<int>(ChannelState::Normal)];
+        for (int ch : m_highlightedChannels)
+            m_mixer->setChannelColor(ch, normal);
+        m_highlightedChannels.clear();
+    }
+}
+
 void ScribbleController::setCueNumberChannel(int channel) {
     m_cueChannel = channel > 0 ? channel : 0;
 }
@@ -90,20 +107,84 @@ void ScribbleController::onChannelStateChanged(int channel, int state) {
     int idx = state;
     if (idx < 0 || idx >= 3)
         idx = static_cast<int>(ChannelState::Normal);
-    m_mixer->setChannelColor(channel, m_stateColors[idx]);
+
+    int color = m_stateColors[idx];
+    // a highlighted channel keeps its highlight while it reads Normal; silence
+    // and clip warnings still win so the operator sees them.
+    if (idx == static_cast<int>(ChannelState::Normal) && m_highlightEnabled &&
+        m_highlightedChannels.contains(channel)) {
+        color = m_highlightColor;
+    }
+    m_mixer->setChannelColor(channel, color);
 }
 
 void ScribbleController::onCurrentCueChanged(int cueIndex) {
-    if (!m_enabled || !m_mixer || m_cueChannel <= 0)
-        return;
+    m_currentCueIndex = cueIndex;
 
-    QString label = QStringLiteral("--");
-    if (m_cueList && cueIndex >= 0 && cueIndex < m_cueList->count())
-        label = cueLabel(m_cueList->at(cueIndex).number());
+    if (m_enabled && m_mixer && m_cueChannel > 0) {
+        QString label = QStringLiteral("--");
+        if (m_cueList && cueIndex >= 0 && cueIndex < m_cueList->count())
+            label = cueLabel(m_cueList->at(cueIndex).number());
+        m_mixer->setChannelName(m_cueChannel, label);
+    }
 
-    m_mixer->setChannelName(m_cueChannel, label);
+    updateHighlight(cueIndex);
 }
 
 void ScribbleController::onActorLibraryChanged() { refreshNames(); }
+
+QSet<int> ScribbleController::channelsTouchedByCue(const Cue& cue) const {
+    QSet<int> channels;
+
+    for (int ch : cue.channelProfiles().keys())
+        if (ch > 0)
+            channels.insert(ch);
+    for (int ch : cue.channelLevels().keys())
+        if (ch > 0)
+            channels.insert(ch);
+
+    // channels reached through the cue's targeted DCAs (per-cue custom mapping
+    // if present, otherwise the show-level mapping)
+    const QSet<int> targetDCAs = cue.targetedDCAs(); // empty = all DCAs
+    if (cue.hasCustomDCAMapping()) {
+        const QMap<int, QList<int>> mapping = cue.dcaChannelMapping();
+        for (auto it = mapping.constBegin(); it != mapping.constEnd(); ++it) {
+            if (!targetDCAs.isEmpty() && !targetDCAs.contains(it.key()))
+                continue;
+            for (int ch : it.value())
+                if (ch > 0)
+                    channels.insert(ch);
+        }
+    } else if (m_dcaMapping) {
+        const QSet<int> dcas = targetDCAs.isEmpty() ? m_dcaMapping->assignedDCAs() : targetDCAs;
+        for (int dca : dcas)
+            for (int ch : m_dcaMapping->channelsForDCA(dca))
+                if (ch > 0)
+                    channels.insert(ch);
+    }
+
+    return channels;
+}
+
+void ScribbleController::updateHighlight(int cueIndex) {
+    if (!m_highlightEnabled || !m_enabled || !m_mixer)
+        return;
+
+    QSet<int> touched;
+    if (m_cueList && cueIndex >= 0 && cueIndex < m_cueList->count())
+        touched = channelsTouchedByCue(m_cueList->at(cueIndex));
+
+    // restore strips that are no longer touched to the Normal state color
+    const int normal = m_stateColors[static_cast<int>(ChannelState::Normal)];
+    for (int ch : m_highlightedChannels) {
+        if (!touched.contains(ch))
+            m_mixer->setChannelColor(ch, normal);
+    }
+
+    for (int ch : touched)
+        m_mixer->setChannelColor(ch, m_highlightColor);
+
+    m_highlightedChannels = touched;
+}
 
 } // namespace OpenMix

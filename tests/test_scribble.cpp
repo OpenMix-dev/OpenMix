@@ -3,6 +3,7 @@
 #include "core/ChannelMonitor.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
+#include "core/DCAMapping.h"
 #include "core/ScribbleController.h"
 #include "protocol/MixerProtocol.h"
 #include <QtTest/QtTest>
@@ -39,6 +40,15 @@ class RecordingMixer : public MixerProtocol {
 
     [[nodiscard]] bool hasName(int ch, const QString& name) const {
         return nameCalls.contains({ch, name});
+    }
+
+    // most recent color pushed to a channel, or -1 if none
+    [[nodiscard]] int lastColor(int ch) const {
+        int color = -1;
+        for (const auto& call : colorCalls)
+            if (call.first == ch)
+                color = call.second;
+        return color;
     }
 };
 
@@ -173,6 +183,113 @@ class TestScribble : public QObject {
         ctl.onChannelStateChanged(3, static_cast<int>(ChannelState::Clipping));
         QVERIFY(mixer.nameCalls.isEmpty());
         QVERIFY(mixer.colorCalls.isEmpty());
+    }
+
+    // --- active-channel highlight ---
+
+    void highlight_colorsTouchedChannels() {
+        CueList cues;
+        Cue cue(1.0, "A");
+        cue.setChannelLevel(3, 0.5);
+        cue.setChannelProfile(7, "slot");
+        cues.addCue(cue);
+
+        RecordingMixer mixer;
+        ScribbleController ctl;
+        ctl.setCueList(&cues);
+        ctl.setMixer(&mixer);
+        ctl.setHighlightColor(2);
+        ctl.setHighlightEnabled(true);
+        mixer.colorCalls.clear();
+
+        ctl.onCurrentCueChanged(0);
+        QCOMPARE(mixer.lastColor(3), 2);
+        QCOMPARE(mixer.lastColor(7), 2);
+    }
+
+    void highlight_restoresUntouchedOnCueChange() {
+        CueList cues;
+        Cue a(1.0, "A");
+        a.setChannelLevel(3, 0.5);
+        cues.addCue(a);
+        Cue b(2.0, "B");
+        b.setChannelLevel(5, 0.5);
+        cues.addCue(b);
+
+        RecordingMixer mixer;
+        ScribbleController ctl;
+        ctl.setCueList(&cues);
+        ctl.setMixer(&mixer);
+        ctl.setHighlightColor(2);
+        ctl.setHighlightEnabled(true);
+
+        ctl.onCurrentCueChanged(0);
+        QCOMPARE(mixer.lastColor(3), 2);
+
+        ctl.onCurrentCueChanged(1);
+        QCOMPARE(mixer.lastColor(5), 2); // now highlighted
+        QCOMPARE(mixer.lastColor(3), ctl.stateColor(ChannelState::Normal)); // restored
+    }
+
+    void highlight_includesDcaAssignedChannels() {
+        CueList cues;
+        cues.addCue(Cue(1.0, "A")); // targets all DCAs
+
+        DCAMapping dca;
+        dca.assignChannelToDCA(2, 1);
+        dca.assignChannelToDCA(4, 1);
+
+        RecordingMixer mixer;
+        ScribbleController ctl;
+        ctl.setCueList(&cues);
+        ctl.setDCAMapping(&dca);
+        ctl.setMixer(&mixer);
+        ctl.setHighlightColor(2);
+        ctl.setHighlightEnabled(true);
+        mixer.colorCalls.clear();
+
+        ctl.onCurrentCueChanged(0);
+        QCOMPARE(mixer.lastColor(2), 2);
+        QCOMPARE(mixer.lastColor(4), 2);
+    }
+
+    void highlight_disabledDoesNotColor() {
+        CueList cues;
+        Cue cue(1.0, "A");
+        cue.setChannelLevel(3, 0.5);
+        cues.addCue(cue);
+
+        RecordingMixer mixer;
+        ScribbleController ctl;
+        ctl.setCueList(&cues);
+        ctl.setMixer(&mixer);
+        mixer.colorCalls.clear();
+
+        ctl.onCurrentCueChanged(0); // highlight off by default
+        QVERIFY(mixer.colorCalls.isEmpty());
+    }
+
+    void highlight_keepsColorUnderNormalState() {
+        CueList cues;
+        Cue cue(1.0, "A");
+        cue.setChannelLevel(3, 0.5);
+        cues.addCue(cue);
+
+        RecordingMixer mixer;
+        ScribbleController ctl;
+        ctl.setCueList(&cues);
+        ctl.setMixer(&mixer);
+        ctl.setHighlightColor(2);
+        ctl.setHighlightEnabled(true);
+        ctl.onCurrentCueChanged(0);
+
+        // a Normal-state report on a highlighted channel keeps the highlight
+        ctl.onChannelStateChanged(3, static_cast<int>(ChannelState::Normal));
+        QCOMPARE(mixer.lastColor(3), 2);
+
+        // a clip warning still wins
+        ctl.onChannelStateChanged(3, static_cast<int>(ChannelState::Clipping));
+        QCOMPARE(mixer.lastColor(3), ctl.stateColor(ChannelState::Clipping));
     }
 };
 

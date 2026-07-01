@@ -69,6 +69,56 @@ class TestQLabClient : public QObject {
         lo_server_thread_stop(srv);
         lo_server_thread_free(srv);
     }
+
+    void passcodeSendsConnectBeforeCommand() {
+        Recorder rec;
+        lo_server_thread srv = lo_server_thread_new(nullptr, nullptr);
+        QVERIFY(srv);
+        lo_server_thread_add_method(srv, nullptr, nullptr, record, &rec);
+        lo_server_thread_start(srv);
+
+        QLabClient client;
+        client.setTarget("127.0.0.1", lo_server_thread_get_port(srv));
+        client.setPasscode("secret");
+        client.setEnabled(true);
+        client.triggerCue("7");
+
+        QTRY_VERIFY(rec.paths.contains("/connect"));
+        QTRY_VERIFY(rec.paths.contains("/cue/7/start"));
+
+        // /connect is sent only once per target
+        rec.paths.clear();
+        client.triggerCue("8");
+        QTRY_VERIFY(rec.paths.contains("/cue/8/start"));
+        QVERIFY(!rec.paths.contains("/connect"));
+
+        lo_server_thread_stop(srv);
+        lo_server_thread_free(srv);
+    }
+
+    void suppressBackGatesBack() {
+        Recorder rec;
+        lo_server_thread srv = lo_server_thread_new(nullptr, nullptr);
+        QVERIFY(srv);
+        lo_server_thread_add_method(srv, nullptr, nullptr, record, &rec);
+        lo_server_thread_start(srv);
+
+        QLabClient client;
+        client.setTarget("127.0.0.1", lo_server_thread_get_port(srv));
+        client.setEnabled(true);
+
+        client.setSuppressBack(true);
+        client.back();
+        QTest::qWait(50);
+        QVERIFY(!rec.paths.contains("/playhead/previous"));
+
+        client.setSuppressBack(false);
+        client.back();
+        QTRY_VERIFY(rec.paths.contains("/playhead/previous"));
+
+        lo_server_thread_stop(srv);
+        lo_server_thread_free(srv);
+    }
 };
 
 QTEST_MAIN(TestQLabClient)

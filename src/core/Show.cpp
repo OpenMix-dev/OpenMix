@@ -86,11 +86,51 @@ void Show::connectCueZeroSignals() {
     connect(&m_cueZero, &CueZero::changed, this, &Show::checkModifiedState);
 }
 
+void Show::setChannelGangs(const QList<QPair<int, int>>& gangs) {
+    m_channelGangs = gangs;
+    // keep per-gang metadata aligned by index, preserving existing entries
+    while (m_channelGangMeta.size() > gangs.size())
+        m_channelGangMeta.removeLast();
+    while (m_channelGangMeta.size() < gangs.size())
+        m_channelGangMeta.append(qMakePair(QString(), QString()));
+    checkModifiedState();
+}
+
+void Show::setGangName(int index, const QString& name) {
+    if (index < 0 || index >= m_channelGangMeta.size())
+        return;
+    m_channelGangMeta[index].first = name;
+    checkModifiedState();
+}
+
+QString Show::gangName(int index) const {
+    return (index >= 0 && index < m_channelGangMeta.size()) ? m_channelGangMeta[index].first
+                                                            : QString();
+}
+
+void Show::setGangColor(int index, const QString& color) {
+    if (index < 0 || index >= m_channelGangMeta.size())
+        return;
+    m_channelGangMeta[index].second = color;
+    checkModifiedState();
+}
+
+QString Show::gangColor(int index) const {
+    return (index >= 0 && index < m_channelGangMeta.size()) ? m_channelGangMeta[index].second
+                                                            : QString();
+}
+
 void Show::newShow() {
     m_name = tr("Untitled Show");
     m_author.clear();
+    m_designer.clear();
     m_notes.clear();
     m_filePath.clear();
+    m_dimDcaFaders = false;
+    m_selectOnSpill = false;
+    m_muteDcaUnassign = false;
+    m_suppressBackupSwitch = false;
+    m_channelGangMeta.clear();
     m_mixerConfig = MixerConfig();
     m_mixerConfig.type = "x32";
     m_mixerConfig.port = 10023;
@@ -106,11 +146,17 @@ void Show::newShow() {
 
 QJsonObject Show::toJson() const {
     QJsonObject json;
-    json["version"] = "1.3";
+    json["version"] = "1.4";
     json["name"] = m_name;
     json["author"] = m_author;
+    json["designer"] = m_designer;
     json["notes"] = m_notes;
     json["mixer"] = m_mixerConfig.toJson();
+
+    json["dimDcaFaders"] = m_dimDcaFaders;
+    json["selectOnSpill"] = m_selectOnSpill;
+    json["muteDcaUnassign"] = m_muteDcaUnassign;
+    json["suppressBackupSwitch"] = m_suppressBackupSwitch;
     json["cues"] = m_cueList.toJson();
     json["dcaMapping"] = m_dcaMapping.toJson();
     json["actors"] = m_actorProfileLibrary.toJson();
@@ -127,6 +173,16 @@ QJsonObject Show::toJson() const {
     }
     json["channelGangs"] = gangArray;
 
+    // per-gang name/color, aligned by index with channelGangs
+    QJsonArray gangMetaArray;
+    for (const auto& meta : m_channelGangMeta) {
+        QJsonObject obj;
+        obj["name"] = meta.first;
+        obj["color"] = meta.second;
+        gangMetaArray.append(obj);
+    }
+    json["channelGangMeta"] = gangMetaArray;
+
     return json;
 }
 
@@ -138,9 +194,16 @@ void Show::fromJson(const QJsonObject& json) {
 
     m_name = json["name"].toString("Untitled Show");
     m_author = json["author"].toString();
+    m_designer = json["designer"].toString();
     m_notes = json["notes"].toString();
     m_mixerConfig = MixerConfig::fromJson(json["mixer"].toObject());
     m_cueList.fromJson(json["cues"].toArray());
+
+    // console-behavior preferences (added in show version 1.4)
+    m_dimDcaFaders = json["dimDcaFaders"].toBool(false);
+    m_selectOnSpill = json["selectOnSpill"].toBool(false);
+    m_muteDcaUnassign = json["muteDcaUnassign"].toBool(false);
+    m_suppressBackupSwitch = json["suppressBackupSwitch"].toBool(false);
 
     if (json.contains("dcaMapping")) {
         m_dcaMapping.loadFromJson(json["dcaMapping"].toObject());
@@ -187,6 +250,19 @@ void Show::fromJson(const QJsonObject& json) {
             }
         }
     }
+
+    // per-gang name/color, aligned by index (added in show version 1.4)
+    m_channelGangMeta.clear();
+    const QJsonArray gangMetaArray = json["channelGangMeta"].toArray();
+    for (const QJsonValue& val : gangMetaArray) {
+        const QJsonObject obj = val.toObject();
+        m_channelGangMeta.append(qMakePair(obj["name"].toString(), obj["color"].toString()));
+    }
+    // keep metadata length aligned with the gang list
+    while (m_channelGangMeta.size() < m_channelGangs.size())
+        m_channelGangMeta.append(qMakePair(QString(), QString()));
+    while (m_channelGangMeta.size() > m_channelGangs.size())
+        m_channelGangMeta.removeLast();
 
     m_isDirty = false;
     emit nameChanged(m_name);

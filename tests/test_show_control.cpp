@@ -48,6 +48,10 @@ class RecordingMixer : public MixerProtocol {
         calls << QString("fader:ch=%1:level=%2").arg(channel).arg(level);
     }
 
+    void setChannelMute(int channel, bool muted) override {
+        calls << QString("mute:ch=%1:%2").arg(channel).arg(muted ? 1 : 0);
+    }
+
     void refresh() override {}
     int latencyMs() const override { return 0; }
 
@@ -116,6 +120,46 @@ class TestShowControl : public QObject {
         QCOMPARE(loaded.channelGangs().size(), 2);
         QCOMPARE(loaded.channelGangs().at(0), qMakePair(1, 2));
         QCOMPARE(loaded.channelGangs().at(1), qMakePair(3, 4));
+    }
+
+    void show_consoleToggles_roundtrip() {
+        Show show;
+        show.setDimDcaFaders(true);
+        show.setSelectOnSpill(true);
+        show.setMuteDcaUnassign(true);
+        show.setSuppressBackupSwitch(true);
+        show.setDesigner("Jane Doe");
+
+        Show loaded;
+        loaded.fromJson(show.toJson());
+        QVERIFY(loaded.dimDcaFaders());
+        QVERIFY(loaded.selectOnSpill());
+        QVERIFY(loaded.muteDcaUnassign());
+        QVERIFY(loaded.suppressBackupSwitch());
+        QCOMPARE(loaded.designer(), QString("Jane Doe"));
+
+        // defaults are all off
+        Show fresh;
+        Show freshLoaded;
+        freshLoaded.fromJson(fresh.toJson());
+        QVERIFY(!freshLoaded.dimDcaFaders());
+        QVERIFY(!freshLoaded.muteDcaUnassign());
+    }
+
+    void show_gangMeta_roundtrip() {
+        Show show;
+        show.setChannelGangs({qMakePair(1, 2), qMakePair(3, 4)});
+        show.setGangName(0, "Vocals L/R");
+        show.setGangColor(0, "#ff0000");
+        show.setGangName(1, "FX");
+
+        Show loaded;
+        loaded.fromJson(show.toJson());
+        QCOMPARE(loaded.gangName(0), QString("Vocals L/R"));
+        QCOMPARE(loaded.gangColor(0), QString("#ff0000"));
+        QCOMPARE(loaded.gangName(1), QString("FX"));
+        // gang metadata stays aligned with the gang list
+        QCOMPARE(loaded.channelGangs().size(), 2);
     }
 
     // --- on-fire playback ---
@@ -191,6 +235,93 @@ class TestShowControl : public QObject {
 
         QVERIFY(mixer->calls.contains("fader:ch=6:level=0.9"));
         QVERIFY(!mixer->calls.contains("fader:ch=6:level=0.4"));
+    }
+
+    // --- channel mute buttons ---
+
+    void toggleChannelMute_flipsAndDispatches() {
+        RecordingMixer* mixer = makeConnectedMixer(this);
+        PlaybackEngine engine;
+        engine.setMixer(mixer);
+
+        QSignalSpy spy(&engine, &PlaybackEngine::channelMuteChanged);
+
+        engine.toggleChannelMute(5);
+        QVERIFY(engine.isChannelMuted(5));
+        QVERIFY2(mixer->calls.contains("mute:ch=5:1"), qPrintable(mixer->calls.join(" | ")));
+
+        engine.toggleChannelMute(5);
+        QVERIFY(!engine.isChannelMuted(5));
+        QVERIFY(mixer->calls.contains("mute:ch=5:0"));
+
+        QCOMPARE(spy.count(), 2);
+        QCOMPARE(spy.at(0).at(0).toInt(), 5);
+        QCOMPARE(spy.at(0).at(1).toBool(), true);
+    }
+
+    // --- DCA console-behavior toggles on fire ---
+
+    void fire_muteDcaUnassign_sendsUnassign() {
+        CueList cues;
+        Cue cue(1.0, "A");
+        cue.setType(CueType::Snapshot);
+        DCAOverride ov;
+        ov.mute = true;
+        cue.setTargetedDCAs({2});
+        cue.setDCAOverride(2, ov);
+        cues.addCue(cue);
+
+        RecordingMixer* mixer = makeConnectedMixer(this);
+        PlaybackEngine engine;
+        engine.setCueList(&cues);
+        engine.setMixer(mixer);
+        engine.setMuteDcaUnassign(true);
+        engine.executeCue(0);
+
+        QVERIFY2(mixer->calls.contains("send:/dca/2/mute=1"), qPrintable(mixer->calls.join(" | ")));
+        QVERIFY(mixer->calls.contains("send:/dca/2/assign=0"));
+    }
+
+    void fire_dimDcaFaders_sendsFaderDim() {
+        CueList cues;
+        Cue cue(1.0, "A");
+        cue.setType(CueType::Snapshot);
+        DCAOverride ov;
+        ov.mute = true;
+        cue.setTargetedDCAs({2});
+        cue.setDCAOverride(2, ov);
+        cues.addCue(cue);
+
+        RecordingMixer* mixer = makeConnectedMixer(this);
+        PlaybackEngine engine;
+        engine.setCueList(&cues);
+        engine.setMixer(mixer);
+        engine.setDimDcaFaders(true);
+        engine.executeCue(0);
+
+        QVERIFY2(mixer->calls.contains("send:/dca/2/fader=0"), qPrintable(mixer->calls.join(" | ")));
+    }
+
+    void fire_dcaToggles_offByDefault() {
+        CueList cues;
+        Cue cue(1.0, "A");
+        cue.setType(CueType::Snapshot);
+        DCAOverride ov;
+        ov.mute = true;
+        cue.setTargetedDCAs({2});
+        cue.setDCAOverride(2, ov);
+        cues.addCue(cue);
+
+        RecordingMixer* mixer = makeConnectedMixer(this);
+        PlaybackEngine engine;
+        engine.setCueList(&cues);
+        engine.setMixer(mixer);
+        engine.executeCue(0);
+
+        // only the plain mute is sent; no unassign/dim side effects
+        QVERIFY(mixer->calls.contains("send:/dca/2/mute=1"));
+        QVERIFY(!mixer->calls.contains("send:/dca/2/assign=0"));
+        QVERIFY(!mixer->calls.contains("send:/dca/2/fader=0"));
     }
 
     // --- skip + check mode ---

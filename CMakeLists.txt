@@ -121,6 +121,7 @@ set(SOURCES
     src/ui/ActorSetupPanel.cpp
     src/ui/EnsemblePanel.cpp
     src/ui/RemoteControlDialog.cpp
+    src/ui/SettingsDialog.cpp
     src/ui/PopOutWindow.cpp
     src/ui/BubbleButton.cpp
     src/ui/BubbleBar.cpp
@@ -218,6 +219,7 @@ set(HEADERS
     src/ui/ActorGroupIo.h
     src/ui/EnsemblePanel.h
     src/ui/RemoteControlDialog.h
+    src/ui/SettingsDialog.h
     src/ui/PopOutWindow.h
     src/ui/BubbleButton.h
     src/ui/BubbleBar.h

@@ -59,6 +59,12 @@ class MidiInputManager : public QObject {
     void clearMappings();
     bool hasConflict(const MidiTrigger& trigger, int excludeIndex = -1) const;
 
+    // channel mute-button assignments (trigger -> channel mute toggle)
+    void setMuteAssignments(const QVector<MidiMuteAssignment>& assignments);
+    QVector<MidiMuteAssignment> muteAssignments() const { return m_muteAssignments; }
+    void addMuteAssignment(const MidiMuteAssignment& assignment);
+    void clearMuteAssignments();
+
     // MIDI Learn mode
     void startMidiLearn();
     void stopMidiLearn();
@@ -77,6 +83,7 @@ class MidiInputManager : public QObject {
     void midiMessageReceived(MidiMessageType type, int channel, int noteOrCC, int value);
     void midiLearnReceived(const MidiTrigger& trigger);
     void actionExecuted(MidiAction action);
+    void channelMuteToggled(int channel); // a mute-button assignment fired
     void mscReceived(int command); // a MIDI Show Control command was handled
     // a full MIDI Time Code frame was assembled (from quarter-frame or full-frame)
     void timecodeChanged(int hours, int minutes, int seconds, int frames);
@@ -105,6 +112,7 @@ class MidiInputManager : public QObject {
     int m_mscDeviceId = 0x7F; // 0x7F = respond to all device IDs
 
     QVector<MidiMapping> m_mappings;
+    QVector<MidiMuteAssignment> m_muteAssignments;
 
     bool m_midiLearnActive = false;
 

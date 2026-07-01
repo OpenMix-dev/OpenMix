@@ -53,6 +53,20 @@ struct MidiMapping {
     static MidiMapping fromJson(const QJsonObject& json);
 };
 
+// Binds a MIDI trigger to a mixer input channel; firing it toggles that
+// channel's mute (a console-style mute button). Kept separate from MidiMapping
+// so the parameterless action mappings stay untouched.
+struct MidiMuteAssignment {
+    MidiTrigger trigger;
+    int channel = 0; // 1-based mixer input channel
+
+    bool operator==(const MidiMuteAssignment& other) const;
+    bool operator!=(const MidiMuteAssignment& other) const { return !(*this == other); }
+
+    QJsonObject toJson() const;
+    static MidiMuteAssignment fromJson(const QJsonObject& json);
+};
+
 QString midiMessageTypeToString(MidiMessageType type);
 MidiMessageType midiMessageTypeFromString(const QString& str);
 

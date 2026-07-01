@@ -110,6 +110,16 @@ void PlaybackEngine::go() {
         advanceStandby();
 }
 
+void PlaybackEngine::toggleChannelMute(int channel) {
+    if (channel <= 0)
+        return;
+    const bool muted = !m_channelMutes.value(channel, false);
+    m_channelMutes[channel] = muted;
+    if (m_mixer)
+        m_mixer->setChannelMute(channel, muted);
+    emit channelMuteChanged(channel, muted);
+}
+
 void PlaybackEngine::stop() {
     m_autoFollowTimer.stop();
     m_autoFollowArmed = false;
@@ -304,8 +314,15 @@ void PlaybackEngine::applyDCAOverrides(const Cue& cue, const QSet<int>& targetDC
         DCAOverride override = cue.dcaOverride(dca);
 
         if (override.mute.has_value()) {
+            const bool muting = override.mute.value();
             QString path = QString("/dca/%1/mute").arg(dca);
-            m_mixer->sendParameter(path, override.mute.value() ? 1 : 0);
+            m_mixer->sendParameter(path, muting ? 1 : 0);
+
+            // optional console behaviors, only on the muting edge
+            if (muting && m_dimDcaFaders)
+                m_mixer->sendParameter(QString("/dca/%1/fader").arg(dca), 0.0);
+            if (muting && m_muteDcaUnassign)
+                m_mixer->sendParameter(QString("/dca/%1/assign").arg(dca), 0);
         }
 
         if (override.label.has_value()) {

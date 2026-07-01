@@ -128,6 +128,21 @@ void MidiInputManager::clearMappings() {
     emit mappingsChanged();
 }
 
+void MidiInputManager::setMuteAssignments(const QVector<MidiMuteAssignment>& assignments) {
+    m_muteAssignments = assignments;
+    emit mappingsChanged();
+}
+
+void MidiInputManager::addMuteAssignment(const MidiMuteAssignment& assignment) {
+    m_muteAssignments.append(assignment);
+    emit mappingsChanged();
+}
+
+void MidiInputManager::clearMuteAssignments() {
+    m_muteAssignments.clear();
+    emit mappingsChanged();
+}
+
 bool MidiInputManager::hasConflict(const MidiTrigger& trigger, int excludeIndex) const {
     for (int i = 0; i < m_mappings.size(); ++i) {
         if (i == excludeIndex)
@@ -157,6 +172,12 @@ void MidiInputManager::saveToSettings() {
     QJsonDocument doc(mappingsArray);
     settings.setValue("mappings", doc.toJson(QJsonDocument::Compact));
 
+    QJsonArray muteArray;
+    for (const MidiMuteAssignment& mute : m_muteAssignments) {
+        muteArray.append(mute.toJson());
+    }
+    settings.setValue("muteAssignments", QJsonDocument(muteArray).toJson(QJsonDocument::Compact));
+
     settings.endGroup();
 }
 
@@ -175,6 +196,15 @@ void MidiInputManager::loadFromSettings() {
         m_mappings.clear();
         for (const QJsonValue& val : mappingsArray) {
             m_mappings.append(MidiMapping::fromJson(val.toObject()));
+        }
+    }
+
+    QString muteJson = settings.value("muteAssignments").toString();
+    if (!muteJson.isEmpty()) {
+        QJsonArray muteArray = QJsonDocument::fromJson(muteJson.toUtf8()).array();
+        m_muteAssignments.clear();
+        for (const QJsonValue& val : muteArray) {
+            m_muteAssignments.append(MidiMuteAssignment::fromJson(val.toObject()));
         }
     }
 
@@ -312,6 +342,16 @@ void MidiInputManager::processMidiMessage(const std::vector<unsigned char>& mess
         if (mapping.trigger.matches(type, channel, noteOrCC, value)) {
             executeAction(mapping.action);
             break; // only execute first matching mapping
+        }
+    }
+
+    // channel mute buttons: toggle the assigned channel's mute on the console
+    for (const MidiMuteAssignment& mute : m_muteAssignments) {
+        if (mute.channel > 0 && mute.trigger.matches(type, channel, noteOrCC, value)) {
+            if (m_engine)
+                m_engine->toggleChannelMute(mute.channel);
+            emit channelMuteToggled(mute.channel);
+            break;
         }
     }
 }

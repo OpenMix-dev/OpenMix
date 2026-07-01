@@ -109,6 +109,24 @@ MidiMapping MidiMapping::fromJson(const QJsonObject& json) {
     return mapping;
 }
 
+bool MidiMuteAssignment::operator==(const MidiMuteAssignment& other) const {
+    return trigger == other.trigger && channel == other.channel;
+}
+
+QJsonObject MidiMuteAssignment::toJson() const {
+    QJsonObject obj;
+    obj["trigger"] = trigger.toJson();
+    obj["channel"] = channel;
+    return obj;
+}
+
+MidiMuteAssignment MidiMuteAssignment::fromJson(const QJsonObject& json) {
+    MidiMuteAssignment mute;
+    mute.trigger = MidiTrigger::fromJson(json["trigger"].toObject());
+    mute.channel = json["channel"].toInt(0);
+    return mute;
+}
+
 QString midiMessageTypeToString(MidiMessageType type) {
     switch (type) {
     case MidiMessageType::NoteOn:

@@ -116,6 +116,14 @@ target_link_libraries(test_msc PRIVATE Qt6::Core Qt6::Test)
 target_include_directories(test_msc PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME MscTest COMMAND test_msc)
 
+add_executable(test_midi_mute
+    test_midi_mute.cpp
+    ${CMAKE_SOURCE_DIR}/src/midi/MidiControlMapping.cpp
+)
+target_link_libraries(test_midi_mute PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(test_midi_mute PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME MidiMuteTest COMMAND test_midi_mute)
+
 add_executable(test_osc_remote
     test_osc_remote.cpp
     ${CMAKE_SOURCE_DIR}/src/app/OscRemoteServer.cpp

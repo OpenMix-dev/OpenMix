@@ -55,6 +55,18 @@ class PlaybackEngine : public QObject {
     void setVerifyCues(bool enabled) { m_verifyCues = enabled; }
     [[nodiscard]] bool verifyCues() const noexcept { return m_verifyCues; }
 
+    // console-behavior toggles applied during DCA override recall (mirrors show
+    // preferences; both default off so existing recalls are unchanged):
+    //   dimDcaFaders    - pull a DCA's fader to unity-off when a cue mutes it
+    //   muteDcaUnassign - drop a DCA's channel assignments when a cue mutes it
+    void setDimDcaFaders(bool enabled) { m_dimDcaFaders = enabled; }
+    [[nodiscard]] bool dimDcaFaders() const noexcept { return m_dimDcaFaders; }
+    void setMuteDcaUnassign(bool enabled) { m_muteDcaUnassign = enabled; }
+    [[nodiscard]] bool muteDcaUnassign() const noexcept { return m_muteDcaUnassign; }
+
+    // channel mute state driven by MIDI mute buttons (console-style mute toggle)
+    [[nodiscard]] bool isChannelMuted(int channel) const { return m_channelMutes.value(channel); }
+
     void setValidator(CueValidator* validator);
     [[nodiscard]] CueValidator* validator() const noexcept { return m_validator; }
 
@@ -80,6 +92,9 @@ class PlaybackEngine : public QObject {
   public slots:
     void go();
     void stop();
+
+    // toggle a channel's mute on the console and remember the new state
+    void toggleChannelMute(int channel);
 
     void goToFirst();
     void goToLast();
@@ -107,6 +122,7 @@ class PlaybackEngine : public QObject {
     void cueValidationFailed(int index, const ValidationResult& result);
     void goLockout(const QString& reason);
     void emergencyStopped();
+    void channelMuteChanged(int channel, bool muted);
 
   private slots:
     void onAutoFollowTimerTimeout();
@@ -155,6 +171,9 @@ class PlaybackEngine : public QObject {
     QHash<int, int> m_gangPartners;           // channel -> ganged partner (both directions)
     bool m_checkMode = false;                 // soundcheck: GO holds on current cue
     bool m_verifyCues = false;
+    bool m_dimDcaFaders = false;              // dim a DCA's fader when a cue mutes it
+    bool m_muteDcaUnassign = false;           // unassign a DCA's channels when muted
+    QHash<int, bool> m_channelMutes;          // channel -> mute state (MIDI mute buttons)
     PlaybackState m_state = PlaybackState::Stopped;
     int m_currentIndex = -1;
     int m_standbyIndex = -1;

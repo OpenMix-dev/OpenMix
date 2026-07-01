@@ -106,10 +106,16 @@ void Application::initialize() {
     m_playbackEngine->setActorLibrary(m_show->actorProfileLibrary());
     m_playbackEngine->setPositionLibrary(m_show->positionLibrary());
     m_playbackEngine->setChannelGangs(m_show->channelGangs());
+    m_playbackEngine->setDimDcaFaders(m_show->dimDcaFaders());
+    m_playbackEngine->setMuteDcaUnassign(m_show->muteDcaUnassign());
 
-    // re-seed L/R gangs whenever a project is loaded (fromJson re-emits nameChanged)
-    connect(m_show, &Show::nameChanged, this,
-            [this]() { m_playbackEngine->setChannelGangs(m_show->channelGangs()); });
+    // re-seed gangs + console-behavior toggles whenever a project is loaded
+    // (fromJson re-emits nameChanged)
+    connect(m_show, &Show::nameChanged, this, [this]() {
+        m_playbackEngine->setChannelGangs(m_show->channelGangs());
+        m_playbackEngine->setDimDcaFaders(m_show->dimDcaFaders());
+        m_playbackEngine->setMuteDcaUnassign(m_show->muteDcaUnassign());
+    });
 
     if (m_mixer) {
         m_playbackEngine->setMixer(m_mixer);
@@ -211,15 +217,40 @@ void Application::initialize() {
                 m_playbackEngine->go();
             });
 
-    // scribble strips: actor names + cue number + silence/clip coloring
+    // scribble strips: actor names + cue number + silence/clip coloring +
+    // active-channel highlight (DCA mapping resolves a cue's touched channels)
     m_scribbleController->setActorLibrary(m_show->actorProfileLibrary());
     m_scribbleController->setCueList(m_show->cueList());
+    m_scribbleController->setDCAMapping(m_show->dcaMapping());
     connect(m_show->actorProfileLibrary(), &ActorProfileLibrary::changed, m_scribbleController,
             &ScribbleController::onActorLibraryChanged);
     connect(m_channelMonitor, &ChannelMonitor::channelStateChanged, m_scribbleController,
             &ScribbleController::onChannelStateChanged);
     connect(m_playbackEngine, &PlaybackEngine::currentCueChanged, m_scribbleController,
             &ScribbleController::onCurrentCueChanged);
+
+    // seed scribble-highlight + channel-monitor tunables persisted by the
+    // Settings dialog
+    {
+        QSettings settings;
+        settings.beginGroup("Scribble");
+        m_scribbleController->setHighlightColor(
+            settings.value("highlightColor", m_scribbleController->highlightColor()).toInt());
+        m_scribbleController->setHighlightEnabled(
+            settings.value("highlightEnabled", false).toBool());
+        settings.endGroup();
+
+        settings.beginGroup("Monitor");
+        m_channelMonitor->setSilenceThreshold(
+            settings.value("silenceThreshold", m_channelMonitor->silenceThreshold()).toDouble());
+        m_channelMonitor->setClipThreshold(
+            settings.value("clipThreshold", m_channelMonitor->clipThreshold()).toDouble());
+        m_channelMonitor->setSilenceTimeoutMs(
+            settings.value("silenceTimeoutMs", m_channelMonitor->silenceTimeoutMs()).toInt());
+        m_channelMonitor->setClipHoldMs(
+            settings.value("clipHoldMs", m_channelMonitor->clipHoldMs()).toInt());
+        settings.endGroup();
+    }
 }
 
 void Application::setupMixerConnection(const QString& type, const QString& host, int port) {
