@@ -388,6 +388,10 @@ void CueListView::setRowHeight(int pixels) {
     m_tableView->verticalHeader()->setDefaultSectionSize(pixels);
 }
 
+void CueListView::setColumnVisible(int column, bool visible) {
+    m_tableView->setColumnHidden(column, !visible);
+}
+
 void CueListView::setEditingLocked(bool locked) {
     m_tableView->setEditTriggers(locked ? QAbstractItemView::NoEditTriggers
                                         : QAbstractItemView::DoubleClicked |

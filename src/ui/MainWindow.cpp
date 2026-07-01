@@ -459,6 +459,25 @@ void MainWindow::createMenus() {
             m_cueListView->setRowHeight(pixels);
         });
     }
+
+    // optional-column visibility
+    QMenu* columnsMenu = m_viewMenu->addMenu(tr("&Columns"));
+    struct ColumnToggle {
+        const char* label;
+        int column;
+    };
+    const ColumnToggle columnToggles[] = {{"&Group", CueTableModel::ColGroup},
+                                          {"&Tags", CueTableModel::ColTags},
+                                          {"&Notes", CueTableModel::ColNotes},
+                                          {"Colo&r", CueTableModel::ColColor}};
+    for (const ColumnToggle& ct : columnToggles) {
+        QAction* action = columnsMenu->addAction(tr(ct.label));
+        action->setCheckable(true);
+        action->setChecked(true);
+        const int column = ct.column;
+        connect(action, &QAction::toggled, this,
+                [this, column](bool on) { m_cueListView->setColumnVisible(column, on); });
+    }
     m_viewMenu->addSeparator();
     m_viewMenu->addAction(m_cueZeroAction);
     m_viewMenu->addSeparator();

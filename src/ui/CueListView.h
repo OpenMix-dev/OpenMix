@@ -48,6 +48,7 @@ class CueListView : public QWidget {
     void jumpToSelectedCue(); // set the selected cue as standby without firing
     void setEditingLocked(bool locked); // make the cue table read-only
     void setRowHeight(int pixels);      // cue-table row height
+    void setColumnVisible(int column, bool visible);
 
     [[nodiscard]] bool hasClipboardCue() const { return m_clipboard.has_value(); }
 
