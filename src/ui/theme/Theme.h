@@ -85,6 +85,7 @@ constexpr int XL = 24;
 constexpr int XXL = 32;
 } // namespace Spacing
 
+constexpr int SpacingXXS = Spacing::XXS;
 constexpr int SpacingXS = Spacing::XS;
 constexpr int SpacingS = Spacing::S;
 constexpr int SpacingM = Spacing::M;

@@ -6,7 +6,7 @@
 #include <QResizeEvent>
 
 namespace {
-constexpr int kBubbleColumns = 4; // wrap the icon grid so it fits a narrow pane
+constexpr int kBubbleColumns = 64; // keep the icons on a single row
 }
 
 namespace OpenMix {
@@ -18,9 +18,9 @@ BubbleBar::BubbleBar(QWidget* parent) : QWidget(parent) {
 
 void BubbleBar::setupUi() {
     m_layout = new QGridLayout(this);
-    m_layout->setContentsMargins(Theme::SpacingS, Theme::SpacingS, Theme::SpacingS,
-                                 Theme::SpacingS);
-    m_layout->setSpacing(Theme::SpacingXS);
+    m_layout->setContentsMargins(Theme::SpacingXS, Theme::SpacingXS, Theme::SpacingXS,
+                                 Theme::SpacingXS);
+    m_layout->setSpacing(Theme::SpacingXXS);
 
     setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 }

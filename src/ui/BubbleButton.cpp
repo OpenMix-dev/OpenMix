@@ -13,7 +13,7 @@ BubbleButton::BubbleButton(const QString& icon, const QString& tooltip, QWidget*
     setObjectName(Theme::ObjectNames::BubbleButton);
     setToolTip(tooltip);
     setCheckable(true);
-    setFixedSize(36, 36);
+    setFixedSize(30, 30);
 
     QFont f = font();
     f.setPointSize(16);
@@ -27,9 +27,9 @@ BubbleButton::BubbleButton(const QIcon& icon, const QString& tooltip, QWidget* p
     setObjectName(Theme::ObjectNames::BubbleButton);
     setToolTip(tooltip);
     setCheckable(true);
-    setFixedSize(36, 36);
+    setFixedSize(30, 30);
     QPushButton::setIcon(icon);
-    setIconSize(QSize(20, 20));
+    setIconSize(QSize(18, 18));
 }
 
 void BubbleButton::setBadge(const QString& text) {
@@ -60,7 +60,7 @@ void BubbleButton::setButtonIcon(const QIcon& icon) {
     m_iconText.clear();
     setText(QString());
     QPushButton::setIcon(icon);
-    setIconSize(QSize(20, 20));
+    setIconSize(QSize(18, 18));
     update();
 }
 

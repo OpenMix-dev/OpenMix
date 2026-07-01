@@ -947,12 +947,12 @@ QWidget#BubbleBar {
 QPushButton#BubbleButton {
     background-color: transparent;
     border: none;
-    border-radius: 8px;
-    padding: 8px;
-    min-width: 36px;
-    max-width: 36px;
-    min-height: 36px;
-    max-height: 36px;
+    border-radius: 6px;
+    padding: 4px;
+    min-width: 30px;
+    max-width: 30px;
+    min-height: 30px;
+    max-height: 30px;
     color: #9ca3af;
 }
 
