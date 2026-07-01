@@ -193,6 +193,29 @@ target_include_directories(test_undo_commands PRIVATE
 )
 add_test(NAME UndoCommandsTest COMMAND test_undo_commands)
 
+add_executable(test_digico_protocol
+    test_digico_protocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/digico/DiGiCoProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/transport/TcpTransport.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+)
+target_link_libraries(test_digico_protocol PRIVATE
+    Qt6::Core
+    Qt6::Network
+    Qt6::Test
+)
+target_include_directories(test_digico_protocol PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
+if(WIN32)
+    target_compile_definitions(test_digico_protocol PRIVATE NOMINMAX)
+endif()
+add_test(NAME DiGiCoProtocolTest COMMAND test_digico_protocol)
+
 add_executable(test_allenheath_parsing
     test_allenheath_parsing.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/AllenHeathTcpProtocol.cpp

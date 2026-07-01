@@ -29,6 +29,11 @@ enum class ConsoleType {
     CL5, // CL5
     DM7, // DM7 / DM7 Compact
 
+    SD7,  // DiGiCo SD7
+    SD9,  // DiGiCo SD9
+    SD11, // DiGiCo SD11
+    SD12, // DiGiCo SD12
+
     Loopback, // loopback for testing
 
     Unknown
@@ -44,7 +49,7 @@ enum class ProtocolType {
 };
 
 // manufacturer categories
-enum class Manufacturer { Behringer, Midas, AllenHeath, Yamaha, Unknown };
+enum class Manufacturer { Behringer, Midas, AllenHeath, Yamaha, DiGiCo, Unknown };
 
 // capabilities descriptor for each console type
 struct MixerCapabilities {

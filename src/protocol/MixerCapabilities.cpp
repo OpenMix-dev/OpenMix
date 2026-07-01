@@ -382,6 +382,83 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.supportsEffectSends = true;
         break;
 
+    // DiGiCo SD series (TLV binary over TCP 51321, reverse-engineered)
+    case ConsoleType::SD7:
+        caps.manufacturer = Manufacturer::DiGiCo;
+        caps.protocol = ProtocolType::BinaryTcp;
+        caps.displayName = "DiGiCo SD7";
+        caps.protocolId = "sd7";
+        caps.defaultPort = 51321;
+        caps.dcaCount = 24;
+        caps.inputChannels = 128;
+        caps.mixBuses = 48;
+        caps.matrixOutputs = 36;
+        caps.scenes = 1000;
+        caps.maxDCANameLength = 8;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LShv", "PEQ", "PEQ", "HShv"};
+        caps.effectSendBuses = 16;
+        caps.supportsEffectSends = true;
+        break;
+
+    case ConsoleType::SD9:
+        caps.manufacturer = Manufacturer::DiGiCo;
+        caps.protocol = ProtocolType::BinaryTcp;
+        caps.displayName = "DiGiCo SD9";
+        caps.protocolId = "sd9";
+        caps.defaultPort = 51321;
+        caps.dcaCount = 12;
+        caps.inputChannels = 96;
+        caps.mixBuses = 48;
+        caps.matrixOutputs = 24;
+        caps.scenes = 1000;
+        caps.maxDCANameLength = 8;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LShv", "PEQ", "PEQ", "HShv"};
+        caps.effectSendBuses = 16;
+        caps.supportsEffectSends = true;
+        break;
+
+    case ConsoleType::SD11:
+        caps.manufacturer = Manufacturer::DiGiCo;
+        caps.protocol = ProtocolType::BinaryTcp;
+        caps.displayName = "DiGiCo SD11";
+        caps.protocolId = "sd11";
+        caps.defaultPort = 51321;
+        caps.dcaCount = 8;
+        caps.inputChannels = 32;
+        caps.mixBuses = 16;
+        caps.matrixOutputs = 8;
+        caps.scenes = 1000;
+        caps.maxDCANameLength = 8;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LShv", "PEQ", "PEQ", "HShv"};
+        caps.effectSendBuses = 8;
+        caps.supportsEffectSends = true;
+        break;
+
+    case ConsoleType::SD12:
+        caps.manufacturer = Manufacturer::DiGiCo;
+        caps.protocol = ProtocolType::BinaryTcp;
+        caps.displayName = "DiGiCo SD12";
+        caps.protocolId = "sd12";
+        caps.defaultPort = 51321;
+        caps.dcaCount = 12;
+        caps.inputChannels = 72;
+        caps.mixBuses = 36;
+        caps.matrixOutputs = 12;
+        caps.scenes = 1000;
+        caps.maxDCANameLength = 8;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LShv", "PEQ", "PEQ", "HShv"};
+        caps.effectSendBuses = 16;
+        caps.supportsEffectSends = true;
+        break;
+
     // Loopback
     case ConsoleType::Loopback:
         caps.manufacturer = Manufacturer::Unknown;
@@ -469,6 +546,16 @@ MixerCapabilities MixerCapabilities::forProtocolId(const QString& protocolId) {
     if (id == "dm7")
         return forConsole(ConsoleType::DM7);
 
+    // DiGiCo SD
+    if (id == "sd7")
+        return forConsole(ConsoleType::SD7);
+    if (id == "sd9")
+        return forConsole(ConsoleType::SD9);
+    if (id == "sd11")
+        return forConsole(ConsoleType::SD11);
+    if (id == "sd12" || id == "sd")
+        return forConsole(ConsoleType::SD12);
+
     // Loopback
     if (id == "loopback" || id == "test")
         return forConsole(ConsoleType::Loopback);
@@ -503,6 +590,12 @@ QVector<MixerCapabilities> MixerCapabilities::allSupported() {
     all.append(forConsole(ConsoleType::CL3));
     all.append(forConsole(ConsoleType::CL5));
     all.append(forConsole(ConsoleType::DM7));
+
+    // DiGiCo
+    all.append(forConsole(ConsoleType::SD7));
+    all.append(forConsole(ConsoleType::SD9));
+    all.append(forConsole(ConsoleType::SD11));
+    all.append(forConsole(ConsoleType::SD12));
 
     return all;
 }
@@ -555,6 +648,13 @@ bool MixerCapabilities::isSupported() const {
     case ConsoleType::DM7:
         return true;
 
+    // DiGiCo SD (reverse-engineered, hardware-unvalidated)
+    case ConsoleType::SD7:
+    case ConsoleType::SD9:
+    case ConsoleType::SD11:
+    case ConsoleType::SD12:
+        return true;
+
     // Behringer Wing
     case ConsoleType::Wing:
         return true;
@@ -574,6 +674,8 @@ QString MixerCapabilities::manufacturerName() const {
         return "Allen & Heath";
     case Manufacturer::Yamaha:
         return "Yamaha";
+    case Manufacturer::DiGiCo:
+        return "DiGiCo";
     default:
         return "Unknown";
     }

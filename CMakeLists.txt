@@ -168,6 +168,8 @@ set(SOURCES
     src/protocol/yamaha/YamahaCLProtocol.cpp
     src/protocol/yamaha/YamahaDM7Protocol.cpp
 
+    src/protocol/digico/DiGiCoProtocol.cpp
+
     src/protocol/discovery/DiscoveredConsole.cpp
     src/protocol/discovery/ConsoleDiscoveryService.cpp
     src/protocol/discovery/probes/BehringerX32ProbeStrategy.cpp
@@ -281,6 +283,8 @@ set(HEADERS
     src/protocol/yamaha/YamahaQLProtocol.h
     src/protocol/yamaha/YamahaCLProtocol.h
     src/protocol/yamaha/YamahaDM7Protocol.h
+
+    src/protocol/digico/DiGiCoProtocol.h
 
     src/protocol/discovery/DiscoveredConsole.h
     src/protocol/discovery/OscProbeStrategy.h
