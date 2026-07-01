@@ -4,6 +4,7 @@
 #include "BubbleButton.h"
 #include "ConnectionPanel.h"
 #include "CueEditor.h"
+#include "ActiveCueInfoPanel.h"
 #include "AllocateSpareDialog.h"
 #include "ChannelUtilisationDialog.h"
 #include "CueListView.h"
@@ -293,6 +294,13 @@ void MainWindow::createActions() {
     m_showTimecodeAction->setToolTip(tr("Show/hide timecode triggers panel (F12)"));
     connect(m_showTimecodeAction, &QAction::triggered, this, &MainWindow::toggleTimecodePanel);
 
+    m_showActiveCueInfoAction = new QAction(tr("Active Cue &Info"), this);
+    m_showActiveCueInfoAction->setCheckable(true);
+    m_showActiveCueInfoAction->setChecked(false);
+    m_showActiveCueInfoAction->setToolTip(tr("Show/hide the active cue info panel"));
+    connect(m_showActiveCueInfoAction, &QAction::triggered, this,
+            &MainWindow::toggleActiveCueInfoPanel);
+
     m_cueZeroAction = new QAction(tr("Cue &Zero..."), this);
     m_cueZeroAction->setToolTip(tr("Edit the base/reset state recalled before the first cue"));
     connect(m_cueZeroAction, &QAction::triggered, this, &MainWindow::showCueZeroDialog);
@@ -452,6 +460,7 @@ void MainWindow::createMenus() {
     m_viewMenu->addAction(m_showEnsembleAction);
     m_viewMenu->addAction(m_showPositionAction);
     m_viewMenu->addAction(m_showTimecodeAction);
+    m_viewMenu->addAction(m_showActiveCueInfoAction);
     m_viewMenu->addSeparator();
 
     // cue-table row size
@@ -613,6 +622,16 @@ void MainWindow::createPopOutWindows() {
         m_showTimecodeAction->setChecked(visible);
         m_bubbleBar->setButtonActive("timecode", visible);
     });
+
+    m_activeCueInfoPanel = new ActiveCueInfoPanel(m_app, nullptr);
+    m_activeCueInfoPopOut = new PopOutWindow("activeCueInfo", tr("Active Cue Info"), this);
+    m_activeCueInfoPopOut->setContentWidget(m_activeCueInfoPanel);
+    m_activeCueInfoPopOut->setMinimumContentSize(320, 400);
+
+    connect(m_activeCueInfoPopOut, &PopOutWindow::visibilityChanged, [this](bool visible) {
+        m_showActiveCueInfoAction->setChecked(visible);
+        m_bubbleBar->setButtonActive("activeCueInfo", visible);
+    });
 }
 
 void MainWindow::createBubbleBar() {
@@ -625,6 +644,7 @@ void MainWindow::createBubbleBar() {
     m_bubbleBar->addButton("ensembles", Icons::actor(), tr("Ensembles (F10)"));
     m_bubbleBar->addButton("positions", Icons::sliders(), tr("Positions (F11)"));
     m_bubbleBar->addButton("timecode", Icons::sliders(), tr("Timecode Triggers (F12)"));
+    m_bubbleBar->addButton("activeCueInfo", Icons::sliders(), tr("Active Cue Info"));
 
     connect(m_bubbleBar, &BubbleBar::buttonClicked, this, &MainWindow::onBubbleButtonClicked);
 
@@ -647,6 +667,8 @@ void MainWindow::onBubbleButtonClicked(const QString& id, [[maybe_unused]] bool 
         togglePositionPanel();
     } else if (id == "timecode") {
         toggleTimecodePanel();
+    } else if (id == "activeCueInfo") {
+        toggleActiveCueInfoPanel();
     }
 }
 
@@ -1003,6 +1025,15 @@ void MainWindow::toggleTimecodePanel() {
     } else {
         m_timecodePopOut->showAndRestore();
         m_timecodePanel->refresh();
+    }
+}
+
+void MainWindow::toggleActiveCueInfoPanel() {
+    if (m_activeCueInfoPopOut->isVisible()) {
+        m_activeCueInfoPopOut->hide();
+    } else {
+        m_activeCueInfoPopOut->showAndRestore();
+        m_activeCueInfoPanel->refresh();
     }
 }
 

@@ -21,6 +21,7 @@ class ActorSetupPanel;
 class EnsemblePanel;
 class PositionPanel;
 class TimecodePanel;
+class ActiveCueInfoPanel;
 class PopOutWindow;
 class BubbleBar;
 class PlaybackGuard;
@@ -69,6 +70,7 @@ class MainWindow : public QMainWindow {
     void toggleEnsemblePanel();
     void togglePositionPanel();
     void toggleTimecodePanel();
+    void toggleActiveCueInfoPanel();
     void showCueZeroDialog();
 
     // update UI state
@@ -130,6 +132,7 @@ class MainWindow : public QMainWindow {
     EnsemblePanel* m_ensemblePanel;
     PositionPanel* m_positionPanel;
     TimecodePanel* m_timecodePanel;
+    ActiveCueInfoPanel* m_activeCueInfoPanel;
 
     // pop-out windows
     PopOutWindow* m_connectionPopOut;
@@ -139,6 +142,7 @@ class MainWindow : public QMainWindow {
     PopOutWindow* m_ensemblePopOut;
     PopOutWindow* m_positionPopOut;
     PopOutWindow* m_timecodePopOut;
+    PopOutWindow* m_activeCueInfoPopOut;
 
     // bubble bar
     BubbleBar* m_bubbleBar;
@@ -202,6 +206,7 @@ class MainWindow : public QMainWindow {
     QAction* m_showEnsembleAction;
     QAction* m_showPositionAction;
     QAction* m_showTimecodeAction;
+    QAction* m_showActiveCueInfoAction;
     QAction* m_cueZeroAction;
     QAction* m_editHistoryAction;
     QAction* m_exportCsvAction;
