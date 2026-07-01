@@ -181,6 +181,29 @@ class Cue {
     void setChannelLevel(int channel, double level) { m_channelLevels[channel] = level; }
     void removeChannelLevel(int channel) { m_channelLevels.remove(channel); }
 
+    // per-FX-unit mute state (fx unit index -> muted). Sent to the console on fire.
+    [[nodiscard]] QMap<int, bool> fxMutes() const { return m_fxMutes; }
+    void setFxMutes(const QMap<int, bool>& mutes) { m_fxMutes = mutes; }
+    void setFxMute(int fxUnit, bool muted) { m_fxMutes[fxUnit] = muted; }
+    void removeFxMute(int fxUnit) { m_fxMutes.remove(fxUnit); }
+
+    // console snippet indices recalled on fire (partial scene recalls)
+    [[nodiscard]] QList<int> snippets() const { return m_snippets; }
+    void setSnippets(const QList<int>& snippets) { m_snippets = snippets; }
+    void addSnippet(int snippet) {
+        if (!m_snippets.contains(snippet))
+            m_snippets.append(snippet);
+    }
+    void removeSnippet(int snippet) { m_snippets.removeAll(snippet); }
+
+    // display colour (hex string, e.g. "#ff0000"); empty = list default
+    [[nodiscard]] QString colour() const { return m_colour; }
+    void setColour(const QString& colour) { m_colour = colour; }
+
+    // when true, standby advance (next / auto-advance) steps over this cue
+    [[nodiscard]] bool skip() const noexcept { return m_skip; }
+    void setSkip(bool skip) { m_skip = skip; }
+
     QJsonObject toJson() const;
     [[nodiscard]] static Cue fromJson(const QJsonObject& json);
 
@@ -228,6 +251,11 @@ class Cue {
 
     QMap<int, QString> m_channelProfiles; // channel -> active profile slot id
     QMap<int, double> m_channelLevels;    // channel -> fader level override (0..1)
+
+    QMap<int, bool> m_fxMutes; // fx unit index -> muted
+    QList<int> m_snippets;     // console snippet indices recalled on fire
+    QString m_colour;          // display colour (hex)
+    bool m_skip = false;       // skip during standby advance
 };
 
 } // namespace OpenMix

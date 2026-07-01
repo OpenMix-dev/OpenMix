@@ -61,7 +61,20 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
             return cue.tags().join(", ");
         case ColNotes:
             return cue.notes();
+        case ColColour:
+            return cue.colour();
         }
+    }
+
+    // colour swatch shown in the colour column
+    if (role == Qt::DecorationRole && col == ColColour) {
+        const QString hex = cue.colour();
+        if (!hex.isEmpty()) {
+            QColor c(hex);
+            if (c.isValid())
+                return c;
+        }
+        return QVariant();
     }
 
     if (role == Qt::BackgroundRole) {
@@ -121,6 +134,8 @@ QVariant CueTableModel::headerData(int section, Qt::Orientation orientation, int
         return tr("Tags");
     case ColNotes:
         return tr("Notes");
+    case ColColour:
+        return tr("Colour");
     }
     return QVariant();
 }

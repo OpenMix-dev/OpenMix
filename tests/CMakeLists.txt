@@ -269,3 +269,33 @@ add_executable(test_cuezero
 target_link_libraries(test_cuezero PRIVATE Qt6::Core Qt6::Test)
 target_include_directories(test_cuezero PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME CueZeroTest COMMAND test_cuezero)
+
+# --- show control: fx mutes, snippets, gangs, colour/skip, check mode ---
+
+add_executable(test_show_control
+    test_show_control.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueValidator.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackGuard.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackLogger.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/FadeEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueZero.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+)
+target_link_libraries(test_show_control PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+target_include_directories(test_show_control PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
+add_test(NAME ShowControlTest COMMAND test_show_control)

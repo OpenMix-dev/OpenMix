@@ -52,6 +52,9 @@ class WingProtocol : public MixerProtocol {
     // scene recall
     void recallScene(int sceneNumber) override;
 
+    // snippet (partial scene) recall
+    void recallSnippet(int snippetNumber) override;
+
     // semantic channel setters (WING uses real-world values, so most pass through)
     void setChannelFader(int channel, double level) override;
     void setChannelMute(int channel, bool muted) override;

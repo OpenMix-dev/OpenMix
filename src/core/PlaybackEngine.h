@@ -2,9 +2,12 @@
 
 #include "CueValidator.h"
 #include "FadeEngine.h"
+#include <QHash>
 #include <QJsonObject>
+#include <QList>
 #include <QMap>
 #include <QObject>
+#include <QPair>
 #include <QSet>
 #include <QTimer>
 
@@ -33,6 +36,16 @@ class PlaybackEngine : public QObject {
     void setDCAMapping(DCAMapping* mapping);
     void setActorLibrary(ActorProfileLibrary* library);
     void setPositionLibrary(PositionLibrary* library);
+
+    // ganged input-channel pairs (from the show); a level applied to one channel
+    // is mirrored to its partner on fire.
+    void setChannelGangs(const QList<QPair<int, int>>& gangs);
+    [[nodiscard]] QList<QPair<int, int>> channelGangs() const { return m_channelGangs; }
+
+    // check / soundcheck (rehearsal) mode: while enabled, GO re-fires the current
+    // cue instead of advancing standby to the next cue.
+    void setCheckMode(bool enabled);
+    [[nodiscard]] bool checkMode() const noexcept { return m_checkMode; }
 
     // drives timed fader fades; exposed so the UI (and tests) can observe/step it
     [[nodiscard]] FadeEngine* fadeEngine() { return &m_fadeEngine; }
@@ -89,6 +102,7 @@ class PlaybackEngine : public QObject {
     void cueDrifted(int index, const QStringList& paths);
     void autoFollowArmed(bool armed);
     void macroChildExecuted(const QString& parentId, const QString& childId);
+    void checkModeChanged(bool enabled);
 
     void cueValidationFailed(int index, const ValidationResult& result);
     void goLockout(const QString& reason);
@@ -101,6 +115,8 @@ class PlaybackEngine : public QObject {
     void setState(PlaybackState state);
     void setCurrentIndex(int index);
     void advanceStandby();
+    // first index after 'from' whose cue is not skipped, or -1 at end of list
+    [[nodiscard]] int nextEnabledIndex(int from) const;
     void executeCueInternal(const Cue& cue);
     void applyDCAOverrides(const Cue& cue, const QSet<int>& targetDCAs);
     void executeMacroCue(const Cue& cue);
@@ -119,7 +135,12 @@ class PlaybackEngine : public QObject {
     void expandChannelProfiles(const Cue& cue);
     void applyVoice(int channel, const VoiceData& voice);
     void applyChannelLevels(const Cue& cue); // fade-aware per-channel fader moves
+    // drive a single channel's fader to target (instant or faded), tracking the
+    // applied value as the next fade's source.
+    void driveChannelLevel(int channel, double target, double fadeMs, FadeCurve curve);
     void applyChannelPositions(const Cue& cue); // named-position pan/delay sends
+    void applyFxMutes(const Cue& cue);          // per-FX-unit mute sends
+    void recallSnippets(const Cue& cue);        // console snippet recalls
     void verifyCue(int index, const Cue& cue);
 
     CueList* m_cueList = nullptr;
@@ -130,6 +151,9 @@ class PlaybackEngine : public QObject {
 
     FadeEngine m_fadeEngine;
     QMap<int, double> m_appliedChannelLevels; // last-applied fader per channel (fade source)
+    QList<QPair<int, int>> m_channelGangs;    // ganged input-channel pairs
+    QHash<int, int> m_gangPartners;           // channel -> ganged partner (both directions)
+    bool m_checkMode = false;                 // soundcheck: GO holds on current cue
     bool m_verifyCues = false;
     PlaybackState m_state = PlaybackState::Stopped;
     int m_currentIndex = -1;
