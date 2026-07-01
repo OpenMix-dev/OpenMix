@@ -613,9 +613,10 @@ void MainWindow::createToolBars() {
     m_playbackToolBar->addSeparator();
     m_playbackToolBar->addAction(m_panicAction);
 
-    // GO/Stop/PANIC icons are self-explanatory; drop their labels and rely on
+    // all transport icons are self-explanatory; drop their labels and rely on
     // the tooltips set on each action for hover discovery
-    for (QAction* a : {m_goAction, m_stopAction, m_panicAction}) {
+    for (QAction* a : {m_goAction, m_stopAction, m_previousCueAction, m_nextCueAction,
+                       m_panicAction}) {
         if (auto* b = qobject_cast<QToolButton*>(m_playbackToolBar->widgetForAction(a)))
             b->setToolButtonStyle(Qt::ToolButtonIconOnly);
     }
