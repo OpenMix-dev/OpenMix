@@ -39,8 +39,13 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMenuBar>
+#include <QDialog>
+#include <QFile>
 #include <QInputDialog>
 #include <QMessageBox>
+#include <QTextStream>
+#include <QUndoView>
+#include <QVBoxLayout>
 #include <QPushButton>
 #include <QSettings>
 #include <QSplitter>
@@ -281,6 +286,14 @@ void MainWindow::createActions() {
     m_cueZeroAction->setToolTip(tr("Edit the base/reset state recalled before the first cue"));
     connect(m_cueZeroAction, &QAction::triggered, this, &MainWindow::showCueZeroDialog);
 
+    m_editHistoryAction = new QAction(tr("Edit &History"), this);
+    m_editHistoryAction->setToolTip(tr("Browse and step through the edit history"));
+    connect(m_editHistoryAction, &QAction::triggered, this, &MainWindow::showEditHistoryDialog);
+
+    m_exportCsvAction = new QAction(tr("&Export to CSV..."), this);
+    m_exportCsvAction->setToolTip(tr("Export the cue list to a CSV file"));
+    connect(m_exportCsvAction, &QAction::triggered, this, &MainWindow::exportCuesToCsv);
+
     m_showLogViewerAction = new QAction(tr("Application &Log..."), this);
     m_showLogViewerAction->setShortcut(Qt::Key_F8);
     m_showLogViewerAction->setToolTip(tr("Show application log (F8)"));
@@ -422,6 +435,8 @@ void MainWindow::createMenus() {
     m_viewMenu->addSeparator();
     m_viewMenu->addAction(m_cueZeroAction);
     m_viewMenu->addSeparator();
+    m_viewMenu->addAction(m_editHistoryAction);
+    m_viewMenu->addAction(m_exportCsvAction);
     m_viewMenu->addAction(m_showLogViewerAction);
 
     m_settingsMenu = menuBar()->addMenu(tr("&Settings"));
@@ -1123,6 +1138,50 @@ void MainWindow::showKeyboardShortcutsDialog() {
 void MainWindow::showLogViewerDialog() {
     LogViewerDialog dialog(m_app->appLogger(), this);
     dialog.exec();
+}
+
+void MainWindow::showEditHistoryDialog() {
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Edit History"));
+    dialog.resize(360, 480);
+    QVBoxLayout* layout = new QVBoxLayout(&dialog);
+    QUndoView* view = new QUndoView(m_app->undoStack(), &dialog);
+    view->setEmptyLabel(tr("<clean>"));
+    layout->addWidget(view);
+    dialog.exec();
+}
+
+void MainWindow::exportCuesToCsv() {
+    QString filePath = QFileDialog::getSaveFileName(this, tr("Export to CSV"), QString(),
+                                                    tr("CSV Files (*.csv)"));
+    if (filePath.isEmpty())
+        return;
+    if (!filePath.endsWith(".csv", Qt::CaseInsensitive))
+        filePath += ".csv";
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("Error"), tr("Could not write %1").arg(filePath));
+        return;
+    }
+
+    // quote a field and escape embedded quotes per RFC 4180
+    auto csv = [](const QString& s) {
+        QString v = s;
+        v.replace('"', "\"\"");
+        return QString("\"%1\"").arg(v);
+    };
+
+    QTextStream out(&file);
+    out << "Number,Name,Type,Notes,Color,Skip\n";
+    const CueList* list = m_app->show()->cueList();
+    for (int i = 0; i < list->count(); ++i) {
+        const Cue& cue = list->at(i);
+        out << QString::number(cue.number(), 'f', 2) << ',' << csv(cue.name()) << ','
+            << csv(cueTypeToString(cue.type())) << ',' << csv(cue.notes()) << ','
+            << csv(cue.color()) << ',' << (cue.skip() ? "yes" : "no") << '\n';
+    }
+    file.close();
 }
 
 } // namespace OpenMix

@@ -91,6 +91,8 @@ class MainWindow : public QMainWindow {
     void showKeyboardShortcutsDialog();
     void showSettingsDialog();
     void showLogViewerDialog();
+    void showEditHistoryDialog();
+    void exportCuesToCsv();
 
     // bubble bar interaction
     void onBubbleButtonClicked(const QString& id, bool checked);
@@ -196,6 +198,8 @@ class MainWindow : public QMainWindow {
     QAction* m_showPositionAction;
     QAction* m_showTimecodeAction;
     QAction* m_cueZeroAction;
+    QAction* m_editHistoryAction;
+    QAction* m_exportCsvAction;
     QAction* m_showLogViewerAction;
 
     // settings actions
