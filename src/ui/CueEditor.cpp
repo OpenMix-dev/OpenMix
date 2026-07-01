@@ -6,6 +6,7 @@
 #include "core/CueList.h"
 #include "core/FadeCurve.h"
 #include "core/PlaybackEngine.h"
+#include "core/Position.h"
 #include "core/Show.h"
 #include "theme/Theme.h"
 
@@ -321,9 +322,9 @@ void CueEditor::createChannelProfilesSection() {
     hint->setStyleSheet(QString("color: %1;").arg(Theme::Colors::TextSecondary));
     layout->addWidget(hint);
 
-    m_channelTable = new QTableWidget(0, 5, m_channelProfilesGroup);
+    m_channelTable = new QTableWidget(0, 6, m_channelProfilesGroup);
     m_channelTable->setHorizontalHeaderLabels(
-        {tr("Ch"), tr("Actor"), tr("Profile"), tr("Set"), tr("Level")});
+        {tr("Ch"), tr("Actor"), tr("Profile"), tr("Set"), tr("Level"), tr("Position")});
     m_channelTable->verticalHeader()->setVisible(false);
     m_channelTable->setSelectionMode(QAbstractItemView::NoSelection);
     m_channelTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -761,6 +762,17 @@ void CueEditor::rebuildChannelTable() {
         connect(levelSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
                 [this, ch]() { onChannelLevelChanged(ch); });
         m_channelTable->setCellWidget(row, 4, levelSpin);
+
+        auto* positionCombo = new QComboBox(m_channelTable);
+        positionCombo->addItem(tr("(none)"), QString());
+        if (m_app && m_app->show()) {
+            for (const Position& p : m_app->show()->positionLibrary()->positions())
+                positionCombo->addItem(p.name().isEmpty() ? tr("(unnamed)") : p.name(), p.id());
+        }
+        positionCombo->setProperty("channel", ch);
+        connect(positionCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+                [this, ch]() { onChannelPositionChanged(ch); });
+        m_channelTable->setCellWidget(row, 5, positionCombo);
     }
 }
 
@@ -788,6 +800,11 @@ void CueEditor::populateChannelTable() {
         spin->setEnabled(hasLevel);
         spin->setValue(hasLevel ? std::clamp(static_cast<int>(levels.value(ch) * 100.0 + 0.5), 0, 100)
                                 : 75);
+
+        if (auto* posCombo = qobject_cast<QComboBox*>(m_channelTable->cellWidget(row, 5))) {
+            const int posIdx = posCombo->findData(cue->channelPosition(ch));
+            posCombo->setCurrentIndex(posIdx < 0 ? 0 : posIdx);
+        }
     }
 }
 
@@ -847,6 +864,34 @@ void CueEditor::onChannelProfileChanged(int channel) {
         cue->removeChannelProfile(channel);
     else
         cue->setChannelProfile(channel, slot);
+
+    m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
+    emit cueModified();
+}
+
+void CueEditor::onChannelPositionChanged(int channel) {
+    if (m_updatingUi)
+        return;
+    Cue* cue = currentCue();
+    if (!cue || !m_channelTable)
+        return;
+
+    QComboBox* combo = nullptr;
+    for (int row = 0; row < m_channelTable->rowCount(); ++row) {
+        auto* c = qobject_cast<QComboBox*>(m_channelTable->cellWidget(row, 5));
+        if (c && c->property("channel").toInt() == channel) {
+            combo = c;
+            break;
+        }
+    }
+    if (!combo)
+        return;
+
+    const QString positionId = combo->currentData().toString();
+    if (positionId.isEmpty())
+        cue->clearChannelPosition(channel);
+    else
+        cue->setChannelPosition(channel, positionId);
 
     m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
     emit cueModified();

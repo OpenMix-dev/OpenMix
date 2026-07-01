@@ -6,8 +6,11 @@
 #include "CueEditor.h"
 #include "CueListView.h"
 #include "CueTableModel.h"
+#include "CueZeroDialog.h"
 #include "DCAMappingPanel.h"
 #include "EnsemblePanel.h"
+#include "PositionPanel.h"
+#include "TimecodePanel.h"
 #include "LogViewerDialog.h"
 #include "MixerFeedbackPanel.h"
 #include "PopOutWindow.h"
@@ -206,6 +209,24 @@ void MainWindow::createActions() {
     m_showEnsembleAction->setToolTip(tr("Show/hide ensembles panel (F10)"));
     connect(m_showEnsembleAction, &QAction::triggered, this, &MainWindow::toggleEnsemblePanel);
 
+    m_showPositionAction = new QAction(Icons::sliders(), tr("&Positions"), this);
+    m_showPositionAction->setCheckable(true);
+    m_showPositionAction->setChecked(false);
+    m_showPositionAction->setShortcut(Qt::Key_F11);
+    m_showPositionAction->setToolTip(tr("Show/hide positions panel (F11)"));
+    connect(m_showPositionAction, &QAction::triggered, this, &MainWindow::togglePositionPanel);
+
+    m_showTimecodeAction = new QAction(Icons::sliders(), tr("&Timecode Triggers"), this);
+    m_showTimecodeAction->setCheckable(true);
+    m_showTimecodeAction->setChecked(false);
+    m_showTimecodeAction->setShortcut(Qt::Key_F12);
+    m_showTimecodeAction->setToolTip(tr("Show/hide timecode triggers panel (F12)"));
+    connect(m_showTimecodeAction, &QAction::triggered, this, &MainWindow::toggleTimecodePanel);
+
+    m_cueZeroAction = new QAction(tr("Cue &Zero..."), this);
+    m_cueZeroAction->setToolTip(tr("Edit the base/reset state recalled before the first cue"));
+    connect(m_cueZeroAction, &QAction::triggered, this, &MainWindow::showCueZeroDialog);
+
     m_showLogViewerAction = new QAction(tr("Application &Log..."), this);
     m_showLogViewerAction->setShortcut(Qt::Key_F8);
     m_showLogViewerAction->setToolTip(tr("Show application log (F8)"));
@@ -277,6 +298,9 @@ void MainWindow::registerShortcuts() {
     sm->registerAction("view.connection", m_showConnectionAction, QKeySequence(Qt::Key_F7));
     sm->registerAction("view.actorSetup", m_showActorSetupAction, QKeySequence(Qt::Key_F9));
     sm->registerAction("view.ensembles", m_showEnsembleAction, QKeySequence(Qt::Key_F10));
+    sm->registerAction("view.positions", m_showPositionAction, QKeySequence(Qt::Key_F11));
+    sm->registerAction("view.timecode", m_showTimecodeAction, QKeySequence(Qt::Key_F12));
+    sm->registerAction("view.cueZero", m_cueZeroAction, QKeySequence());
     sm->registerAction("view.logViewer", m_showLogViewerAction, QKeySequence(Qt::Key_F8));
 
     // settings actions
@@ -326,6 +350,10 @@ void MainWindow::createMenus() {
     m_viewMenu->addAction(m_showConnectionAction);
     m_viewMenu->addAction(m_showActorSetupAction);
     m_viewMenu->addAction(m_showEnsembleAction);
+    m_viewMenu->addAction(m_showPositionAction);
+    m_viewMenu->addAction(m_showTimecodeAction);
+    m_viewMenu->addSeparator();
+    m_viewMenu->addAction(m_cueZeroAction);
     m_viewMenu->addSeparator();
     m_viewMenu->addAction(m_showLogViewerAction);
 
@@ -423,6 +451,26 @@ void MainWindow::createPopOutWindows() {
         m_showEnsembleAction->setChecked(visible);
         m_bubbleBar->setButtonActive("ensembles", visible);
     });
+
+    m_positionPanel = new PositionPanel(m_app, nullptr);
+    m_positionPopOut = new PopOutWindow("positions", tr("Positions"), this);
+    m_positionPopOut->setContentWidget(m_positionPanel);
+    m_positionPopOut->setMinimumContentSize(420, 480);
+
+    connect(m_positionPopOut, &PopOutWindow::visibilityChanged, [this](bool visible) {
+        m_showPositionAction->setChecked(visible);
+        m_bubbleBar->setButtonActive("positions", visible);
+    });
+
+    m_timecodePanel = new TimecodePanel(m_app, nullptr);
+    m_timecodePopOut = new PopOutWindow("timecode", tr("Timecode Triggers"), this);
+    m_timecodePopOut->setContentWidget(m_timecodePanel);
+    m_timecodePopOut->setMinimumContentSize(480, 420);
+
+    connect(m_timecodePopOut, &PopOutWindow::visibilityChanged, [this](bool visible) {
+        m_showTimecodeAction->setChecked(visible);
+        m_bubbleBar->setButtonActive("timecode", visible);
+    });
 }
 
 void MainWindow::createBubbleBar() {
@@ -433,6 +481,8 @@ void MainWindow::createBubbleBar() {
     m_bubbleBar->addButton("connection", Icons::network(), tr("Connection (F7)"));
     m_bubbleBar->addButton("actors", Icons::actorSetup(), tr("Actor Setup (F9)"));
     m_bubbleBar->addButton("ensembles", Icons::actor(), tr("Ensembles (F10)"));
+    m_bubbleBar->addButton("positions", Icons::sliders(), tr("Positions (F11)"));
+    m_bubbleBar->addButton("timecode", Icons::sliders(), tr("Timecode Triggers (F12)"));
 
     connect(m_bubbleBar, &BubbleBar::buttonClicked, this, &MainWindow::onBubbleButtonClicked);
 
@@ -451,6 +501,10 @@ void MainWindow::onBubbleButtonClicked(const QString& id, [[maybe_unused]] bool 
         toggleActorSetupPanel();
     } else if (id == "ensembles") {
         toggleEnsemblePanel();
+    } else if (id == "positions") {
+        togglePositionPanel();
+    } else if (id == "timecode") {
+        toggleTimecodePanel();
     }
 }
 
@@ -738,6 +792,29 @@ void MainWindow::toggleEnsemblePanel() {
         m_ensemblePopOut->showAndRestore();
         m_ensemblePanel->refresh();
     }
+}
+
+void MainWindow::togglePositionPanel() {
+    if (m_positionPopOut->isVisible()) {
+        m_positionPopOut->hide();
+    } else {
+        m_positionPopOut->showAndRestore();
+        m_positionPanel->refresh();
+    }
+}
+
+void MainWindow::toggleTimecodePanel() {
+    if (m_timecodePopOut->isVisible()) {
+        m_timecodePopOut->hide();
+    } else {
+        m_timecodePopOut->showAndRestore();
+        m_timecodePanel->refresh();
+    }
+}
+
+void MainWindow::showCueZeroDialog() {
+    CueZeroDialog dialog(m_app, this);
+    dialog.exec();
 }
 
 void MainWindow::updateTitle() {

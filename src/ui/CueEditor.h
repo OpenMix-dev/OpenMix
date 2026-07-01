@@ -52,6 +52,7 @@ class CueEditor : public QWidget {
     void onFadeCurveChanged(int index);
     void onQLabCueChanged(const QString& text);
     void onChannelProfileChanged(int channel);
+    void onChannelPositionChanged(int channel);
     void onChannelLevelToggled(int channel, bool on);
     void onChannelLevelChanged(int channel);
     void onActorLibraryChanged();

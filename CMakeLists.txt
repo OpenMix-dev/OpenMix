@@ -122,6 +122,9 @@ set(SOURCES
     src/ui/EnsemblePanel.cpp
     src/ui/RemoteControlDialog.cpp
     src/ui/SettingsDialog.cpp
+    src/ui/PositionPanel.cpp
+    src/ui/TimecodePanel.cpp
+    src/ui/CueZeroDialog.cpp
     src/ui/PopOutWindow.cpp
     src/ui/BubbleButton.cpp
     src/ui/BubbleBar.cpp
@@ -220,6 +223,9 @@ set(HEADERS
     src/ui/EnsemblePanel.h
     src/ui/RemoteControlDialog.h
     src/ui/SettingsDialog.h
+    src/ui/PositionPanel.h
+    src/ui/TimecodePanel.h
+    src/ui/CueZeroDialog.h
     src/ui/PopOutWindow.h
     src/ui/BubbleButton.h
     src/ui/BubbleBar.h

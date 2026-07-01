@@ -19,6 +19,8 @@ class MixerFeedbackPanel;
 class DCAMappingPanel;
 class ActorSetupPanel;
 class EnsemblePanel;
+class PositionPanel;
+class TimecodePanel;
 class PopOutWindow;
 class BubbleBar;
 class PlaybackGuard;
@@ -60,6 +62,9 @@ class MainWindow : public QMainWindow {
     void toggleDCAMappingPanel();
     void toggleActorSetupPanel();
     void toggleEnsemblePanel();
+    void togglePositionPanel();
+    void toggleTimecodePanel();
+    void showCueZeroDialog();
 
     // update UI state
     void updateTitle();
@@ -115,6 +120,8 @@ class MainWindow : public QMainWindow {
     DCAMappingPanel* m_dcaMappingPanel;
     ActorSetupPanel* m_actorSetupPanel;
     EnsemblePanel* m_ensemblePanel;
+    PositionPanel* m_positionPanel;
+    TimecodePanel* m_timecodePanel;
 
     // pop-out windows
     PopOutWindow* m_connectionPopOut;
@@ -122,6 +129,8 @@ class MainWindow : public QMainWindow {
     PopOutWindow* m_dcaMappingPopOut;
     PopOutWindow* m_actorSetupPopOut;
     PopOutWindow* m_ensemblePopOut;
+    PopOutWindow* m_positionPopOut;
+    PopOutWindow* m_timecodePopOut;
 
     // bubble bar
     BubbleBar* m_bubbleBar;
@@ -169,6 +178,9 @@ class MainWindow : public QMainWindow {
     QAction* m_showDCAMappingAction;
     QAction* m_showActorSetupAction;
     QAction* m_showEnsembleAction;
+    QAction* m_showPositionAction;
+    QAction* m_showTimecodeAction;
+    QAction* m_cueZeroAction;
     QAction* m_showLogViewerAction;
 
     // settings actions
