@@ -2,12 +2,14 @@ cmake_minimum_required(VERSION 3.16)
 
 project(OpenMix
     VERSION 0.1.0
-    DESCRIPTION "Open Source Theatre Sound Mixing Control"
+    DESCRIPTION "Stage mixing software for live theatre that lets engineers program, automate, and run cues seamlessly across 30+ digital mixing consoles"
     LANGUAGES CXX
 )
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+include(GNUInstallDirs)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -373,6 +375,40 @@ install(TARGETS ${PROJECT_NAME}
     BUNDLE DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+# desktop entry + icon (Linux/BSD)
+if(UNIX AND NOT APPLE)
+    install(FILES packaging/openmix.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES packaging/openmix.svg
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+endif()
+
+# packaging (cpack): deb/rpm/tarball on Linux, NSIS on Windows, drag-drop dmg on macOS
+set(CPACK_PACKAGE_NAME "OpenMix")
+set(CPACK_PACKAGE_VENDOR "OpenMix")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "OpenMix")
+set(CPACK_PACKAGE_CONTACT "OpenMix")
+
+if(WIN32)
+    set(CPACK_GENERATOR "NSIS")
+    set(CPACK_NSIS_PACKAGE_NAME "OpenMix")
+    set(CPACK_NSIS_DISPLAY_NAME "OpenMix")
+    set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+    set(CPACK_NSIS_MODIFY_PATH OFF)
+elseif(APPLE)
+    set(CPACK_GENERATOR "DragNDrop")
+else()
+    set(CPACK_GENERATOR "DEB;RPM;TGZ")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "sound")
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+    set(CPACK_RPM_PACKAGE_LICENSE "MIT")
+    set(CPACK_RPM_PACKAGE_GROUP "Applications/Multimedia")
+endif()
+
+include(CPack)
 
 # enable testing
 enable_testing()

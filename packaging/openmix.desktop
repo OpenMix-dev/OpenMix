@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=OpenMix
+GenericName=Theatre Mixing Console Control
+Comment=Fire theatre sound cues to digital mixing consoles
+Exec=OpenMix %f
+Icon=openmix
+Terminal=false
+Categories=AudioVideo;Audio;
+StartupWMClass=OpenMix
