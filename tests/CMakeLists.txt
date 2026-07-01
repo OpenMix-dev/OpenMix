@@ -32,6 +32,7 @@ add_executable(test_show
     ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
     ${CMAKE_SOURCE_DIR}/src/core/SpareBackup.cpp
     ${CMAKE_SOURCE_DIR}/src/core/FxLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ConsoleNameCache.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
@@ -62,6 +63,7 @@ add_executable(test_actor_profiles
     ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
     ${CMAKE_SOURCE_DIR}/src/core/SpareBackup.cpp
     ${CMAKE_SOURCE_DIR}/src/core/FxLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ConsoleNameCache.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Ensemble.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueZero.cpp
@@ -300,6 +302,7 @@ add_executable(test_ensembles
     ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
     ${CMAKE_SOURCE_DIR}/src/core/SpareBackup.cpp
     ${CMAKE_SOURCE_DIR}/src/core/FxLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ConsoleNameCache.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
@@ -339,6 +342,7 @@ add_executable(test_show_control
     ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
     ${CMAKE_SOURCE_DIR}/src/core/SpareBackup.cpp
     ${CMAKE_SOURCE_DIR}/src/core/FxLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ConsoleNameCache.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueValidator.cpp
     ${CMAKE_SOURCE_DIR}/src/core/PlaybackGuard.cpp
@@ -370,6 +374,7 @@ add_executable(test_tmix_import
     ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
     ${CMAKE_SOURCE_DIR}/src/core/SpareBackup.cpp
     ${CMAKE_SOURCE_DIR}/src/core/FxLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ConsoleNameCache.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
     ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
@@ -396,6 +401,7 @@ add_executable(test_channel_utilization
     ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
     ${CMAKE_SOURCE_DIR}/src/core/SpareBackup.cpp
     ${CMAKE_SOURCE_DIR}/src/core/FxLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ConsoleNameCache.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
     ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
@@ -417,6 +423,7 @@ add_executable(test_spare_backup
     test_spare_backup.cpp
     ${CMAKE_SOURCE_DIR}/src/core/SpareBackup.cpp
     ${CMAKE_SOURCE_DIR}/src/core/FxLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ConsoleNameCache.cpp
 )
 target_link_libraries(test_spare_backup PRIVATE
     Qt6::Core
@@ -430,6 +437,7 @@ add_test(NAME SpareBackupTest COMMAND test_spare_backup)
 add_executable(test_fx_library
     test_fx_library.cpp
     ${CMAKE_SOURCE_DIR}/src/core/FxLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ConsoleNameCache.cpp
 )
 target_link_libraries(test_fx_library PRIVATE
     Qt6::Core
@@ -439,3 +447,11 @@ target_include_directories(test_fx_library PRIVATE
     ${CMAKE_SOURCE_DIR}/src
 )
 add_test(NAME FxLibraryTest COMMAND test_fx_library)
+
+add_executable(test_console_name_cache
+    test_console_name_cache.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ConsoleNameCache.cpp
+)
+target_link_libraries(test_console_name_cache PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(test_console_name_cache PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME ConsoleNameCacheTest COMMAND test_console_name_cache)

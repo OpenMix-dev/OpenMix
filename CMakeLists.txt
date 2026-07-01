@@ -89,6 +89,7 @@ set(SOURCES
     src/core/Show.cpp
     src/core/SpareBackup.cpp
     src/core/FxLibrary.cpp
+    src/core/ConsoleNameCache.cpp
     src/core/PlaybackEngine.cpp
     src/core/UndoCommands.cpp
     src/core/CueValidator.cpp
@@ -199,6 +200,7 @@ set(HEADERS
     src/core/Show.h
     src/core/SpareBackup.h
     src/core/FxLibrary.h
+    src/core/ConsoleNameCache.h
     src/core/PlaybackEngine.h
     src/core/UndoCommands.h
     src/core/CueValidator.h

@@ -2,6 +2,7 @@
 
 #include "ActorProfileLibrary.h"
 #include "CueList.h"
+#include "ConsoleNameCache.h"
 #include "CueZero.h"
 #include "DCAMapping.h"
 #include "Ensemble.h"
@@ -82,6 +83,9 @@ class Show : public QObject {
     [[nodiscard]] FxLibrary* fxLibrary() { return &m_fxLibrary; }
     [[nodiscard]] const FxLibrary* fxLibrary() const { return &m_fxLibrary; }
 
+    [[nodiscard]] ConsoleNameCache* consoleNameCache() { return &m_consoleNameCache; }
+    [[nodiscard]] const ConsoleNameCache* consoleNameCache() const { return &m_consoleNameCache; }
+
     // recall the show's Cue Zero base state onto a connected mixer
     void applyCueZero(MixerProtocol* mixer) const { m_cueZero.apply(mixer); }
 
@@ -150,6 +154,7 @@ class Show : public QObject {
     CueZero m_cueZero;
     SpareBackup m_spareBackup;
     FxLibrary m_fxLibrary;
+    ConsoleNameCache m_consoleNameCache;
     bool m_isDirty = false;
 };
 
