@@ -31,6 +31,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Widgets
     Network
     Svg
+    Sql
 )
 
 # icons
@@ -164,6 +165,7 @@ set(SOURCES
     src/io/ProjectFile.cpp
     src/io/AutosaveManager.cpp
     src/io/CrashRecovery.cpp
+    src/io/TmixImporter.cpp
 
     src/midi/MidiControlMapping.cpp
     src/midi/MidiInputManager.cpp
@@ -266,6 +268,7 @@ set(HEADERS
     src/io/ProjectFile.h
     src/io/AutosaveManager.h
     src/io/CrashRecovery.h
+    src/io/TmixImporter.h
 
     src/midi/MidiControlMapping.h
     src/midi/MidiInputManager.h
@@ -303,6 +306,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::Svg
+    Qt6::Sql
     qlementine-icons
 )
 

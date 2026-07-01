@@ -25,6 +25,7 @@
 #include "core/ShortcutManager.h"
 #include "core/Show.h"
 #include "io/ProjectFile.h"
+#include "io/TmixImporter.h"
 #include "midi/MidiInputManager.h"
 #include "protocol/MixerProtocol.h"
 #include "theme/Icons.h"
@@ -102,6 +103,10 @@ void MainWindow::createActions() {
     m_openAction->setShortcut(QKeySequence::Open);
     m_openAction->setToolTip(tr("Open an existing show (Ctrl+O)"));
     connect(m_openAction, &QAction::triggered, this, &MainWindow::openShow);
+
+    m_importTmixAction = new QAction(tr("&Import TheatreMix Show..."), this);
+    m_importTmixAction->setToolTip(tr("Import a .tmix show file"));
+    connect(m_importTmixAction, &QAction::triggered, this, &MainWindow::importTmixShow);
 
     m_saveAction = new QAction(Icons::fileSave(), tr("&Save"), this);
     m_saveAction->setShortcut(QKeySequence::Save);
@@ -366,6 +371,7 @@ void MainWindow::createMenus() {
     m_fileMenu = menuBar()->addMenu(tr("&File"));
     m_fileMenu->addAction(m_newAction);
     m_fileMenu->addAction(m_openAction);
+    m_fileMenu->addAction(m_importTmixAction);
     m_recentProjectsMenu = m_fileMenu->addMenu(tr("Open &Recent"));
     updateRecentProjectsMenu();
     m_fileMenu->addSeparator();
@@ -746,6 +752,31 @@ void MainWindow::openShow() {
     updateTitle();
     updateStatusBar();
     updateRecentProjectsMenu();
+}
+
+void MainWindow::importTmixShow() {
+    if (!maybeSave())
+        return;
+
+    QString filePath = QFileDialog::getOpenFileName(
+        this, tr("Import TheatreMix Show"), QString(), tr("TheatreMix Show (*.tmix *.x32tc)"));
+
+    if (filePath.isEmpty())
+        return;
+
+    QString error;
+    TmixImporter importer;
+    if (!importer.import(filePath, m_app->show(), &error)) {
+        QMessageBox::warning(this, tr("Error"), tr("Failed to import show:\n%1").arg(error));
+        return;
+    }
+
+    m_app->show()->setFilePath(QString()); // imported: force Save As to a native file
+    m_app->show()->setModified(true);
+    m_cueEditor->setCue(-1);
+    m_cueListView->refreshAll();
+    updateTitle();
+    updateStatusBar();
 }
 
 void MainWindow::saveShow() {

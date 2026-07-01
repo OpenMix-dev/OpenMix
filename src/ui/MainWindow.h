@@ -44,6 +44,7 @@ class MainWindow : public QMainWindow {
     // file menu actions
     void newShow();
     void openShow();
+    void importTmixShow();
     void saveShow();
     void saveShowAs();
 
@@ -153,6 +154,7 @@ class MainWindow : public QMainWindow {
     // file actions
     QAction* m_newAction;
     QAction* m_openAction;
+    QAction* m_importTmixAction;
     QAction* m_saveAction;
     QAction* m_saveAsAction;
     QAction* m_exitAction;
