@@ -95,6 +95,8 @@ class MixerProtocol : public QObject {
     void parameterChanged(const QString& path, const QVariant& value);
     // a console snippet (isScene=false) or scene (isScene=true) name was read.
     void consoleNameReceived(bool isScene, int index, const QString& name);
+    // a channel fader moved on the console (channel 1-based, level normalized 0..1).
+    void channelFaderChanged(int channel, double level);
     void requestTimeout(const QString& path);
 
     // live input-channel meter level (channel 1-based, level 0..1 linear). Emitted

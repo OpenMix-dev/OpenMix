@@ -263,6 +263,13 @@ void MainWindow::createActions() {
     m_spareBackupAction->setToolTip(tr("Allocate the spare-backup channel and switch to it"));
     connect(m_spareBackupAction, &QAction::triggered, this, &MainWindow::showAllocateSpareDialog);
 
+    m_recordFadersAction = new QAction(tr("&Record Faders"), this);
+    m_recordFadersAction->setCheckable(true);
+    m_recordFadersAction->setToolTip(tr("Write live console fader moves into the current cue"));
+    connect(m_recordFadersAction, &QAction::toggled, m_app, &Application::setRecordFadersActive);
+    connect(m_app, &Application::recordFadersActiveChanged, m_recordFadersAction,
+            &QAction::setChecked);
+
     m_showDCAMappingAction = new QAction(Icons::sliders(), tr("&DCA Mapping"), this);
     m_showDCAMappingAction->setCheckable(true);
     m_showDCAMappingAction->setChecked(false);
@@ -489,6 +496,7 @@ void MainWindow::createMenus() {
     m_playbackMenu->addAction(m_panicRestoreAction);
     m_playbackMenu->addSeparator();
     m_playbackMenu->addAction(m_spareBackupAction);
+    m_playbackMenu->addAction(m_recordFadersAction);
 
     m_viewMenu = menuBar()->addMenu(tr("&View"));
     m_viewMenu->addAction(m_showDCAMappingAction);

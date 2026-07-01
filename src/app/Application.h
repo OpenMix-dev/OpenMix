@@ -90,6 +90,11 @@ class Application : public QObject {
     void setMainWindow(MainWindow* window);
     [[nodiscard]] MainWindow* mainWindow();
 
+    // record-faders: while active, console fader moves are written live into the
+    // current cue's channel levels.
+    void setRecordFadersActive(bool active);
+    [[nodiscard]] bool recordFadersActive() const { return m_recordFadersActive; }
+
     // initialization
     void initialize();
 
@@ -99,6 +104,7 @@ class Application : public QObject {
   signals:
     void mixerConnected();
     void mixerDisconnected();
+    void recordFadersActiveChanged(bool active);
 
   private:
     void setupMixerConnection(const QString& type, const QString& host, int port);
@@ -142,6 +148,8 @@ class Application : public QObject {
     // outbound QLab / DAW remote
     QLabClient* m_qLabClient;
     ReaperClient* m_reaperClient;
+
+    bool m_recordFadersActive = false;
 
     // timecode-triggered cues + channel silence/clip monitoring
     TimecodeTriggerList* m_timecodeTriggers;

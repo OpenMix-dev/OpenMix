@@ -305,6 +305,18 @@ void Application::setupMixerConnection(const QString& type, const QString& host,
     connect(m_mixer, &MixerProtocol::channelMeter, m_channelMonitor,
             [this](int channel, float level) { m_channelMonitor->onLevel(channel, level); });
 
+    // record-faders: live console fader moves write into the current cue
+    connect(m_mixer, &MixerProtocol::channelFaderChanged, this, [this](int channel, double level) {
+        if (!m_recordFadersActive || !m_show->cueList())
+            return;
+        const int idx = m_playbackEngine->currentCueIndex();
+        if (idx < 0 || idx >= m_show->cueList()->count())
+            return;
+        Cue cue = m_show->cueList()->at(idx);
+        cue.setChannelLevel(channel, level);
+        m_show->cueList()->updateCue(idx, cue);
+    });
+
     // scribble strips push actor names/colors to this console
     m_scribbleController->setMixer(m_mixer);
 
@@ -377,6 +389,13 @@ void Application::startupScan() {
     }
 
     m_discoveryService->startScan(3000);
+}
+
+void Application::setRecordFadersActive(bool active) {
+    if (m_recordFadersActive == active)
+        return;
+    m_recordFadersActive = active;
+    emit recordFadersActiveChanged(active);
 }
 
 void Application::setMainWindow(MainWindow* window) { m_mainWindow = window; }

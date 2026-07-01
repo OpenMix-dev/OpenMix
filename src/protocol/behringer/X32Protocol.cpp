@@ -491,6 +491,13 @@ void X32Protocol::processResponse(const QString& path, const QVariant& value) {
                                  nameMatch.captured(2).toInt(), value.toString());
     }
 
+    // input-channel fader move -> semantic signal (used by record-faders)
+    static const QRegularExpression faderRe(QStringLiteral("^/ch/(\\d+)/mix/fader$"));
+    const QRegularExpressionMatch faderMatch = faderRe.match(path);
+    if (faderMatch.hasMatch() && value.isValid()) {
+        emit channelFaderChanged(faderMatch.captured(1).toInt(), value.toDouble());
+    }
+
     if (m_pendingRequests.contains(path)) {
         X32PendingRequest req = m_pendingRequests.take(path);
         qint64 roundTrip = now - req.sentTime;

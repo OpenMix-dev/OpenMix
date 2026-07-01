@@ -207,6 +207,7 @@ class MainWindow : public QMainWindow {
     QAction* m_panicAction;
     QAction* m_panicRestoreAction;
     QAction* m_spareBackupAction;
+    QAction* m_recordFadersAction;
 
     // view actions (for menu checkable items)
     QAction* m_showConnectionAction;
