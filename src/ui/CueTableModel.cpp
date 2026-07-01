@@ -15,6 +15,8 @@ CueTableModel::CueTableModel(CueList* cueList, QObject* parent)
     : QAbstractTableModel(parent), m_cueList(cueList) {
     if (m_cueList) {
         connect(m_cueList, &CueList::cueAdded, this, &CueTableModel::onCueAdded);
+        connect(m_cueList, &CueList::cueAboutToBeRemoved, this,
+                &CueTableModel::onCueAboutToBeRemoved);
         connect(m_cueList, &CueList::cueRemoved, this, &CueTableModel::onCueRemoved);
         connect(m_cueList, &CueList::cueUpdated, this, &CueTableModel::onCueUpdated);
         connect(m_cueList, &CueList::cueMoved, this, &CueTableModel::onCueMoved);
@@ -387,8 +389,12 @@ void CueTableModel::onCueAdded(int index) {
     endInsertRows();
 }
 
-void CueTableModel::onCueRemoved(int index) {
+void CueTableModel::onCueAboutToBeRemoved(int index) {
+    // must bracket the removal before the row is erased from the list
     beginRemoveRows(QModelIndex(), index, index);
+}
+
+void CueTableModel::onCueRemoved(int index) {
     endRemoveRows();
 
     // adjust highlight indices

@@ -130,6 +130,7 @@ class PlaybackEngine : public QObject {
 
   private slots:
     void onAutoFollowTimerTimeout();
+    void onCueRemoved(int index);
 
   private:
     void setState(PlaybackState state);

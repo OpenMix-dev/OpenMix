@@ -49,6 +49,7 @@ class CueList : public QObject {
 
   signals:
     void cueAdded(int index);
+    void cueAboutToBeRemoved(int index); // emitted before the cue is erased
     void cueRemoved(int index);
     void cueUpdated(int index);
     void cueMoved(int fromIndex, int toIndex);

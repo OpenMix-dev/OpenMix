@@ -67,6 +67,7 @@ class CueTableModel : public QAbstractTableModel {
 
   private slots:
     void onCueAdded(int index);
+    void onCueAboutToBeRemoved(int index);
     void onCueRemoved(int index);
     void onCueUpdated(int index);
     void onCueMoved(int from, int to);

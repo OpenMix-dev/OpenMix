@@ -20,10 +20,37 @@ PlaybackEngine::PlaybackEngine(QObject* parent) : QObject(parent) {
 }
 
 void PlaybackEngine::setCueList(CueList* cueList) {
+    if (m_cueList)
+        m_cueList->disconnect(this);
     m_cueList = cueList;
     stop();
-    if (m_cueList && !m_cueList->isEmpty()) {
-        setStandbyIndex(0);
+    if (m_cueList) {
+        connect(m_cueList, &CueList::cueRemoved, this, &PlaybackEngine::onCueRemoved);
+        if (!m_cueList->isEmpty())
+            setStandbyIndex(0);
+    }
+}
+
+void PlaybackEngine::onCueRemoved(int index) {
+    // keep our indices valid when a cue is deleted underneath playback
+    if (m_currentIndex == index) {
+        // the playing cue itself was removed: abandon it and stop follow-on
+        m_autoFollowTimer.stop();
+        m_autoFollowArmed = false;
+        m_currentIndex = -1;
+        emit currentCueChanged(m_currentIndex);
+    } else if (m_currentIndex > index) {
+        --m_currentIndex;
+    }
+
+    if (m_standbyIndex == index) {
+        int fallback = -1;
+        if (m_cueList && !m_cueList->isEmpty())
+            fallback = qMin(index, m_cueList->count() - 1);
+        m_standbyIndex = -2; // force setStandbyIndex to emit
+        setStandbyIndex(fallback);
+    } else if (m_standbyIndex > index) {
+        setStandbyIndex(m_standbyIndex - 1);
     }
 }
 
@@ -79,7 +106,7 @@ void PlaybackEngine::go() {
         emit autoFollowArmed(false);
     }
 
-    if (!m_cueList || m_standbyIndex < 0)
+    if (!m_cueList || m_standbyIndex < 0 || m_standbyIndex >= m_cueList->count())
         return;
 
     if (m_guard && m_guard->isGoLocked()) {

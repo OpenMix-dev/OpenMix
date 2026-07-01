@@ -201,6 +201,19 @@ target_link_libraries(test_scs_client PRIVATE Qt6::Core Qt6::Test PkgConfig::LIB
 target_include_directories(test_scs_client PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME ScsClientTest COMMAND test_scs_client)
 
+add_executable(test_delete_playing_cue
+    test_delete_playing_cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/CueTableModel.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/CueFilterProxyModel.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/theme/Theme.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+)
+target_link_libraries(test_delete_playing_cue PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
+target_include_directories(test_delete_playing_cue PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME DeletePlayingCueTest COMMAND test_delete_playing_cue)
+
 add_executable(test_digico_protocol
     test_digico_protocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/digico/DiGiCoProtocol.cpp

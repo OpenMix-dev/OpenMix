@@ -64,6 +64,7 @@ void CueList::updateCue(int index, const Cue& cue) {
 
 void CueList::removeCue(int index) {
     if (index >= 0 && index < m_cues.size()) {
+        emit cueAboutToBeRemoved(index);
         m_cues.remove(index);
         emit cueRemoved(index);
     }
