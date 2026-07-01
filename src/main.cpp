@@ -6,53 +6,12 @@
 #include <QSettings>
 #include <QFile>
 #include <QPalette>
-#include <QAction>
-#include <QFontMetrics>
-#include <QHelpEvent>
 #include <QProxyStyle>
 #include <QStyleFactory>
 #include <QTimer>
-#include <QToolButton>
-#include <QToolTip>
 #include <oclero/qlementine/icons/QlementineIcons.hpp>
 
 namespace OpenMix {
-
-// Show tooltips horizontally centered under the widget (and center multi-line
-// text), rather than the platform's offset-to-the-right placement.
-class CenteredToolTipFilter : public QObject {
-  public:
-    using QObject::QObject;
-    bool eventFilter(QObject* obj, QEvent* event) override {
-        if (event->type() == QEvent::ToolTip) {
-            auto* widget = qobject_cast<QWidget*>(obj);
-            if (widget) {
-                // toolbar buttons carry the tooltip on their action, not the widget
-                QString tip = widget->toolTip();
-                if (tip.isEmpty())
-                    if (auto* button = qobject_cast<QToolButton*>(widget))
-                        if (QAction* action = button->defaultAction())
-                            tip = action->toolTip();
-
-                if (!tip.isEmpty()) {
-                    const QString html = "<div align='center'>" +
-                                         tip.toHtmlEscaped().replace("\n", "<br>") + "</div>";
-                    const QPoint cursor = static_cast<QHelpEvent*>(event)->globalPos();
-                    QToolTip::showText(QPoint(cursor.x(), cursor.y() + 16), html, widget);
-                    // recenter on the cursor using the tooltip's real rendered width
-                    for (QWidget* tipLabel : QApplication::topLevelWidgets()) {
-                        if (tipLabel->isVisible() && tipLabel->inherits("QTipLabel")) {
-                            tipLabel->move(cursor.x() - tipLabel->width() / 2, tipLabel->y());
-                            break;
-                        }
-                    }
-                    return true;
-                }
-            }
-        }
-        return QObject::eventFilter(obj, event);
-    }
-};
 
 // Show tooltips almost immediately and keep them up longer than the platform
 // default, so hovering an icon reveals its label without a long wait.
@@ -83,7 +42,6 @@ int main(int argc, char* argv[]) {
 
     // Fusion base, but show tooltips faster than the platform default
     QApplication::setStyle(new OpenMix::FastTooltipStyle(QStyleFactory::create("Fusion")));
-    qtApp.installEventFilter(new OpenMix::CenteredToolTipFilter(&qtApp));
 
     // force dark theme on all platforms
     QPalette darkPalette;
