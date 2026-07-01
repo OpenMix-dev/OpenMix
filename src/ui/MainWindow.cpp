@@ -601,9 +601,9 @@ void MainWindow::createToolBars() {
     // larger live-control targets: GO/STOP/NEXT/PREV/PANIC are hit under pressure
     m_playbackToolBar->setIconSize(QSize(28, 28));
     m_playbackToolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-    // uniform horizontal padding so short labels (GO/Stop) match the wider ones
+    // modest horizontal padding so short labels (GO/Stop) aren't cramped
     m_playbackToolBar->setStyleSheet(
-        "QToolButton { min-width: 68px; padding-left: 10px; padding-right: 10px; }");
+        "QToolButton { padding-left: 6px; padding-right: 6px; }");
     m_playbackToolBar->addAction(m_goAction);
     m_playbackToolBar->addAction(m_stopAction);
     m_playbackToolBar->addSeparator();
