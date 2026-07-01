@@ -23,8 +23,10 @@ MixerConfig MixerConfig::fromJson(const QJsonObject& json) {
 
 Show::Show(QObject* parent)
     : QObject(parent), m_cueList(this), m_dcaMapping(this), m_actorProfileLibrary(this),
-      m_positionLibrary(this), m_ensembleLibrary(this), m_cueZero(this), m_spareBackup(this) {
+      m_positionLibrary(this), m_ensembleLibrary(this), m_cueZero(this), m_spareBackup(this),
+      m_fxLibrary(this) {
     connect(&m_spareBackup, &SpareBackup::changed, this, &Show::checkModifiedState);
+    connect(&m_fxLibrary, &FxLibrary::changed, this, &Show::checkModifiedState);
     connectCueListSignals();
     connectDcaMappingSignals();
     connectActorLibrarySignals();
@@ -142,13 +144,14 @@ void Show::newShow() {
     m_ensembleLibrary.clear();
     m_cueZero.clear();
     m_spareBackup.setSpareChannel(-1);
+    m_fxLibrary.clear();
     m_channelGangs.clear();
     m_isDirty = false;
 }
 
 QJsonObject Show::toJson() const {
     QJsonObject json;
-    json["version"] = "1.5";
+    json["version"] = "1.6";
     json["name"] = m_name;
     json["author"] = m_author;
     json["designer"] = m_designer;
@@ -166,6 +169,7 @@ QJsonObject Show::toJson() const {
     json["ensembles"] = m_ensembleLibrary.toJson();
     json["cueZero"] = m_cueZero.toJson();
     json["spareBackup"] = m_spareBackup.toJson();
+    json["fx"] = m_fxLibrary.toJson();
 
     QJsonArray gangArray;
     for (const auto& gang : m_channelGangs) {
@@ -247,6 +251,13 @@ void Show::fromJson(const QJsonObject& json) {
         m_spareBackup.loadFromJson(json["spareBackup"].toObject());
     } else {
         m_spareBackup.setSpareChannel(-1);
+    }
+
+    // FX unit registry + assignments (added in show version 1.6)
+    if (json.contains("fx")) {
+        m_fxLibrary.loadFromJson(json["fx"].toObject());
+    } else {
+        m_fxLibrary.clear();
     }
 
     // ganged input-channel pairs
