@@ -129,6 +129,7 @@ set(SOURCES
     src/ui/TimecodePanel.cpp
     src/ui/CueZeroDialog.cpp
     src/ui/ChannelUtilisationDialog.cpp
+    src/ui/AllocateSpareDialog.cpp
     src/ui/PopOutWindow.cpp
     src/ui/BubbleButton.cpp
     src/ui/BubbleBar.cpp
@@ -234,6 +235,7 @@ set(HEADERS
     src/ui/TimecodePanel.h
     src/ui/CueZeroDialog.h
     src/ui/ChannelUtilisationDialog.h
+    src/ui/AllocateSpareDialog.h
     src/ui/PopOutWindow.h
     src/ui/BubbleButton.h
     src/ui/BubbleBar.h

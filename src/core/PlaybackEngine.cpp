@@ -464,6 +464,22 @@ void PlaybackEngine::applyVoice(int channel, const VoiceData& voice) {
                                     voice.dynRelease.value_or(100.0), voice.dynGain.value_or(0.0));
 }
 
+void PlaybackEngine::applyBackupSwitch(int coveredChannel, int spareChannel) {
+    if (!m_mixer || !m_actorLibrary || spareChannel < 0)
+        return;
+    const Actor* actor = m_actorLibrary->actorForChannel(coveredChannel);
+    if (!actor)
+        return;
+    // apply the first stored backup voice this actor carries to the spare channel
+    for (const QString& slot : actor->profileSlots()) {
+        const ActorProfile profile = actor->profile(slot);
+        if (!profile.backup().isEmpty()) {
+            applyVoice(spareChannel, profile.backup());
+            return;
+        }
+    }
+}
+
 void PlaybackEngine::verifyCue(int index, const Cue& cue) {
     if (!m_verifyCues || !m_mixer || !m_mixer->isConnected())
         return;

@@ -58,6 +58,7 @@ class MainWindow : public QMainWindow {
     // playback actions
     void go();
     void stopPlayback();
+    void showAllocateSpareDialog();
 
     // view actions - pop-out windows
     void toggleConnectionPanel();
@@ -189,6 +190,7 @@ class MainWindow : public QMainWindow {
     // safety actions
     QAction* m_panicAction;
     QAction* m_panicRestoreAction;
+    QAction* m_spareBackupAction;
 
     // view actions (for menu checkable items)
     QAction* m_showConnectionAction;

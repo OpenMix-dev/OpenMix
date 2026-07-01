@@ -20,6 +20,7 @@
 #include "core/ScribbleController.h"
 #include "core/ShortcutManager.h"
 #include "core/Show.h"
+#include "core/SpareBackup.h"
 #include "io/AutosaveManager.h"
 #include "io/CrashRecovery.h"
 #include "midi/MidiInputManager.h"
@@ -251,6 +252,20 @@ void Application::initialize() {
             settings.value("clipHoldMs", m_channelMonitor->clipHoldMs()).toInt());
         settings.endGroup();
     }
+
+    // spare-backup mic switch: a queued (Later) switch promotes on the next cue
+    // fire; when the switch goes live, apply the covered actor's backup voice to
+    // the spare channel.
+    connect(m_playbackEngine, &PlaybackEngine::cueExecuted, m_show->spareBackup(),
+            &SpareBackup::onCueFired);
+    connect(m_show->spareBackup(), &SpareBackup::stateChanged, this,
+            [this](SpareBackup::State state) {
+                if (state != SpareBackup::State::Active)
+                    return;
+                SpareBackup* spare = m_show->spareBackup();
+                m_playbackEngine->applyBackupSwitch(spare->allocatedChannel(),
+                                                    spare->spareChannel());
+            });
 }
 
 void Application::setupMixerConnection(const QString& type, const QString& host, int port) {

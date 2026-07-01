@@ -40,6 +40,10 @@ class PlaybackEngine : public QObject {
     // ganged input-channel pairs (from the show); a level applied to one channel
     // is mirrored to its partner on fire.
     void setChannelGangs(const QList<QPair<int, int>>& gangs);
+
+    // apply the backup voice of the actor covering `coveredChannel` to the spare
+    // channel (spare-backup mic switch). No-op without a mixer/actor/backup voice.
+    void applyBackupSwitch(int coveredChannel, int spareChannel);
     [[nodiscard]] QList<QPair<int, int>> channelGangs() const { return m_channelGangs; }
 
     // check / soundcheck (rehearsal) mode: while enabled, GO re-fires the current

@@ -4,6 +4,7 @@
 #include "BubbleButton.h"
 #include "ConnectionPanel.h"
 #include "CueEditor.h"
+#include "AllocateSpareDialog.h"
 #include "ChannelUtilisationDialog.h"
 #include "CueListView.h"
 #include "CueTableModel.h"
@@ -234,6 +235,10 @@ void MainWindow::createActions() {
         tr("Panic then restore to previous state (Ctrl+Shift+Escape)"));
     connect(m_panicRestoreAction, &QAction::triggered, this, &MainWindow::panicRestore);
 
+    m_spareBackupAction = new QAction(tr("Allocate &Spare..."), this);
+    m_spareBackupAction->setToolTip(tr("Allocate the spare-backup channel and switch to it"));
+    connect(m_spareBackupAction, &QAction::triggered, this, &MainWindow::showAllocateSpareDialog);
+
     m_showDCAMappingAction = new QAction(Icons::sliders(), tr("&DCA Mapping"), this);
     m_showDCAMappingAction->setCheckable(true);
     m_showDCAMappingAction->setChecked(false);
@@ -430,6 +435,8 @@ void MainWindow::createMenus() {
     m_playbackMenu->addSeparator();
     m_playbackMenu->addAction(m_panicAction);
     m_playbackMenu->addAction(m_panicRestoreAction);
+    m_playbackMenu->addSeparator();
+    m_playbackMenu->addAction(m_spareBackupAction);
 
     m_viewMenu = menuBar()->addMenu(tr("&View"));
     m_viewMenu->addAction(m_showDCAMappingAction);
@@ -920,6 +927,11 @@ void MainWindow::toggleLockEditing() {
 void MainWindow::go() { m_app->playbackEngine()->go(); }
 
 void MainWindow::stopPlayback() { m_app->playbackEngine()->stop(); }
+
+void MainWindow::showAllocateSpareDialog() {
+    AllocateSpareDialog dialog(m_app, this);
+    dialog.exec();
+}
 
 void MainWindow::openConnectionPanel() {
     if (!m_connectionPopOut->isVisible()) {
