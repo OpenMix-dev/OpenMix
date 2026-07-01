@@ -134,7 +134,6 @@ class CueEditor : public QWidget {
 
     // DCA overrides (mute/label per DCA)
     QGroupBox* m_dcaOverridesGroup;
-    QScrollArea* m_dcaOverridesScroll;
     struct DCAOverrideWidgets {
         QCheckBox* enableMute;
         QCheckBox* muteValue;

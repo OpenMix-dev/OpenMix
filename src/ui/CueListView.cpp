@@ -17,6 +17,7 @@
 #include <QHeaderView>
 #include <QKeyEvent>
 #include <QMenu>
+#include <QSettings>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <algorithm>
@@ -92,6 +93,12 @@ void CueListView::setupUi() {
     m_tableView->setColumnWidth(CueTableModel::ColGroup, 100);
     m_tableView->setColumnWidth(CueTableModel::ColTags, 120);
     m_tableView->setColumnWidth(CueTableModel::ColFade, 72);
+
+    // columns are user-resizable; remember widths across sessions
+    m_tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
+    restoreColumnWidths();
+    connect(m_tableView->horizontalHeader(), &QHeaderView::sectionResized, this,
+            [this](int, int, int) { saveColumnWidths(); });
 
     // right-click context menu for quick edits
     m_tableView->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -491,6 +498,25 @@ void CueListView::showContextMenu(const QPoint& pos) {
     }
 
     menu.exec(m_tableView->viewport()->mapToGlobal(pos));
+}
+
+void CueListView::saveColumnWidths() {
+    QSettings s;
+    s.beginGroup("CueListColumns");
+    for (int c = 0; c < CueTableModel::ColCount; ++c)
+        s.setValue(QString::number(c), m_tableView->columnWidth(c));
+    s.endGroup();
+}
+
+void CueListView::restoreColumnWidths() {
+    QSettings s;
+    s.beginGroup("CueListColumns");
+    for (int c = 0; c < CueTableModel::ColCount; ++c) {
+        const int w = s.value(QString::number(c), 0).toInt();
+        if (w > 0)
+            m_tableView->setColumnWidth(c, w);
+    }
+    s.endGroup();
 }
 
 void CueListView::beginRenameSelected() {

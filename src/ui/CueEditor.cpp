@@ -146,12 +146,9 @@ void CueEditor::setupUi() {
     m_dcaOverridesGroup = new QGroupBox(tr("DCA Overrides (Mute/Label)"), this);
     QVBoxLayout* overridesLayout = new QVBoxLayout(m_dcaOverridesGroup);
 
-    m_dcaOverridesScroll = new QScrollArea(this);
-    m_dcaOverridesScroll->setWidgetResizable(true);
-    m_dcaOverridesScroll->setFrameShape(QFrame::NoFrame);
-    m_dcaOverridesScroll->setMaximumHeight(200);
-
-    QWidget* overridesContent = new QWidget();
+    // no inner scroll here: the whole editor is already scrollable, so let the
+    // overrides expand inline rather than nesting a second scrollbar
+    QWidget* overridesContent = new QWidget(m_dcaOverridesGroup);
     QVBoxLayout* overridesContentLayout = new QVBoxLayout(overridesContent);
     overridesContentLayout->setContentsMargins(0, 0, 0, 0);
     overridesContentLayout->setSpacing(4);
@@ -200,8 +197,7 @@ void CueEditor::setupUi() {
     }
 
     overridesContentLayout->addStretch();
-    m_dcaOverridesScroll->setWidget(overridesContent);
-    overridesLayout->addWidget(m_dcaOverridesScroll);
+    overridesLayout->addWidget(overridesContent);
 
     m_mainLayout->addWidget(m_dcaOverridesGroup);
 
@@ -240,7 +236,7 @@ void CueEditor::setupUi() {
 
     m_notesEdit = new QTextEdit(this);
     m_notesEdit->setPlaceholderText(tr("Enter cue notes..."));
-    m_notesEdit->setMaximumHeight(80);
+    m_notesEdit->setMaximumHeight(120);
     notesLayout->addWidget(m_notesEdit);
 
     m_mainLayout->addWidget(notesGroup);
@@ -342,7 +338,7 @@ void CueEditor::createChannelProfilesSection() {
     m_channelTable->setSelectionMode(QAbstractItemView::NoSelection);
     m_channelTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_channelTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-    m_channelTable->setMaximumHeight(220);
+    m_channelTable->setMaximumHeight(340);
     layout->addWidget(m_channelTable);
 }
 

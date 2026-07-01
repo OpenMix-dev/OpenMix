@@ -598,6 +598,9 @@ void MainWindow::createToolBars() {
 
     m_playbackToolBar = addToolBar(tr("Playback"));
     m_playbackToolBar->setObjectName("PlaybackToolBar");
+    // larger live-control targets: GO/STOP/NEXT/PREV/PANIC are hit under pressure
+    m_playbackToolBar->setIconSize(QSize(28, 28));
+    m_playbackToolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
     m_playbackToolBar->addAction(m_goAction);
     m_playbackToolBar->addAction(m_stopAction);
     m_playbackToolBar->addSeparator();

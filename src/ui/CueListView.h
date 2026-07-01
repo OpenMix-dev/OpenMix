@@ -74,6 +74,8 @@ class CueListView : public QWidget {
   private:
     void setupUi();
     void setupDelegates();
+    void saveColumnWidths();
+    void restoreColumnWidths();
     void createActions();
     void editNextCell(bool forward);
     QModelIndex nextEditableIndex(const QModelIndex& current, bool forward) const;

@@ -67,9 +67,9 @@ void CueConfidenceIndicator::setConfidence(ConfidenceLevel level, const QString&
 
 QString CueConfidenceIndicator::tooltipText() const { return m_tooltipText; }
 
-QSize CueConfidenceIndicator::sizeHint() const { return QSize(16, 16); }
+QSize CueConfidenceIndicator::sizeHint() const { return QSize(20, 20); }
 
-QSize CueConfidenceIndicator::minimumSizeHint() const { return QSize(12, 12); }
+QSize CueConfidenceIndicator::minimumSizeHint() const { return QSize(18, 18); }
 
 QColor CueConfidenceIndicator::colorForLevel(ConfidenceLevel level) {
     switch (level) {

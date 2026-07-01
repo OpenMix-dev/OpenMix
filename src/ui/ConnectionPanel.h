@@ -38,6 +38,7 @@ class ConnectionPanel : public QWidget {
 
   private:
     void setupUi();
+    void populateProtocolCombo();
     void updateUiState();
     void loadFromConfig();
     void saveToConfig();

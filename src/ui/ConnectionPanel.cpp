@@ -9,6 +9,8 @@
 #include "protocol/discovery/ConsoleDiscoveryService.h"
 #include "theme/Icons.h"
 
+#include <QStandardItemModel>
+
 #include <QComboBox>
 #include <QFormLayout>
 #include <QGroupBox>
@@ -25,6 +27,36 @@ ConnectionPanel::ConnectionPanel(Application* app, QWidget* parent) : QWidget(pa
     loadFromConfig();
     onProtocolTypeChanged(m_protocolCombo->currentIndex());
     updateUiState();
+}
+
+void ConnectionPanel::populateProtocolCombo() {
+    m_protocolCombo->addItem(tr("Loopback (Test)"), "loopback");
+
+    // group consoles under a disabled manufacturer header, stripping the
+    // redundant manufacturer prefix from each model so the list scans quickly
+    const Manufacturer order[] = {Manufacturer::Behringer, Manufacturer::Midas,
+                                  Manufacturer::AllenHeath, Manufacturer::Yamaha,
+                                  Manufacturer::DiGiCo};
+    auto* model = qobject_cast<QStandardItemModel*>(m_protocolCombo->model());
+    for (Manufacturer man : order) {
+        const QVector<MixerCapabilities> group = MixerCapabilities::forManufacturer(man);
+        if (group.isEmpty())
+            continue;
+
+        const QString maker = group.first().manufacturerName();
+        m_protocolCombo->insertSeparator(m_protocolCombo->count());
+        m_protocolCombo->addItem(maker);
+        if (model)
+            if (QStandardItem* header = model->item(m_protocolCombo->count() - 1))
+                header->setFlags(header->flags() & ~(Qt::ItemIsSelectable | Qt::ItemIsEnabled));
+
+        for (const MixerCapabilities& caps : group) {
+            QString label = caps.displayName;
+            if (label.startsWith(maker))
+                label = label.mid(maker.size()).trimmed();
+            m_protocolCombo->addItem(label, caps.protocolId);
+        }
+    }
 }
 
 void ConnectionPanel::setupUi() {
@@ -51,27 +83,7 @@ void ConnectionPanel::setupUi() {
     QFormLayout* formLayout = new QFormLayout(connectionGroup);
 
     m_protocolCombo = new QComboBox(this);
-
-    m_protocolCombo->addItem(tr("Loopback (Test)"), "loopback");
-    m_protocolCombo->addItem(tr("Allen & Heath Avantis"), "avantis");
-    m_protocolCombo->addItem(tr("Allen & Heath dLive"), "dlive");
-    m_protocolCombo->addItem(tr("Allen & Heath GLD-80"), "gld80");
-    m_protocolCombo->addItem(tr("Allen & Heath GLD-112"), "gld112");
-    m_protocolCombo->addItem(tr("Allen & Heath SQ-5"), "sq5");
-    m_protocolCombo->addItem(tr("Allen & Heath SQ-6"), "sq6");
-    m_protocolCombo->addItem(tr("Allen & Heath SQ-7"), "sq7");
-    m_protocolCombo->addItem(tr("Behringer WING"), "wing");
-    m_protocolCombo->addItem(tr("Behringer X32"), "x32");
-    m_protocolCombo->addItem(tr("Midas M32"), "m32");
-    m_protocolCombo->addItem(tr("Yamaha CL1"), "cl1");
-    m_protocolCombo->addItem(tr("Yamaha CL3"), "cl3");
-    m_protocolCombo->addItem(tr("Yamaha CL5"), "cl5");
-    m_protocolCombo->addItem(tr("Yamaha DM7"), "dm7");
-    m_protocolCombo->addItem(tr("Yamaha QL1"), "ql1");
-    m_protocolCombo->addItem(tr("Yamaha QL5"), "ql5");
-    m_protocolCombo->addItem(tr("Yamaha TF1"), "tf1");
-    m_protocolCombo->addItem(tr("Yamaha TF3"), "tf3");
-    m_protocolCombo->addItem(tr("Yamaha TF5"), "tf5");
+    populateProtocolCombo();
 
     formLayout->addRow(tr("Protocol:"), m_protocolCombo);
 
