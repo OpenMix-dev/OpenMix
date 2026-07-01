@@ -601,6 +601,11 @@ void MainWindow::createStatusBar() {
     m_cueStatusLabel = new QLabel(tr("No cues"));
     m_currentCueLabel = new QLabel();
     m_nextCueLabel = new QLabel();
+    // Reinforce the list's color language: running = green, standby = amber.
+    m_currentCueLabel->setStyleSheet(
+        QString("color: %1; font-weight: bold; padding: 0 8px;").arg(Theme::Colors::AccentGreen));
+    m_nextCueLabel->setStyleSheet(
+        QString("color: %1; font-weight: bold; padding: 0 8px;").arg(Theme::Colors::AccentAmber));
 
     statusBar()->addWidget(m_connectionStatusLabel);
     statusBar()->addWidget(m_cueStatusLabel, 1);

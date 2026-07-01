@@ -1,4 +1,5 @@
 #include "ConnectionStateWidget.h"
+#include "theme/Theme.h"
 #include <QPainter>
 #include <QPainterPath>
 
@@ -87,15 +88,15 @@ void ConnectionStateWidget::paintEvent([[maybe_unused]] QPaintEvent* event) {
 QColor ConnectionStateWidget::stateColor() const {
     switch (m_state) {
     case ConnectionState::Disconnected:
-        return QColor(200, 60, 60); // red
+        return Theme::color(Theme::Colors::AccentRed);
     case ConnectionState::Connecting:
-        return QColor(220, 180, 60); // yellow
+        return Theme::color(Theme::Colors::AccentAmber);
     case ConnectionState::Connected:
-        return QColor(60, 180, 60); // green
+        return Theme::color(Theme::Colors::AccentGreen);
     case ConnectionState::Reconnecting:
-        return QColor(220, 140, 60); // orange
+        return Theme::color(Theme::Colors::AccentAmberHover);
     default:
-        return QColor(128, 128, 128); // gray
+        return Theme::color(Theme::Colors::TextTertiary);
     }
 }
 

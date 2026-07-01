@@ -49,8 +49,17 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
 
     if (role == Qt::DisplayRole || role == Qt::EditRole) {
         switch (col) {
-        case ColNumber:
-            return QString::number(cue.number(), 'f', 1);
+        case ColNumber: {
+            const QString num = QString::number(cue.number(), 'f', 1);
+            // Marker only on the display text, never the edit text.
+            if (role == Qt::DisplayRole) {
+                if (row == m_currentIndex)
+                    return QString("▶ ") + num;
+                if (row == m_standbyIndex)
+                    return QString("→ ") + num;
+            }
+            return num;
+        }
         case ColName:
             return cue.name();
         case ColType:
@@ -100,19 +109,24 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
     }
 
     if (role == Qt::BackgroundRole) {
+        // green = running now, amber = standing by next. Distinct so an
+        // operator reads the list at a glance under stage lighting.
         if (row == m_currentIndex) {
-            return QBrush(QColor(34, 197, 94, 220));
+            return QBrush(Theme::withAlpha(Theme::Colors::AccentGreen, 220));
+        }
+        if (row == m_standbyIndex) {
+            return QBrush(Theme::withAlpha(Theme::Colors::AccentAmber, 150));
         }
     }
 
     if (role == Qt::ForegroundRole) {
-        if (row == m_currentIndex) {
+        if (row == m_currentIndex || row == m_standbyIndex) {
             return QBrush(Theme::color(Theme::Colors::TextPrimary));
         }
     }
 
     if (role == Qt::FontRole) {
-        if (row == m_currentIndex) {
+        if (row == m_currentIndex || row == m_standbyIndex) {
             QFont font;
             font.setBold(true);
             return font;
