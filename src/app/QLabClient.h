@@ -51,6 +51,11 @@ class QLabClient : public QObject {
     void go();
     // step the QLab playhead back one cue (no-op when suppressBack is set)
     void back();
+    // transport controls on the QLab workspace
+    void panic();
+    void stop();
+    void pause();
+    void resume();
 
   signals:
     void sent(const QString& address);

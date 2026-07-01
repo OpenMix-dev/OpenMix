@@ -23,6 +23,7 @@
 #include "RemoteControlDialog.h"
 #include "SettingsDialog.h"
 #include "app/Application.h"
+#include "app/QLabClient.h"
 #include "core/AppLogger.h"
 #include "core/CueList.h"
 #include "core/CueValidator.h"
@@ -1244,6 +1245,9 @@ void MainWindow::panic() {
         // fallback: just stop playback
         m_app->playbackEngine()->stop();
     }
+    // also panic a linked QLab workspace so external playback stops with us
+    if (m_app->qLabClient() && m_app->qLabClient()->isEnabled())
+        m_app->qLabClient()->panic();
 }
 
 void MainWindow::panicRestore() {

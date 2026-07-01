@@ -70,6 +70,14 @@ void QLabClient::triggerCue(const QString& cueId) {
 
 void QLabClient::go() { send(prefix() + QStringLiteral("/go")); }
 
+void QLabClient::panic() { send(prefix() + QStringLiteral("/panic")); }
+
+void QLabClient::stop() { send(prefix() + QStringLiteral("/stop")); }
+
+void QLabClient::pause() { send(prefix() + QStringLiteral("/pause")); }
+
+void QLabClient::resume() { send(prefix() + QStringLiteral("/resume")); }
+
 void QLabClient::back() {
     if (m_suppressBack)
         return;

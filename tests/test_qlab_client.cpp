@@ -119,6 +119,35 @@ class TestQLabClient : public QObject {
         lo_server_thread_stop(srv);
         lo_server_thread_free(srv);
     }
+
+    void transportVerbsSendAddresses() {
+        QLabClient client;
+        client.setTarget("127.0.0.1", 53000);
+        client.setEnabled(true);
+
+        QSignalSpy sent(&client, &QLabClient::sent);
+        client.panic();
+        client.stop();
+        client.pause();
+        client.resume();
+
+        QCOMPARE(sent.count(), 4);
+        QCOMPARE(sent.at(0).at(0).toString(), QString("/panic"));
+        QCOMPARE(sent.at(1).at(0).toString(), QString("/stop"));
+        QCOMPARE(sent.at(2).at(0).toString(), QString("/pause"));
+        QCOMPARE(sent.at(3).at(0).toString(), QString("/resume"));
+    }
+
+    void workspacePrefixesTransport() {
+        QLabClient client;
+        client.setTarget("127.0.0.1", 53000);
+        client.setEnabled(true);
+        client.setWorkspaceId("ABC");
+
+        QSignalSpy sent(&client, &QLabClient::sent);
+        client.panic();
+        QCOMPARE(sent.at(0).at(0).toString(), QString("/workspace/ABC/panic"));
+    }
 };
 
 QTEST_MAIN(TestQLabClient)
