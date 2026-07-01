@@ -57,6 +57,7 @@
 #include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QTextEdit>
+#include <QToolButton>
 #include <QMessageBox>
 #include <QTextStream>
 #include <QUndoView>
@@ -611,6 +612,12 @@ void MainWindow::createToolBars() {
     m_playbackToolBar->addAction(m_nextCueAction);
     m_playbackToolBar->addSeparator();
     m_playbackToolBar->addAction(m_panicAction);
+
+    // GO/Stop icons (play/stop) are universal, so drop their text labels
+    for (QAction* a : {m_goAction, m_stopAction}) {
+        if (auto* b = qobject_cast<QToolButton*>(m_playbackToolBar->widgetForAction(a)))
+            b->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    }
 
     // type-to-jump: "12.5" sets standby, "12.5G" jumps and fires
     m_playbackToolBar->addSeparator();
