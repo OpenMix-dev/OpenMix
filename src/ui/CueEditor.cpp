@@ -354,9 +354,14 @@ void CueEditor::createChannelProfilesSection() {
 }
 
 void CueEditor::addBottomWidget(QWidget* widget) {
-    // add below the scroll area so it stays fixed while the sections scroll
-    if (widget && layout())
-        layout()->addWidget(widget);
+    // add below the scroll area so it stays fixed while the sections scroll,
+    // horizontally centered
+    if (widget) {
+        if (auto* box = qobject_cast<QBoxLayout*>(layout()))
+            box->addWidget(widget, 0, Qt::AlignHCenter);
+        else if (layout())
+            layout()->addWidget(widget);
+    }
 }
 
 void CueEditor::createDCATargetingSection() {
