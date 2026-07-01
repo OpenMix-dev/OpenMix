@@ -56,6 +56,8 @@ class SettingsDialog : public QDialog {
     // QLab remote
     QLineEdit* m_qlabPasscode = nullptr;
     QCheckBox* m_qlabSuppressBack = nullptr;
+
+    QCheckBox* m_highContrast = nullptr;
 };
 
 } // namespace OpenMix

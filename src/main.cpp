@@ -3,6 +3,7 @@
 #include "ui/WelcomeDialog.h"
 #include "ui/theme/Theme.h"
 #include <QApplication>
+#include <QSettings>
 #include <QFile>
 #include <QPalette>
 #include <QStyleFactory>
@@ -41,8 +42,9 @@ int main(int argc, char* argv[]) {
     darkPalette.setColor(QPalette::Disabled, QPalette::WindowText, QColor(0x66, 0x66, 0x66));
     QApplication::setPalette(darkPalette);
 
-    // apply global stylesheet
-    qtApp.setStyleSheet(OpenMix::Theme::globalStylesheet());
+    // apply global stylesheet (booth-friendly high-contrast variant is opt-in)
+    const bool highContrast = QSettings().value("highContrast", false).toBool();
+    qtApp.setStyleSheet(OpenMix::Theme::globalStylesheet(highContrast));
 
     // create app instance
     OpenMix::Application app;

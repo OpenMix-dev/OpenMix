@@ -150,7 +150,8 @@ constexpr int IconL = 20;
 constexpr int IconXL = 24;
 } // namespace Size
 
-QString globalStylesheet();
+// base dark theme; pass highContrast=true for a brighter booth-friendly variant
+QString globalStylesheet(bool highContrast = false);
 
 QColor color(const char* themeColor);
 

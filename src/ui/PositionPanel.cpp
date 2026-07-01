@@ -109,7 +109,7 @@ void PositionPanel::setupUi() {
     m_panSpin->setSingleStep(0.05);
     m_panSpin->setToolTip(tr("Pan: -1 full left, 0 center, +1 full right"));
     connect(m_panSpin, &QDoubleSpinBox::editingFinished, this, &PositionPanel::onFieldsEdited);
-    form->addRow(tr("Pan:"), m_panSpin);
+    form->addRow(tr("Pan (L / R):"), m_panSpin);
 
     m_busesEdit = new QLineEdit(editorGroup);
     m_busesEdit->setPlaceholderText(tr("e.g. 1, 3, 5"));

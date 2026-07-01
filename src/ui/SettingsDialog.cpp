@@ -5,7 +5,9 @@
 #include "core/PlaybackEngine.h"
 #include "core/ScribbleController.h"
 #include "core/Show.h"
+#include "theme/Theme.h"
 
+#include <QApplication>
 #include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
@@ -98,6 +100,14 @@ void SettingsDialog::setupUi() {
     qlabForm->addRow(m_qlabSuppressBack);
     layout->addWidget(qlabBox);
 
+    // --- display -----------------------------------------------------------
+    auto* displayBox = new QGroupBox(tr("Display"), this);
+    auto* displayForm = new QFormLayout(displayBox);
+    m_highContrast = new QCheckBox(tr("High-contrast mode (brighter text and borders for the booth)"),
+                                   displayBox);
+    displayForm->addRow(m_highContrast);
+    layout->addWidget(displayBox);
+
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &SettingsDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, this, &SettingsDialog::reject);
@@ -129,6 +139,8 @@ void SettingsDialog::loadValues() {
         m_qlabPasscode->setText(qlab->passcode());
         m_qlabSuppressBack->setChecked(qlab->suppressBack());
     }
+
+    m_highContrast->setChecked(QSettings().value("highContrast", false).toBool());
 }
 
 void SettingsDialog::applyValues() {
@@ -180,6 +192,14 @@ void SettingsDialog::applyValues() {
         qlab->setPasscode(m_qlabPasscode->text());
         qlab->setSuppressBack(m_qlabSuppressBack->isChecked());
         qlab->saveToSettings();
+    }
+
+    // high-contrast theme: persist and re-skin the running app immediately
+    {
+        const bool hc = m_highContrast->isChecked();
+        QSettings().setValue("highContrast", hc);
+        if (auto* app = qobject_cast<QApplication*>(QApplication::instance()))
+            app->setStyleSheet(Theme::globalStylesheet(hc));
     }
 }
 

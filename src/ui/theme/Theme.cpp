@@ -6,13 +6,29 @@
 namespace OpenMix {
 namespace Theme {
 
-QString globalStylesheet() {
+// Booth-friendly overrides: pure-white text, brighter borders and gridlines so
+// the UI stays legible from a distance in a darkened room.
+static QString highContrastOverrides() {
+    return QString(R"QSS(
+QWidget { color: #ffffff; }
+QLabel { color: #ffffff; }
+QGroupBox { border: 1px solid #8a93a3; }
+QGroupBox::title { color: #ffffff; }
+QTableView { gridline-color: #8a93a3; color: #ffffff; }
+QHeaderView::section { color: #ffffff; }
+QPushButton, QToolButton { border: 1px solid #8a93a3; }
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox { border: 1px solid #8a93a3; color: #ffffff; }
+QMenu, QMenuBar { color: #ffffff; }
+)QSS");
+}
+
+QString globalStylesheet(bool highContrast) {
+    QString base;
     QFile styleFile(":/styles/main.qss");
     if (styleFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return QString::fromUtf8(styleFile.readAll());
-    }
-
-    return QString(R"QSS(
+        base = QString::fromUtf8(styleFile.readAll());
+    } else {
+        base = QString(R"QSS(
 * {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     font-size: 12px;
@@ -24,6 +40,11 @@ QWidget {
     color: #f0f1f3;
 }
 )QSS");
+    }
+
+    if (highContrast)
+        base += highContrastOverrides();
+    return base;
 }
 
 QColor color(const char* themeColor) { return QColor(themeColor); }

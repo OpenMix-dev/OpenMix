@@ -14,6 +14,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QSpinBox>
+#include <QTabWidget>
 #include <QVBoxLayout>
 
 namespace OpenMix {
@@ -27,6 +28,21 @@ RemoteControlDialog::RemoteControlDialog(Application* app, QWidget* parent)
 
 void RemoteControlDialog::setupUi() {
     auto* layout = new QVBoxLayout(this);
+    auto* tabs = new QTabWidget(this);
+
+    // gate a group's config fields on its enable checkbox
+    auto gate = [](QCheckBox* box, QList<QWidget*> fields) {
+        auto apply = [fields](bool on) {
+            for (QWidget* w : fields)
+                w->setEnabled(on);
+        };
+        apply(box->isChecked());
+        QObject::connect(box, &QCheckBox::toggled, box, [apply](bool on) { apply(on); });
+    };
+
+    // ==== Tab 1: primary remotes (MSC + inbound OSC) =======================
+    auto* primaryPage = new QWidget(tabs);
+    auto* primaryLayout = new QVBoxLayout(primaryPage);
 
     // --- MIDI Show Control -------------------------------------------------
     auto* mscBox = new QGroupBox(tr("MIDI Show Control (MSC)"), this);
@@ -41,7 +57,8 @@ void RemoteControlDialog::setupUi() {
         tr("MSC rides on the MIDI input device set in Settings > MIDI Controller."), mscBox);
     mscNote->setWordWrap(true);
     mscForm->addRow(mscNote);
-    layout->addWidget(mscBox);
+    gate(m_mscEnabled, {m_mscDeviceId});
+    primaryLayout->addWidget(mscBox);
 
     // --- inbound OSC -------------------------------------------------------
     auto* oscBox = new QGroupBox(tr("Inbound OSC Remote"), this);
@@ -57,7 +74,14 @@ void RemoteControlDialog::setupUi() {
         tr("Accepts /go, /stop, /next, /prev, /cue/goto and /ctrl/fadeall."), oscBox);
     oscNote->setWordWrap(true);
     oscForm->addRow(oscNote);
-    layout->addWidget(oscBox);
+    gate(m_oscEnabled, {m_oscPort});
+    primaryLayout->addWidget(oscBox);
+    primaryLayout->addStretch();
+    tabs->addTab(primaryPage, tr("Primary"));
+
+    // ==== Tab 2: DAW & playback integration ================================
+    auto* dawPage = new QWidget(tabs);
+    auto* dawLayout = new QVBoxLayout(dawPage);
 
     // --- outbound QLab -----------------------------------------------------
     auto* qlabBox = new QGroupBox(tr("QLab / DAW Remote (outbound)"), this);
@@ -78,7 +102,8 @@ void RemoteControlDialog::setupUi() {
     qlabForm->addRow(tr("Port:"), m_qlabPort);
     qlabForm->addRow(tr("Pre-roll:"), m_qlabPreRoll);
     qlabForm->addRow(tr("Workspace:"), m_qlabWorkspace);
-    layout->addWidget(qlabBox);
+    gate(m_qlabEnabled, {m_qlabHost, m_qlabPort, m_qlabPreRoll, m_qlabWorkspace});
+    dawLayout->addWidget(qlabBox);
 
     // --- REAPER virtual sound check ---------------------------------------
     auto* reaperBox = new QGroupBox(tr("REAPER (Virtual Sound Check)"), this);
@@ -103,7 +128,9 @@ void RemoteControlDialog::setupUi() {
     reaperForm->addRow(tr("Marker pre-roll:"), m_reaperPreRoll);
     reaperForm->addRow(m_reaperAutoDetect);
     reaperForm->addRow(tr("Listen port:"), m_reaperListenPort);
-    layout->addWidget(reaperBox);
+    gate(m_reaperEnabled, {m_reaperHost, m_reaperPort, m_reaperRecord, m_reaperPreRoll,
+                           m_reaperAutoDetect, m_reaperListenPort});
+    dawLayout->addWidget(reaperBox);
 
     // --- Cue Player (cpsound) ---------------------------------------------
     auto* cpBox = new QGroupBox(tr("Cue Player (cpsound)"), this);
@@ -116,7 +143,8 @@ void RemoteControlDialog::setupUi() {
     cpForm->addRow(m_cuePlayerEnabled);
     cpForm->addRow(tr("Host:"), m_cuePlayerHost);
     cpForm->addRow(tr("Port:"), m_cuePlayerPort);
-    layout->addWidget(cpBox);
+    gate(m_cuePlayerEnabled, {m_cuePlayerHost, m_cuePlayerPort});
+    dawLayout->addWidget(cpBox);
 
     // --- Show Cue System (SCS) --------------------------------------------
     auto* scsBox = new QGroupBox(tr("Show Cue System (SCS)"), this);
@@ -132,7 +160,12 @@ void RemoteControlDialog::setupUi() {
     scsForm->addRow(tr("Host:"), m_scsHost);
     scsForm->addRow(tr("Port:"), m_scsPort);
     scsForm->addRow(tr("Password:"), m_scsPassword);
-    layout->addWidget(scsBox);
+    gate(m_scsEnabled, {m_scsHost, m_scsPort, m_scsPassword});
+    dawLayout->addWidget(scsBox);
+    dawLayout->addStretch();
+    tabs->addTab(dawPage, tr("DAW & Playback"));
+
+    layout->addWidget(tabs);
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &RemoteControlDialog::accept);
