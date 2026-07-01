@@ -68,6 +68,23 @@ class TestReaperClient : public QObject {
         QVERIFY(c.markers().isEmpty());
     }
 
+    void transportRecordDrivesMode() {
+        ReaperClient c;
+        QVERIFY(!c.recordMode());
+
+        c.onTransport("/record", 1.0f);
+        QVERIFY(c.recordMode()); // recording -> drop markers
+        c.onTransport("/play", 1.0f);
+        QVERIFY(c.recordMode()); // playing while recording, unchanged
+        c.onTransport("/record", 0.0f);
+        QVERIFY(!c.recordMode()); // record off -> jump mode
+
+        c.onTransport("/record", 1.0f);
+        QVERIFY(c.recordMode());
+        c.onTransport("/stop", 1.0f);
+        QVERIFY(!c.recordMode()); // stop -> jump mode
+    }
+
     void disabledSendsNothing() {
         ReaperClient c;
         c.setTarget("127.0.0.1", 8000);

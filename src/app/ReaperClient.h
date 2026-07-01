@@ -17,6 +17,8 @@ class ReaperClient : public QObject {
   public:
     // REAPER's default OSC receive port.
     static constexpr int REAPER_DEFAULT_PORT = 8000;
+    // default local port we listen on for REAPER's transport feedback.
+    static constexpr int DEFAULT_LISTEN_PORT = 9000;
     // REAPER action id: "Markers: Insert marker at current position".
     static constexpr int ACTION_INSERT_MARKER = 40157;
 
@@ -46,6 +48,19 @@ class ReaperClient : public QObject {
     void setPreRollSeconds(int seconds) { m_preRollSeconds = seconds < 0 ? 0 : seconds; }
     [[nodiscard]] int preRollSeconds() const { return m_preRollSeconds; }
 
+    // auto-detect record vs playback from REAPER's transport feedback OSC.
+    // When on, a local OSC server listens and /record drives the record mode.
+    void setAutoDetect(bool on);
+    [[nodiscard]] bool autoDetect() const { return m_autoDetect; }
+    void setListenPort(int port);
+    [[nodiscard]] int listenPort() const { return m_listenPort; }
+
+    // apply a REAPER transport message (public for testing). /record sets the
+    // record mode; /stop clears it; /play and /pause leave it unchanged.
+    void onTransport(const QString& address, float value);
+    // called from the OSC listener thread; marshals onTransport to this thread.
+    void deliverTransport(const QString& address, float value);
+
     void loadFromSettings();
     void saveToSettings();
 
@@ -61,12 +76,15 @@ class ReaperClient : public QObject {
 
   signals:
     void markersChanged();
+    void recordModeChanged(bool recording);
 
   signals:
     void sent(const QString& address);
 
   private:
     void rebuildAddress();
+    void startListening();
+    void stopListening();
     void send(const QString& address);
     void sendString(const QString& address, const QString& value);
     void placeMarker(double cueNumber, const QString& name);
@@ -78,6 +96,9 @@ class ReaperClient : public QObject {
     bool m_enabled = false;
     bool m_recordMode = false;
     int m_preRollSeconds = 0;
+    bool m_autoDetect = false;
+    int m_listenPort = DEFAULT_LISTEN_PORT;
+    lo_server_thread m_listener = nullptr;
 
     QList<MarkerEntry> m_markers; // session markers, in fire order
     int m_nextMarker = 1;

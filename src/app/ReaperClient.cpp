@@ -1,15 +1,89 @@
 #include "ReaperClient.h"
 
 #include <QByteArray>
+#include <QMetaObject>
 #include <QSettings>
 
 namespace OpenMix {
 
+namespace {
+// liblo callback (runs on the OSC server thread): extract a float and forward.
+int hTransport(const char* path, const char* types, lo_arg** argv, int argc, lo_message,
+               void* user) {
+    float value = 1.0f;
+    if (argc > 0 && types) {
+        if (types[0] == 'f')
+            value = argv[0]->f;
+        else if (types[0] == 'i')
+            value = static_cast<float>(argv[0]->i32);
+    }
+    static_cast<ReaperClient*>(user)->deliverTransport(QString::fromUtf8(path), value);
+    return 0;
+}
+} // namespace
+
 ReaperClient::ReaperClient(QObject* parent) : QObject(parent) { rebuildAddress(); }
 
 ReaperClient::~ReaperClient() {
+    stopListening();
     if (m_address)
         lo_address_free(m_address);
+}
+
+void ReaperClient::setAutoDetect(bool on) {
+    m_autoDetect = on;
+    if (on)
+        startListening();
+    else
+        stopListening();
+}
+
+void ReaperClient::setListenPort(int port) {
+    if (port > 0)
+        m_listenPort = port;
+    if (m_autoDetect)
+        startListening(); // rebind
+}
+
+void ReaperClient::startListening() {
+    stopListening();
+    const QByteArray portStr = QByteArray::number(m_listenPort);
+    m_listener = lo_server_thread_new(portStr.constData(), nullptr);
+    if (!m_listener)
+        return;
+    lo_server_thread_add_method(m_listener, "/record", nullptr, hTransport, this);
+    lo_server_thread_add_method(m_listener, "/play", nullptr, hTransport, this);
+    lo_server_thread_add_method(m_listener, "/stop", nullptr, hTransport, this);
+    lo_server_thread_add_method(m_listener, "/pause", nullptr, hTransport, this);
+    lo_server_thread_start(m_listener);
+}
+
+void ReaperClient::stopListening() {
+    if (m_listener) {
+        lo_server_thread_stop(m_listener);
+        lo_server_thread_free(m_listener);
+        m_listener = nullptr;
+    }
+}
+
+void ReaperClient::deliverTransport(const QString& address, float value) {
+    // marshal from the OSC server thread onto this object's thread
+    QMetaObject::invokeMethod(
+        this, [this, address, value]() { onTransport(address, value); }, Qt::QueuedConnection);
+}
+
+void ReaperClient::onTransport(const QString& address, float value) {
+    bool recording = m_recordMode;
+    if (address == QLatin1String("/record"))
+        recording = value != 0.0f;
+    else if (address == QLatin1String("/stop"))
+        recording = false;
+    // /play and /pause do not change the record state on their own
+
+    if (recording != m_recordMode) {
+        m_recordMode = recording;
+        emit recordModeChanged(m_recordMode);
+    }
 }
 
 void ReaperClient::setTarget(const QString& host, int port) {
@@ -93,8 +167,12 @@ void ReaperClient::loadFromSettings() {
     m_enabled = settings.value("enabled", false).toBool();
     m_recordMode = settings.value("recordMode", false).toBool();
     m_preRollSeconds = settings.value("preRollSeconds", 0).toInt();
+    m_listenPort = settings.value("listenPort", DEFAULT_LISTEN_PORT).toInt();
+    m_autoDetect = settings.value("autoDetect", false).toBool();
     settings.endGroup();
     rebuildAddress();
+    if (m_autoDetect)
+        startListening();
 }
 
 void ReaperClient::saveToSettings() {
@@ -105,6 +183,8 @@ void ReaperClient::saveToSettings() {
     settings.setValue("enabled", m_enabled);
     settings.setValue("recordMode", m_recordMode);
     settings.setValue("preRollSeconds", m_preRollSeconds);
+    settings.setValue("listenPort", m_listenPort);
+    settings.setValue("autoDetect", m_autoDetect);
     settings.endGroup();
 }
 

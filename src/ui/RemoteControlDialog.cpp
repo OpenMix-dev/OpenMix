@@ -90,11 +90,17 @@ void RemoteControlDialog::setupUi() {
     m_reaperPreRoll = new QSpinBox(reaperBox);
     m_reaperPreRoll->setRange(0, 60);
     m_reaperPreRoll->setSuffix(tr(" s"));
+    m_reaperAutoDetect =
+        new QCheckBox(tr("Auto-detect record/playback from REAPER"), reaperBox);
+    m_reaperListenPort = new QSpinBox(reaperBox);
+    m_reaperListenPort->setRange(1, 65535);
     reaperForm->addRow(m_reaperEnabled);
     reaperForm->addRow(tr("Host:"), m_reaperHost);
     reaperForm->addRow(tr("Port:"), m_reaperPort);
     reaperForm->addRow(m_reaperRecord);
     reaperForm->addRow(tr("Marker pre-roll:"), m_reaperPreRoll);
+    reaperForm->addRow(m_reaperAutoDetect);
+    reaperForm->addRow(tr("Listen port:"), m_reaperListenPort);
     layout->addWidget(reaperBox);
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
@@ -130,6 +136,8 @@ void RemoteControlDialog::loadValues() {
         m_reaperPort->setValue(reaper->port());
         m_reaperRecord->setChecked(reaper->recordMode());
         m_reaperPreRoll->setValue(reaper->preRollSeconds());
+        m_reaperAutoDetect->setChecked(reaper->autoDetect());
+        m_reaperListenPort->setValue(reaper->listenPort());
     }
 }
 
@@ -172,6 +180,8 @@ void RemoteControlDialog::applyValues() {
                           m_reaperPort->value());
         reaper->setRecordMode(m_reaperRecord->isChecked());
         reaper->setPreRollSeconds(m_reaperPreRoll->value());
+        reaper->setListenPort(m_reaperListenPort->value());
+        reaper->setAutoDetect(m_reaperAutoDetect->isChecked());
         reaper->saveToSettings();
     }
 }
