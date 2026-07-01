@@ -47,6 +47,7 @@ class CueListView : public QWidget {
     void fillDown();      // copy the selected cue's content into the next cue
     void jumpToSelectedCue(); // set the selected cue as standby without firing
     void setEditingLocked(bool locked); // make the cue table read-only
+    void setRowHeight(int pixels);      // cue-table row height
 
     [[nodiscard]] bool hasClipboardCue() const { return m_clipboard.has_value(); }
 

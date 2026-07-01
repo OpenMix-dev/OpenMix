@@ -384,6 +384,10 @@ void CueListView::jumpToSelectedCue() {
     m_app->playbackEngine()->setStandbyIndex(idx);
 }
 
+void CueListView::setRowHeight(int pixels) {
+    m_tableView->verticalHeader()->setDefaultSectionSize(pixels);
+}
+
 void CueListView::setEditingLocked(bool locked) {
     m_tableView->setEditTriggers(locked ? QAbstractItemView::NoEditTriggers
                                         : QAbstractItemView::DoubleClicked |

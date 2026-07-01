@@ -40,6 +40,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMenuBar>
+#include <QActionGroup>
 #include <QDialog>
 #include <QFile>
 #include <QInputDialog>
@@ -438,6 +439,26 @@ void MainWindow::createMenus() {
     m_viewMenu->addAction(m_showEnsembleAction);
     m_viewMenu->addAction(m_showPositionAction);
     m_viewMenu->addAction(m_showTimecodeAction);
+    m_viewMenu->addSeparator();
+
+    // cue-table row size
+    QMenu* rowSizeMenu = m_viewMenu->addMenu(tr("&Row Size"));
+    QActionGroup* rowSizeGroup = new QActionGroup(this);
+    struct RowSize {
+        const char* label;
+        int pixels;
+    };
+    const RowSize rowSizes[] = {{"&Small", 22}, {"&Medium", 28}, {"&Large", 40}};
+    for (const RowSize& rs : rowSizes) {
+        QAction* action = rowSizeMenu->addAction(tr(rs.label));
+        action->setCheckable(true);
+        action->setChecked(rs.pixels == 28); // medium default
+        rowSizeGroup->addAction(action);
+        const int pixels = rs.pixels;
+        connect(action, &QAction::triggered, this, [this, pixels]() {
+            m_cueListView->setRowHeight(pixels);
+        });
+    }
     m_viewMenu->addSeparator();
     m_viewMenu->addAction(m_cueZeroAction);
     m_viewMenu->addSeparator();
