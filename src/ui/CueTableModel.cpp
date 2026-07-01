@@ -94,6 +94,9 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
             }
             return parts.isEmpty() ? QString() : tr("mute %1").arg(parts.join(", "));
         }
+        case ColFade:
+            return cue.fadeTime() > 0.0 ? tr("%1s").arg(cue.fadeTime(), 0, 'f', 1)
+                                        : tr("instant");
         }
     }
 
@@ -178,6 +181,8 @@ QVariant CueTableModel::headerData(int section, Qt::Orientation orientation, int
         return tr("Positions");
     case ColFx:
         return tr("FX");
+    case ColFade:
+        return tr("Fade");
     }
     return QVariant();
 }

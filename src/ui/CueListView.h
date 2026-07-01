@@ -66,6 +66,10 @@ class CueListView : public QWidget {
     void onCueReordered(int fromIndex, int toIndex);
     void onFiltersChanged();
     void onTabNavigationRequested(const QModelIndex& fromIndex, bool forward);
+    void showContextMenu(const QPoint& pos);
+
+  public slots:
+    void beginRenameSelected(); // enter inline edit on the selected cue's name
 
   private:
     void setupUi();

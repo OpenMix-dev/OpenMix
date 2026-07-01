@@ -50,7 +50,13 @@
 #include <QActionGroup>
 #include <QDialog>
 #include <QFile>
+#include <QAbstractSpinBox>
+#include <QApplication>
+#include <QComboBox>
 #include <QInputDialog>
+#include <QLineEdit>
+#include <QPlainTextEdit>
+#include <QTextEdit>
 #include <QMessageBox>
 #include <QTextStream>
 #include <QUndoView>
@@ -218,9 +224,13 @@ void MainWindow::createActions() {
     connect(m_jumpToSelectedAction, &QAction::triggered, this,
             [this]() { m_cueListView->jumpToSelectedCue(); });
 
-    m_jumpAction = new QAction(tr("Ju&mp..."), this);
-    m_jumpAction->setToolTip(tr("Set standby to a cue by number without firing"));
-    connect(m_jumpAction, &QAction::triggered, this, &MainWindow::showJumpDialog);
+    m_jumpAction = new QAction(tr("Ju&mp to Cue"), this);
+    m_jumpAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_J));
+    m_jumpAction->setToolTip(tr("Focus the jump box: type a cue number (append G to fire)"));
+    connect(m_jumpAction, &QAction::triggered, this, [this]() {
+        m_jumpEdit->setFocus();
+        m_jumpEdit->selectAll();
+    });
 
     m_lockEditingAction = new QAction(tr("&Lock Editing"), this);
     m_lockEditingAction->setCheckable(true);
@@ -538,6 +548,7 @@ void MainWindow::createMenus() {
     const ColumnToggle columnToggles[] = {{"&Group", CueTableModel::ColGroup, true},
                                           {"&Tags", CueTableModel::ColTags, true},
                                           {"&Notes", CueTableModel::ColNotes, true},
+                                          {"F&ade", CueTableModel::ColFade, true},
                                           {"Colo&r", CueTableModel::ColColor, true},
                                           {"&DCAs", CueTableModel::ColDca, false},
                                           {"&Positions", CueTableModel::ColPosition, false},
@@ -594,6 +605,48 @@ void MainWindow::createToolBars() {
     m_playbackToolBar->addAction(m_nextCueAction);
     m_playbackToolBar->addSeparator();
     m_playbackToolBar->addAction(m_panicAction);
+
+    // type-to-jump: "12.5" sets standby, "12.5G" jumps and fires
+    m_playbackToolBar->addSeparator();
+    m_playbackToolBar->addWidget(new QLabel(tr(" Jump: ")));
+    m_jumpEdit = new QLineEdit();
+    m_jumpEdit->setPlaceholderText(tr("12.5 or 12.5G"));
+    m_jumpEdit->setFixedWidth(110);
+    m_jumpEdit->setClearButtonEnabled(true);
+    m_jumpEdit->setToolTip(tr("Type a cue number and press Enter to set standby;\n"
+                              "append G to jump and fire (e.g. 12.5G)."));
+    connect(m_jumpEdit, &QLineEdit::returnPressed, this, &MainWindow::onJumpEntered);
+    m_playbackToolBar->addWidget(m_jumpEdit);
+}
+
+void MainWindow::onJumpEntered() {
+    QString text = m_jumpEdit->text().trimmed();
+    if (text.isEmpty())
+        return;
+
+    bool fireAfter = text.endsWith('g', Qt::CaseInsensitive);
+    if (fireAfter)
+        text.chop(1);
+
+    bool ok = false;
+    double number = text.trimmed().toDouble(&ok);
+    if (!ok) {
+        statusBar()->showMessage(tr("Jump: '%1' is not a cue number").arg(text.trimmed()), 3000);
+        return;
+    }
+
+    auto idx = m_app->show()->cueList()->indexOfNumber(number);
+    if (!idx) {
+        statusBar()->showMessage(tr("Jump: no cue numbered %1").arg(number), 3000);
+        return;
+    }
+
+    m_app->playbackEngine()->setStandbyIndex(*idx);
+    m_jumpEdit->clear();
+    if (fireAfter)
+        go();
+    else
+        m_cueListView->setFocus();
 }
 
 void MainWindow::createStatusBar() {
@@ -838,13 +891,28 @@ void MainWindow::closeEvent(QCloseEvent* event) {
 }
 
 void MainWindow::keyPressEvent(QKeyEvent* event) {
-    // spacebar for GO (when not editing text)
-    if (event->key() == Qt::Key_Space && !m_cueEditor->hasFocus()) {
+    // spacebar for GO, but never while text is being entered: a cell editor,
+    // the filter box, a spin box, or an editable combo must receive the space.
+    if (event->key() == Qt::Key_Space && !isTextEntryFocused()) {
         go();
         event->accept();
         return;
     }
     QMainWindow::keyPressEvent(event);
+}
+
+bool MainWindow::isTextEntryFocused() const {
+    QWidget* focus = QApplication::focusWidget();
+    if (!focus)
+        return false;
+    if (m_cueEditor->isAncestorOf(focus) || m_cueEditor->hasFocus())
+        return true;
+    // any line edit, text edit, spin box, or open combo popup swallows space
+    if (qobject_cast<QLineEdit*>(focus) || qobject_cast<QTextEdit*>(focus) ||
+        qobject_cast<QPlainTextEdit*>(focus) || qobject_cast<QAbstractSpinBox*>(focus) ||
+        qobject_cast<QComboBox*>(focus))
+        return true;
+    return false;
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event) { QMainWindow::resizeEvent(event); }
@@ -991,21 +1059,6 @@ void MainWindow::renumberCues() {
     m_cueListView->refreshAll();
 }
 
-void MainWindow::showJumpDialog() {
-    CueList* list = m_app->show()->cueList();
-    if (list->isEmpty())
-        return;
-    bool ok = false;
-    const double number = QInputDialog::getDouble(this, tr("Jump to Cue"), tr("Cue number:"), 1.0,
-                                                  0.0, 99999.0, 2, &ok);
-    if (!ok)
-        return;
-    if (auto idx = list->indexOfNumber(number))
-        m_app->playbackEngine()->setStandbyIndex(*idx);
-    else
-        QMessageBox::information(this, tr("Jump to Cue"),
-                                 tr("No cue numbered %1.").arg(number));
-}
 
 void MainWindow::recordOffsets() {
     if (!m_app->mixer() || !m_app->mixer()->isConnected()) {

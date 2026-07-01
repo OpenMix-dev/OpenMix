@@ -7,6 +7,7 @@ class QAction;
 class QMenu;
 class QToolBar;
 class QLabel;
+class QLineEdit;
 class QSplitter;
 
 namespace OpenMix {
@@ -56,7 +57,7 @@ class MainWindow : public QMainWindow {
     void addCue();
     void deleteCue();
     void renumberCues();
-    void showJumpDialog();
+    void onJumpEntered();
     void toggleLockEditing();
     void recordOffsets();
 
@@ -110,6 +111,7 @@ class MainWindow : public QMainWindow {
     void onBubbleButtonClicked(const QString& id, bool checked);
 
   private:
+    [[nodiscard]] bool isTextEntryFocused() const;
     void setupUi();
     void createActions();
     void registerShortcuts();
@@ -242,6 +244,7 @@ class MainWindow : public QMainWindow {
     QLabel* m_cueStatusLabel;
     QLabel* m_currentCueLabel;
     QLabel* m_nextCueLabel;
+    QLineEdit* m_jumpEdit = nullptr;
 };
 
 } // namespace OpenMix

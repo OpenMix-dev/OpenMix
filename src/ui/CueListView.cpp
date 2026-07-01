@@ -16,6 +16,7 @@
 #include <QFocusEvent>
 #include <QHeaderView>
 #include <QKeyEvent>
+#include <QMenu>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <algorithm>
@@ -84,12 +85,18 @@ void CueListView::setupUi() {
     m_tableView->horizontalHeader()->setStretchLastSection(true);
     m_tableView->setShowGrid(false);
 
-    // column widths
-    m_tableView->setColumnWidth(CueTableModel::ColNumber, 60);
+    // column widths (ColNumber wider to fit the ▶/→ standby markers)
+    m_tableView->setColumnWidth(CueTableModel::ColNumber, 78);
     m_tableView->setColumnWidth(CueTableModel::ColName, 150);
     m_tableView->setColumnWidth(CueTableModel::ColType, 100);
     m_tableView->setColumnWidth(CueTableModel::ColGroup, 100);
     m_tableView->setColumnWidth(CueTableModel::ColTags, 120);
+    m_tableView->setColumnWidth(CueTableModel::ColFade, 72);
+
+    // right-click context menu for quick edits
+    m_tableView->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_tableView, &QTableView::customContextMenuRequested, this,
+            &CueListView::showContextMenu);
 
     // connections
     connect(m_tableView->selectionModel(), &QItemSelectionModel::selectionChanged, this,
@@ -444,6 +451,60 @@ void CueListView::setEditingLocked(bool locked) {
                                               QAbstractItemView::AnyKeyPressed);
 }
 
+void CueListView::showContextMenu(const QPoint& pos) {
+    QModelIndex at = m_tableView->indexAt(pos);
+    if (at.isValid())
+        m_tableView->selectRow(at.row());
+
+    const int row = selectedCueIndex();
+    QMenu menu(this);
+
+    if (row >= 0) {
+        QAction* rename = menu.addAction(tr("Rename"));
+        rename->setShortcut(QKeySequence(Qt::Key_F2));
+        connect(rename, &QAction::triggered, this, &CueListView::beginRenameSelected);
+
+        QMenu* typeMenu = menu.addMenu(tr("Change Type"));
+        const CueType types[] = {CueType::Snapshot, CueType::Stop, CueType::GoTo,
+                                 CueType::Wait, CueType::Macro};
+        for (CueType t : types) {
+            QAction* a = typeMenu->addAction(cueTypeToString(t));
+            connect(a, &QAction::triggered, this, [this, row, t]() {
+                m_model->setData(m_model->index(row, CueTableModel::ColType),
+                                 cueTypeToString(t), Qt::EditRole);
+            });
+        }
+
+        menu.addSeparator();
+        menu.addAction(tr("Duplicate"), this, &CueListView::duplicateSelectedCue);
+        menu.addAction(tr("Copy"), this, &CueListView::copySelectedCue);
+    }
+
+    QAction* paste = menu.addAction(tr("Paste"));
+    paste->setEnabled(hasClipboardCue());
+    connect(paste, &QAction::triggered, this, &CueListView::pasteCue);
+
+    if (row >= 0) {
+        menu.addSeparator();
+        menu.addAction(tr("Jump to Standby"), this, &CueListView::jumpToSelectedCue);
+        menu.addAction(tr("Delete"), this, &CueListView::deleteSelectedCue);
+    }
+
+    menu.exec(m_tableView->viewport()->mapToGlobal(pos));
+}
+
+void CueListView::beginRenameSelected() {
+    const int row = selectedCueIndex();
+    if (row < 0)
+        return;
+    QModelIndex src = m_model->index(row, CueTableModel::ColName);
+    QModelIndex proxy = m_proxyModel->mapFromSource(src);
+    if (proxy.isValid()) {
+        m_tableView->setCurrentIndex(proxy);
+        m_tableView->edit(proxy);
+    }
+}
+
 void CueListView::onSelectionChanged() { emit cueSelected(selectedCueIndex()); }
 
 void CueListView::onCueReordered(int fromIndex, int toIndex) {
@@ -501,6 +562,12 @@ bool CueListView::eventFilter(QObject* watched, QEvent* event) {
 
         // check if there's an active editor by looking for index widget
         bool isEditing = current.isValid() && m_tableView->indexWidget(current) != nullptr;
+
+        // F2 renames the selected cue inline
+        if (keyEvent->key() == Qt::Key_F2 && !isEditing) {
+            beginRenameSelected();
+            return true;
+        }
 
         // handle enter to edit current cell
         if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {

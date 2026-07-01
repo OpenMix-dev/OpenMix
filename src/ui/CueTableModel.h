@@ -25,6 +25,7 @@ class CueTableModel : public QAbstractTableModel {
         ColDca,      // read-only summary of DCA overrides (channel labels)
         ColPosition, // read-only count of positioned channels
         ColFx,       // read-only muted FX units
+        ColFade,     // fade duration (instant / seconds)
         ColCount
     };
 
