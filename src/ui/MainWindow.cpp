@@ -7,6 +7,7 @@
 #include "ActiveCueInfoPanel.h"
 #include "AllocateSpareDialog.h"
 #include "FxSetupDialog.h"
+#include "WelcomeDialog.h"
 #include "ChannelUtilisationDialog.h"
 #include "CueListView.h"
 #include "CueTableModel.h"
@@ -976,6 +977,37 @@ void MainWindow::showAllocateSpareDialog() {
 void MainWindow::openConnectionPanel() {
     if (!m_connectionPopOut->isVisible()) {
         m_connectionPopOut->showAndRestore();
+    }
+}
+
+void MainWindow::showWelcomeDialog() {
+    WelcomeDialog dialog(this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    switch (dialog.choice()) {
+    case WelcomeDialog::Choice::NewShow:
+        newShow();
+        break;
+    case WelcomeDialog::Choice::OpenShow:
+        openShow();
+        break;
+    case WelcomeDialog::Choice::OpenRecent: {
+        if (!maybeSave())
+            return;
+        QString error;
+        if (!ProjectFile::load(m_app->show(), dialog.recentPath(), &error)) {
+            QMessageBox::warning(this, tr("Error"), tr("Failed to open show:\n%1").arg(error));
+            return;
+        }
+        m_cueEditor->setCue(-1);
+        updateTitle();
+        updateStatusBar();
+        updateRecentProjectsMenu();
+        break;
+    }
+    case WelcomeDialog::Choice::None:
+        break;
     }
 }
 

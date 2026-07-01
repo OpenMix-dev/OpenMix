@@ -35,6 +35,7 @@ class MainWindow : public QMainWindow {
     ~MainWindow() override;
 
     void openConnectionPanel();
+    void showWelcomeDialog();
 
   protected:
     void closeEvent(QCloseEvent* event) override;

@@ -133,6 +133,7 @@ set(SOURCES
     src/ui/AllocateSpareDialog.cpp
     src/ui/ActiveCueInfoPanel.cpp
     src/ui/FxSetupDialog.cpp
+    src/ui/WelcomeDialog.cpp
     src/ui/PopOutWindow.cpp
     src/ui/BubbleButton.cpp
     src/ui/BubbleBar.cpp
@@ -242,6 +243,7 @@ set(HEADERS
     src/ui/AllocateSpareDialog.h
     src/ui/ActiveCueInfoPanel.h
     src/ui/FxSetupDialog.h
+    src/ui/WelcomeDialog.h
     src/ui/PopOutWindow.h
     src/ui/BubbleButton.h
     src/ui/BubbleBar.h

@@ -1,5 +1,6 @@
 #include "app/Application.h"
 #include "ui/MainWindow.h"
+#include "ui/WelcomeDialog.h"
 #include "ui/theme/Theme.h"
 #include <QApplication>
 #include <QFile>
@@ -51,7 +52,10 @@ int main(int argc, char* argv[]) {
     OpenMix::MainWindow mainWindow(&app);
     app.setMainWindow(&mainWindow);
     mainWindow.show();
-    QTimer::singleShot(0, &mainWindow, &OpenMix::MainWindow::openConnectionPanel);
+    if (OpenMix::WelcomeDialog::showAtStartup())
+        QTimer::singleShot(0, &mainWindow, &OpenMix::MainWindow::showWelcomeDialog);
+    else
+        QTimer::singleShot(0, &mainWindow, &OpenMix::MainWindow::openConnectionPanel);
     QTimer::singleShot(500, &app, &OpenMix::Application::startupScan);
 
     return qtApp.exec();
