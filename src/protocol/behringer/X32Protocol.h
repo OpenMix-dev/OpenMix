@@ -71,6 +71,7 @@ class X32Protocol : public MixerProtocol {
 
     // keep-alive
     void refresh() override;
+    void requestConsoleNames(int count) override;
 
     // latency monitoring
     [[nodiscard]] int latencyMs() const override { return m_latencyMs; }

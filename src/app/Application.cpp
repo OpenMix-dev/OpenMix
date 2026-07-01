@@ -284,8 +284,22 @@ void Application::setupMixerConnection(const QString& type, const QString& host,
     m_connectionLogBridge->attachToMixer(m_mixer);
     m_appLogger->logConnectionAttempt(type, host, port);
 
-    connect(m_mixer, &MixerProtocol::connected, this, [this]() { emit mixerConnected(); });
+    connect(m_mixer, &MixerProtocol::connected, this, [this]() {
+        emit mixerConnected();
+        m_mixer->requestConsoleNames(100); // populate the snippet/scene name cache
+    });
     connect(m_mixer, &MixerProtocol::disconnected, this, [this]() { emit mixerDisconnected(); });
+
+    // console-reported snippet/scene names -> show name cache
+    connect(m_mixer, &MixerProtocol::consoleNameReceived, this,
+            [this](bool isScene, int index, const QString& name) {
+                if (name.isEmpty())
+                    return;
+                if (isScene)
+                    m_show->consoleNameCache()->setSceneName(index, name);
+                else
+                    m_show->consoleNameCache()->setSnippetName(index, name);
+            });
 
     // live console metering -> channel silence/clip monitor
     connect(m_mixer, &MixerProtocol::channelMeter, m_channelMonitor,

@@ -477,11 +477,21 @@ void CueEditor::updateFromCue() {
         m_colorEdit->setText(cue->color());
         m_skipCheck->setChecked(cue->skip());
 
-        // console snippets
+        // console snippets, with cached names surfaced in the tooltip
+        const ConsoleNameCache* names =
+            m_app && m_app->show() ? m_app->show()->consoleNameCache() : nullptr;
         QStringList snippetStrs;
-        for (int snippet : cue->snippets())
+        QStringList snippetNamed;
+        for (int snippet : cue->snippets()) {
             snippetStrs << QString::number(snippet);
+            const QString name = names ? names->snippetName(snippet) : QString();
+            snippetNamed << (name.isEmpty() ? QString::number(snippet)
+                                            : QString("%1 (%2)").arg(snippet).arg(name));
+        }
         m_snippetsEdit->setText(snippetStrs.join(", "));
+        m_snippetsEdit->setToolTip(
+            snippetNamed.isEmpty() ? tr("Console snippets recalled when this cue fires")
+                                   : tr("Snippets: %1").arg(snippetNamed.join(", ")));
 
         // per-FX-unit mutes
         updateFxMutesUI();

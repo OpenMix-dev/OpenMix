@@ -71,6 +71,10 @@ class MixerProtocol : public QObject {
         return std::nullopt;
     }
 
+    // query the console for its snippet/scene names (indices 1..count). Default
+    // no-op; drivers that can read names override and emit consoleNameReceived.
+    virtual void requestConsoleNames(int /*count*/) {}
+
     virtual void refresh() = 0;
     virtual int latencyMs() const = 0;
     virtual const MixerCapabilities& capabilities() const;
@@ -89,6 +93,8 @@ class MixerProtocol : public QObject {
     void connectionLost();
 
     void parameterChanged(const QString& path, const QVariant& value);
+    // a console snippet (isScene=false) or scene (isScene=true) name was read.
+    void consoleNameReceived(bool isScene, int index, const QString& name);
     void requestTimeout(const QString& path);
 
     // live input-channel meter level (channel 1-based, level 0..1 linear). Emitted

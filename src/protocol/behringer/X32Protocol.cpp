@@ -343,6 +343,16 @@ void X32Protocol::refresh() {
     }
 }
 
+void X32Protocol::requestConsoleNames(int count) {
+    if (m_connectionState != ConnectionState::Connected)
+        return;
+    for (int i = 1; i <= count; ++i) {
+        const QString idx = QStringLiteral("%1").arg(i, 3, 10, QChar('0'));
+        requestParameter(QStringLiteral("/-show/showfile/snippet/%1/name").arg(idx));
+        requestParameter(QStringLiteral("/-show/showfile/scene/%1/name").arg(idx));
+    }
+}
+
 void X32Protocol::onTransportConnected() {
     // transport connected, but we still wait for /xinfo response
 }
@@ -470,6 +480,15 @@ void X32Protocol::processResponse(const QString& path, const QVariant& value) {
     if (path == "/meters/1") {
         parseMeters(value.toByteArray());
         return;
+    }
+
+    // console snippet/scene name responses -> name cache
+    static const QRegularExpression nameRe(
+        QStringLiteral("^/-show/showfile/(scene|snippet)/(\\d+)/name$"));
+    const QRegularExpressionMatch nameMatch = nameRe.match(path);
+    if (nameMatch.hasMatch()) {
+        emit consoleNameReceived(nameMatch.captured(1) == QLatin1String("scene"),
+                                 nameMatch.captured(2).toInt(), value.toString());
     }
 
     if (m_pendingRequests.contains(path)) {
