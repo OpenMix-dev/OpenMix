@@ -10,6 +10,7 @@
 #include "FxSetupDialog.h"
 #include "WelcomeDialog.h"
 #include "ChannelUtilizationDialog.h"
+#include "MarkerNotesDialog.h"
 #include "CueListView.h"
 #include "CueTableModel.h"
 #include "CueZeroDialog.h"
@@ -336,6 +337,10 @@ void MainWindow::createActions() {
     connect(m_channelUtilizationAction, &QAction::triggered, this,
             &MainWindow::showChannelUtilizationDialog);
 
+    m_markerNotesAction = new QAction(tr("&Marker Notes..."), this);
+    m_markerNotesAction->setToolTip(tr("Review, annotate, and export REAPER sound-check markers"));
+    connect(m_markerNotesAction, &QAction::triggered, this, &MainWindow::showMarkerNotesDialog);
+
     m_showLogViewerAction = new QAction(tr("Application &Log..."), this);
     m_showLogViewerAction->setShortcut(Qt::Key_F8);
     m_showLogViewerAction->setToolTip(tr("Show application log (F8)"));
@@ -543,6 +548,7 @@ void MainWindow::createMenus() {
     m_viewMenu->addSeparator();
     m_viewMenu->addAction(m_editHistoryAction);
     m_viewMenu->addAction(m_channelUtilizationAction);
+    m_viewMenu->addAction(m_markerNotesAction);
     m_viewMenu->addAction(m_exportCsvAction);
     m_viewMenu->addAction(m_showLogViewerAction);
 
@@ -1393,6 +1399,11 @@ void MainWindow::showEditHistoryDialog() {
     QUndoView* view = new QUndoView(m_app->undoStack(), &dialog);
     view->setEmptyLabel(tr("<clean>"));
     layout->addWidget(view);
+    dialog.exec();
+}
+
+void MainWindow::showMarkerNotesDialog() {
+    MarkerNotesDialog dialog(m_app, this);
     dialog.exec();
 }
 

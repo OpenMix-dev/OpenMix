@@ -137,6 +137,7 @@ set(SOURCES
     src/ui/FxSetupDialog.cpp
     src/ui/WelcomeDialog.cpp
     src/ui/HelpDialog.cpp
+    src/ui/MarkerNotesDialog.cpp
     src/ui/PopOutWindow.cpp
     src/ui/BubbleButton.cpp
     src/ui/BubbleBar.cpp
@@ -248,6 +249,7 @@ set(HEADERS
     src/ui/FxSetupDialog.h
     src/ui/WelcomeDialog.h
     src/ui/HelpDialog.h
+    src/ui/MarkerNotesDialog.h
     src/ui/PopOutWindow.h
     src/ui/BubbleButton.h
     src/ui/BubbleBar.h

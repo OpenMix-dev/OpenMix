@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QHash>
+#include <QList>
 #include <QObject>
 #include <QString>
 #include <lo/lo.h>
@@ -19,6 +19,14 @@ class ReaperClient : public QObject {
     static constexpr int REAPER_DEFAULT_PORT = 8000;
     // REAPER action id: "Markers: Insert marker at current position".
     static constexpr int ACTION_INSERT_MARKER = 40157;
+
+    // one dropped marker in the current sound-check session, plus its note.
+    struct MarkerEntry {
+        double cueNumber = 0.0;
+        QString cueName;
+        int index = 0;
+        QString note;
+    };
 
     explicit ReaperClient(QObject* parent = nullptr);
     ~ReaperClient() override;
@@ -41,11 +49,18 @@ class ReaperClient : public QObject {
     void loadFromSettings();
     void saveToSettings();
 
+    // session markers dropped so far, in order, with their notes.
+    [[nodiscard]] QList<MarkerEntry> markers() const { return m_markers; }
+    void setMarkerNoteAt(int row, const QString& note);
+
   public slots:
     // route a fired cue: drop or jump a marker depending on the mode.
     void onCueFired(double cueNumber, const QString& name);
-    // forget the cue->marker mapping (e.g. on new REAPER session).
+    // forget the session markers (e.g. on new REAPER session).
     void resetMarkers();
+
+  signals:
+    void markersChanged();
 
   signals:
     void sent(const QString& address);
@@ -64,7 +79,7 @@ class ReaperClient : public QObject {
     bool m_recordMode = false;
     int m_preRollSeconds = 0;
 
-    QHash<double, int> m_markers; // cue number -> marker index
+    QList<MarkerEntry> m_markers; // session markers, in fire order
     int m_nextMarker = 1;
 };
 

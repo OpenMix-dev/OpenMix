@@ -46,8 +46,9 @@ void ReaperClient::placeMarker(double cueNumber, const QString& name) {
     send(QStringLiteral("/action/%1").arg(ACTION_INSERT_MARKER));
     const QString label = name.isEmpty() ? QString::number(cueNumber, 'f', 2) : name;
     sendString(QStringLiteral("/lastmarker/name"), label);
-    m_markers.insert(cueNumber, m_nextMarker);
+    m_markers.append({cueNumber, label, m_nextMarker, QString()});
     ++m_nextMarker;
+    emit markersChanged();
 }
 
 void ReaperClient::jumpToMarker(int index) {
@@ -61,14 +62,27 @@ void ReaperClient::onCueFired(double cueNumber, const QString& name) {
         return;
     if (m_recordMode) {
         placeMarker(cueNumber, name);
-    } else if (m_markers.contains(cueNumber)) {
-        jumpToMarker(m_markers.value(cueNumber));
+        return;
     }
+    for (const MarkerEntry& marker : m_markers) {
+        if (marker.cueNumber == cueNumber) {
+            jumpToMarker(marker.index);
+            return;
+        }
+    }
+}
+
+void ReaperClient::setMarkerNoteAt(int row, const QString& note) {
+    if (row < 0 || row >= m_markers.size())
+        return;
+    m_markers[row].note = note;
+    emit markersChanged();
 }
 
 void ReaperClient::resetMarkers() {
     m_markers.clear();
     m_nextMarker = 1;
+    emit markersChanged();
 }
 
 void ReaperClient::loadFromSettings() {

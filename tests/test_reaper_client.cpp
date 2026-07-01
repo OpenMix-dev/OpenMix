@@ -49,6 +49,25 @@ class TestReaperClient : public QObject {
         QCOMPARE(sent.count(), 0);
     }
 
+    void markersCarryEditableNotes() {
+        ReaperClient c;
+        c.setTarget("127.0.0.1", 8000);
+        c.setEnabled(true);
+        c.setRecordMode(true);
+        c.onCueFired(1.0, "Opening");
+        c.onCueFired(2.0, "Second");
+
+        QCOMPARE(c.markers().size(), 2);
+        QCOMPARE(c.markers().at(0).cueName, QString("Opening"));
+        QCOMPARE(c.markers().at(1).index, 2);
+
+        c.setMarkerNoteAt(1, "tighten reverb");
+        QCOMPARE(c.markers().at(1).note, QString("tighten reverb"));
+
+        c.resetMarkers();
+        QVERIFY(c.markers().isEmpty());
+    }
+
     void disabledSendsNothing() {
         ReaperClient c;
         c.setTarget("127.0.0.1", 8000);
