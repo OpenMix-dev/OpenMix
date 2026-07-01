@@ -138,6 +138,13 @@ void CueListView::setupDelegates() {
     m_tableView->setItemDelegateForColumn(CueTableModel::ColGroup, m_textDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColTags, m_textDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColNotes, m_textDelegate);
+    // remaining columns: honor the row's standby/current background instead of
+    // painting a selection block over it
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColColor, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColDca, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColPosition, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColFx, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColFade, m_textDelegate);
 
     // connect tab navigation
     connect(m_numberDelegate, &CueNumberDelegate::tabNavigationRequested, this,
