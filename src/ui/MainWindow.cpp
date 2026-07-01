@@ -117,12 +117,12 @@ void MainWindow::setupUi() {
 void MainWindow::createActions() {
     m_newAction = new QAction(Icons::fileNew(), tr("&New Show"), this);
     m_newAction->setShortcut(QKeySequence::New);
-    m_newAction->setToolTip(tr("Create a new show (Ctrl+N)"));
+    m_newAction->setToolTip(tr("New show (Ctrl+N)"));
     connect(m_newAction, &QAction::triggered, this, &MainWindow::newShow);
 
     m_openAction = new QAction(Icons::fileOpen(), tr("&Open..."), this);
     m_openAction->setShortcut(QKeySequence::Open);
-    m_openAction->setToolTip(tr("Open an existing show (Ctrl+O)"));
+    m_openAction->setToolTip(tr("Open show (Ctrl+O)"));
     connect(m_openAction, &QAction::triggered, this, &MainWindow::openShow);
 
     m_importTmixAction = new QAction(tr("&Import Show File..."), this);
@@ -131,7 +131,7 @@ void MainWindow::createActions() {
 
     m_saveAction = new QAction(Icons::fileSave(), tr("&Save"), this);
     m_saveAction->setShortcut(QKeySequence::Save);
-    m_saveAction->setToolTip(tr("Save the current show (Ctrl+S)"));
+    m_saveAction->setToolTip(tr("Save show (Ctrl+S)"));
     connect(m_saveAction, &QAction::triggered, this, &MainWindow::saveShow);
 
     m_saveAsAction = new QAction(Icons::fileSaveAs(), tr("Save &As..."), this);
@@ -154,12 +154,12 @@ void MainWindow::createActions() {
 
     m_addCueAction = new QAction(Icons::listAdd(), tr("&Add Cue"), this);
     m_addCueAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
-    m_addCueAction->setToolTip(tr("Add a new cue to the list (Ctrl+Shift+N)"));
+    m_addCueAction->setToolTip(tr("Add cue (Ctrl+Shift+N)"));
     connect(m_addCueAction, &QAction::triggered, this, &MainWindow::addCue);
 
     m_deleteCueAction = new QAction(Icons::listRemove(), tr("&Delete Cue"), this);
     m_deleteCueAction->setShortcut(QKeySequence::Delete);
-    m_deleteCueAction->setToolTip(tr("Delete the selected cue (Delete)"));
+    m_deleteCueAction->setToolTip(tr("Delete cue (Del)"));
     connect(m_deleteCueAction, &QAction::triggered, this, &MainWindow::deleteCue);
 
     m_renumberAction = new QAction(tr("&Renumber Cues..."), this);
@@ -240,28 +240,28 @@ void MainWindow::createActions() {
 
     m_goAction = new QAction(Icons::mediaPlay(), tr("&GO"), this);
     m_goAction->setShortcut(Qt::Key_Space);
-    m_goAction->setToolTip(tr("Execute the next cue (Space)"));
+    m_goAction->setToolTip(tr("Go (Space)"));
     connect(m_goAction, &QAction::triggered, this, &MainWindow::go);
 
     m_stopAction = new QAction(Icons::mediaStop(), tr("&Stop"), this);
     m_stopAction->setShortcut(Qt::Key_Escape);
-    m_stopAction->setToolTip(tr("Stop playback (Escape)"));
+    m_stopAction->setToolTip(tr("Stop (Esc)"));
     connect(m_stopAction, &QAction::triggered, this, &MainWindow::stopPlayback);
 
     m_previousCueAction = new QAction(Icons::mediaPrevious(), tr("&Previous Cue"), this);
     m_previousCueAction->setShortcut(Qt::Key_Up);
-    m_previousCueAction->setToolTip(tr("Select the previous cue (Up)"));
+    m_previousCueAction->setToolTip(tr("Previous cue (Up)"));
     connect(m_previousCueAction, &QAction::triggered,
             [this]() { m_app->playbackEngine()->previous(); });
 
     m_nextCueAction = new QAction(Icons::mediaNext(), tr("&Next Cue"), this);
     m_nextCueAction->setShortcut(Qt::Key_Down);
-    m_nextCueAction->setToolTip(tr("Select the next cue (Down)"));
+    m_nextCueAction->setToolTip(tr("Next cue (Down)"));
     connect(m_nextCueAction, &QAction::triggered, [this]() { m_app->playbackEngine()->next(); });
 
     m_panicAction = new QAction(Icons::warning(), tr("PANIC"), this);
     m_panicAction->setShortcut(Qt::SHIFT | Qt::Key_Escape);
-    m_panicAction->setToolTip(tr("Emergency stop - recall safe values (Shift+Escape)"));
+    m_panicAction->setToolTip(tr("Panic (Shift+Esc)"));
     connect(m_panicAction, &QAction::triggered, this, &MainWindow::panic);
 
     m_panicRestoreAction = new QAction(Icons::warning(), tr("Panic + Restore"), this);

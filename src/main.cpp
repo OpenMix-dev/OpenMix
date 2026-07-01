@@ -37,14 +37,15 @@ class CenteredToolTipFilter : public QObject {
                 if (!tip.isEmpty()) {
                     const QString html = "<div align='center'>" +
                                          tip.toHtmlEscaped().replace("\n", "<br>") + "</div>";
-                    const int boxWidth =
-                        QFontMetrics(QToolTip::font())
-                            .boundingRect(QRect(0, 0, 600, 1000), Qt::TextWordWrap, tip)
-                            .width() +
-                        20; // padding + border
                     const QPoint cursor = static_cast<QHelpEvent*>(event)->globalPos();
-                    QToolTip::showText(QPoint(cursor.x() - boxWidth / 2, cursor.y() + 16), html,
-                                       widget);
+                    QToolTip::showText(QPoint(cursor.x(), cursor.y() + 16), html, widget);
+                    // recenter on the cursor using the tooltip's real rendered width
+                    for (QWidget* tipLabel : QApplication::topLevelWidgets()) {
+                        if (tipLabel->isVisible() && tipLabel->inherits("QTipLabel")) {
+                            tipLabel->move(cursor.x() - tipLabel->width() / 2, tipLabel->y());
+                            break;
+                        }
+                    }
                     return true;
                 }
             }
