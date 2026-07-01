@@ -1,14 +1,15 @@
 #pragma once
 
+#include "core/Cue.h"
 #include <QAbstractItemDelegate>
 #include <QAction>
 #include <QTableView>
 #include <QWidget>
+#include <optional>
 
 namespace OpenMix {
 
 class Application;
-class Cue;
 class CueTableModel;
 class CueFilterProxyModel;
 class CueFilterBar;
@@ -37,7 +38,17 @@ class CueListView : public QWidget {
   public slots:
     void addNewCue();
     void deleteSelectedCue();
-    void duplicateSelectedCue();
+    void duplicateSelectedCue(); // clone the selected cue to the end of the list
+    void cloneCueAfter();        // clone the selected cue in place, just after it
+    void copySelectedCue();
+    void pasteCue();      // insert the clipboard cue as a new cue after selection
+    void pasteCueMerge(); // merge clipboard content into the selected cue
+    void pasteCueSwap();  // exchange content between clipboard and selected cue
+    void fillDown();      // copy the selected cue's content into the next cue
+    void jumpToSelectedCue(); // set the selected cue as standby without firing
+    void setEditingLocked(bool locked); // make the cue table read-only
+
+    [[nodiscard]] bool hasClipboardCue() const { return m_clipboard.has_value(); }
 
   signals:
     void cueSelected(int index);
@@ -58,6 +69,10 @@ class CueListView : public QWidget {
     void createActions();
     void editNextCell(bool forward);
     QModelIndex nextEditableIndex(const QModelIndex& current, bool forward) const;
+    void insertCueAt(int index, const Cue& cue); // undoable insert + select
+    void selectSourceRow(int sourceRow);
+
+    std::optional<Cue> m_clipboard; // copied cue for paste operations
 
     Application* m_app;
     QTableView* m_tableView;

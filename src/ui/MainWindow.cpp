@@ -38,6 +38,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMenuBar>
+#include <QInputDialog>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSettings>
@@ -140,6 +141,54 @@ void MainWindow::createActions() {
     m_redoAction->setShortcut(QKeySequence::Redo);
     m_redoAction->setIcon(Icons::editRedo());
     m_redoAction->setToolTip(tr("Redo the last undone action (Ctrl+Y)"));
+
+    m_cloneCueAction = new QAction(tr("Clo&ne Cue"), this);
+    m_cloneCueAction->setToolTip(tr("Clone the selected cue in place, just after it"));
+    connect(m_cloneCueAction, &QAction::triggered, this, [this]() { m_cueListView->cloneCueAfter(); });
+
+    m_cloneToEndAction = new QAction(tr("Clone Cue to &End"), this);
+    m_cloneToEndAction->setToolTip(tr("Clone the selected cue to the end of the list"));
+    connect(m_cloneToEndAction, &QAction::triggered, this,
+            [this]() { m_cueListView->duplicateSelectedCue(); });
+
+    m_copyCueAction = new QAction(tr("&Copy Cue"), this);
+    m_copyCueAction->setShortcut(QKeySequence::Copy);
+    m_copyCueAction->setToolTip(tr("Copy the selected cue (Ctrl+C)"));
+    connect(m_copyCueAction, &QAction::triggered, this,
+            [this]() { m_cueListView->copySelectedCue(); updateActions(); });
+
+    m_pasteCueAction = new QAction(tr("&Paste Cue"), this);
+    m_pasteCueAction->setShortcut(QKeySequence::Paste);
+    m_pasteCueAction->setToolTip(tr("Paste the copied cue as a new cue (Ctrl+V)"));
+    connect(m_pasteCueAction, &QAction::triggered, this, [this]() { m_cueListView->pasteCue(); });
+
+    m_pasteMergeAction = new QAction(tr("Paste &Merge"), this);
+    m_pasteMergeAction->setToolTip(tr("Merge the copied cue's content into the selected cue"));
+    connect(m_pasteMergeAction, &QAction::triggered, this,
+            [this]() { m_cueListView->pasteCueMerge(); });
+
+    m_pasteSwapAction = new QAction(tr("Paste S&wap"), this);
+    m_pasteSwapAction->setToolTip(tr("Exchange content between the copied cue and the selected cue"));
+    connect(m_pasteSwapAction, &QAction::triggered, this,
+            [this]() { m_cueListView->pasteCueSwap(); });
+
+    m_fillDownAction = new QAction(tr("Fill &Down"), this);
+    m_fillDownAction->setToolTip(tr("Copy the selected cue's content into the next cue"));
+    connect(m_fillDownAction, &QAction::triggered, this, [this]() { m_cueListView->fillDown(); });
+
+    m_jumpToSelectedAction = new QAction(tr("&Jump to Selected Cue"), this);
+    m_jumpToSelectedAction->setToolTip(tr("Set the selected cue as standby without firing"));
+    connect(m_jumpToSelectedAction, &QAction::triggered, this,
+            [this]() { m_cueListView->jumpToSelectedCue(); });
+
+    m_jumpAction = new QAction(tr("Ju&mp..."), this);
+    m_jumpAction->setToolTip(tr("Set standby to a cue by number without firing"));
+    connect(m_jumpAction, &QAction::triggered, this, &MainWindow::showJumpDialog);
+
+    m_lockEditingAction = new QAction(tr("&Lock Editing"), this);
+    m_lockEditingAction->setCheckable(true);
+    m_lockEditingAction->setToolTip(tr("Prevent cue edits during a performance"));
+    connect(m_lockEditingAction, &QAction::triggered, this, &MainWindow::toggleLockEditing);
 
     m_goAction = new QAction(Icons::mediaPlay(), tr("&GO"), this);
     m_goAction->setShortcut(Qt::Key_Space);
@@ -331,8 +380,20 @@ void MainWindow::createMenus() {
     m_editMenu->addSeparator();
     m_editMenu->addAction(m_addCueAction);
     m_editMenu->addAction(m_deleteCueAction);
+    m_editMenu->addAction(m_cloneCueAction);
+    m_editMenu->addAction(m_cloneToEndAction);
+    m_editMenu->addSeparator();
+    m_editMenu->addAction(m_copyCueAction);
+    m_editMenu->addAction(m_pasteCueAction);
+    m_editMenu->addAction(m_pasteMergeAction);
+    m_editMenu->addAction(m_pasteSwapAction);
+    m_editMenu->addAction(m_fillDownAction);
     m_editMenu->addSeparator();
     m_editMenu->addAction(m_renumberAction);
+    m_editMenu->addAction(m_jumpToSelectedAction);
+    m_editMenu->addAction(m_jumpAction);
+    m_editMenu->addSeparator();
+    m_editMenu->addAction(m_lockEditingAction);
 
     m_playbackMenu = menuBar()->addMenu(tr("&Playback"));
     m_playbackMenu->addAction(m_goAction);
@@ -741,6 +802,28 @@ void MainWindow::renumberCues() {
     m_cueListView->refreshAll();
 }
 
+void MainWindow::showJumpDialog() {
+    CueList* list = m_app->show()->cueList();
+    if (list->isEmpty())
+        return;
+    bool ok = false;
+    const double number = QInputDialog::getDouble(this, tr("Jump to Cue"), tr("Cue number:"), 1.0,
+                                                  0.0, 99999.0, 2, &ok);
+    if (!ok)
+        return;
+    if (auto idx = list->indexOfNumber(number))
+        m_app->playbackEngine()->setStandbyIndex(*idx);
+    else
+        QMessageBox::information(this, tr("Jump to Cue"),
+                                 tr("No cue numbered %1.").arg(number));
+}
+
+void MainWindow::toggleLockEditing() {
+    m_editingLocked = m_lockEditingAction->isChecked();
+    m_cueListView->setEditingLocked(m_editingLocked);
+    updateActions();
+}
+
 void MainWindow::go() { m_app->playbackEngine()->go(); }
 
 void MainWindow::stopPlayback() { m_app->playbackEngine()->stop(); }
@@ -828,9 +911,23 @@ void MainWindow::updateTitle() {
 
 void MainWindow::updateActions() {
     bool hasCues = m_app->show()->cueList()->count() > 0;
-    m_deleteCueAction->setEnabled(hasCues && m_cueListView->selectedCueIndex() >= 0);
-    m_renumberAction->setEnabled(hasCues);
+    bool hasSelection = m_cueListView->selectedCueIndex() >= 0;
+    bool editable = !m_editingLocked;
     m_goAction->setEnabled(hasCues);
+
+    // editing actions gate on selection and the editing lock
+    m_addCueAction->setEnabled(editable);
+    m_deleteCueAction->setEnabled(editable && hasCues && hasSelection);
+    m_renumberAction->setEnabled(editable && hasCues);
+    m_cloneCueAction->setEnabled(editable && hasSelection);
+    m_cloneToEndAction->setEnabled(editable && hasSelection);
+    m_copyCueAction->setEnabled(hasSelection);
+    m_pasteCueAction->setEnabled(editable && m_cueListView->hasClipboardCue());
+    m_pasteMergeAction->setEnabled(editable && hasSelection && m_cueListView->hasClipboardCue());
+    m_pasteSwapAction->setEnabled(editable && hasSelection && m_cueListView->hasClipboardCue());
+    m_fillDownAction->setEnabled(editable && hasSelection);
+    m_jumpToSelectedAction->setEnabled(hasSelection);
+    m_jumpAction->setEnabled(hasCues);
 }
 
 void MainWindow::updateStatusBar() {

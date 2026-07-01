@@ -188,6 +188,94 @@ void Cue::copyDCAMappingFrom(const DCAMapping* showMapping) {
     }
 }
 
+void Cue::mergeContentFrom(const Cue& other) {
+    // scalar content overwritten from the other cue
+    m_type = other.m_type;
+    m_autoFollow = other.m_autoFollow;
+    m_autoFollowDelay = other.m_autoFollowDelay;
+    m_autoFollowCondition = other.m_autoFollowCondition;
+    m_fadeTime = other.m_fadeTime;
+    m_fadeCurve = other.m_fadeCurve;
+    m_macroExecutionMode = other.m_macroExecutionMode;
+    m_gotoTarget = other.m_gotoTarget;
+    m_gotoAutoExecute = other.m_gotoAutoExecute;
+    m_stopBehavior = other.m_stopBehavior;
+    m_group = other.m_group;
+    m_qLabCue = other.m_qLabCue;
+    m_color = other.m_color;
+    m_skip = other.m_skip;
+
+    // set/map content unites, other winning on collisions
+    m_targetedDCAs.unite(other.m_targetedDCAs);
+    for (auto it = other.m_dcaOverrides.begin(); it != other.m_dcaOverrides.end(); ++it)
+        m_dcaOverrides.insert(it.key(), it.value());
+    for (auto it = other.m_channelPositions.begin(); it != other.m_channelPositions.end(); ++it)
+        m_channelPositions.insert(it.key(), it.value());
+    for (auto it = other.m_channelProfiles.begin(); it != other.m_channelProfiles.end(); ++it)
+        m_channelProfiles.insert(it.key(), it.value());
+    for (auto it = other.m_channelLevels.begin(); it != other.m_channelLevels.end(); ++it)
+        m_channelLevels.insert(it.key(), it.value());
+    for (auto it = other.m_fxMutes.begin(); it != other.m_fxMutes.end(); ++it)
+        m_fxMutes.insert(it.key(), it.value());
+    if (other.m_dcaChannelMapping) {
+        QMap<int, QList<int>> merged = m_dcaChannelMapping.value_or(QMap<int, QList<int>>());
+        for (auto it = other.m_dcaChannelMapping->begin(); it != other.m_dcaChannelMapping->end();
+             ++it)
+            merged.insert(it.key(), it.value());
+        m_dcaChannelMapping = merged;
+    }
+    if (other.m_dcaBusMapping) {
+        QMap<int, QList<int>> merged = m_dcaBusMapping.value_or(QMap<int, QList<int>>());
+        for (auto it = other.m_dcaBusMapping->begin(); it != other.m_dcaBusMapping->end(); ++it)
+            merged.insert(it.key(), it.value());
+        m_dcaBusMapping = merged;
+    }
+
+    // list content unites without duplicating
+    for (const QString& id : other.m_childCueIds)
+        if (!m_childCueIds.contains(id))
+            m_childCueIds.append(id);
+    for (const QString& tag : other.m_tags)
+        if (!m_tags.contains(tag))
+            m_tags.append(tag);
+    for (int snippet : other.m_snippets)
+        if (!m_snippets.contains(snippet))
+            m_snippets.append(snippet);
+
+    // parameter bag: other's keys overlay
+    for (auto it = other.m_parameters.begin(); it != other.m_parameters.end(); ++it)
+        m_parameters.insert(it.key(), it.value());
+}
+
+void Cue::swapContentWith(Cue& other) {
+    std::swap(m_type, other.m_type);
+    std::swap(m_autoFollow, other.m_autoFollow);
+    std::swap(m_autoFollowDelay, other.m_autoFollowDelay);
+    std::swap(m_autoFollowCondition, other.m_autoFollowCondition);
+    std::swap(m_fadeTime, other.m_fadeTime);
+    std::swap(m_fadeCurve, other.m_fadeCurve);
+    std::swap(m_targetedDCAs, other.m_targetedDCAs);
+    std::swap(m_dcaOverrides, other.m_dcaOverrides);
+    std::swap(m_dcaChannelMapping, other.m_dcaChannelMapping);
+    std::swap(m_dcaBusMapping, other.m_dcaBusMapping);
+    std::swap(m_childCueIds, other.m_childCueIds);
+    std::swap(m_macroExecutionMode, other.m_macroExecutionMode);
+    std::swap(m_gotoTarget, other.m_gotoTarget);
+    std::swap(m_gotoAutoExecute, other.m_gotoAutoExecute);
+    std::swap(m_stopBehavior, other.m_stopBehavior);
+    std::swap(m_group, other.m_group);
+    std::swap(m_tags, other.m_tags);
+    std::swap(m_qLabCue, other.m_qLabCue);
+    std::swap(m_channelPositions, other.m_channelPositions);
+    std::swap(m_parameters, other.m_parameters);
+    std::swap(m_channelProfiles, other.m_channelProfiles);
+    std::swap(m_channelLevels, other.m_channelLevels);
+    std::swap(m_fxMutes, other.m_fxMutes);
+    std::swap(m_snippets, other.m_snippets);
+    std::swap(m_color, other.m_color);
+    std::swap(m_skip, other.m_skip);
+}
+
 QJsonObject Cue::toJson() const {
     QJsonObject json;
     json["id"] = m_id;

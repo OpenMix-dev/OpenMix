@@ -225,6 +225,57 @@ class TestCue : public QObject {
         QCOMPARE(stringToStopBehavior("stopandapply"), StopBehavior::StopAndApply);
         QCOMPARE(stringToStopBehavior("invalid"), StopBehavior::StopAndApply); // default
     }
+
+    void testMergeContentPreservesIdentity() {
+        Cue target(5.0, "Target");
+        target.setChannelProfile(1, "lead");
+        Cue source(9.0, "Source");
+        source.setNotes("src notes");
+        source.setChannelProfile(2, "backup");
+        source.setChannelLevel(3, 0.5);
+        source.setColor("#ff0000");
+
+        const QString keepId = target.id();
+        target.mergeContentFrom(source);
+
+        // identity preserved
+        QCOMPARE(target.id(), keepId);
+        QCOMPARE(target.number(), 5.0);
+        QCOMPARE(target.name(), QString("Target"));
+        QCOMPARE(target.notes(), QString()); // notes are identity, not merged
+
+        // content united, other winning
+        QCOMPARE(target.channelProfiles().value(1), QString("lead"));
+        QCOMPARE(target.channelProfiles().value(2), QString("backup"));
+        QCOMPARE(target.channelLevels().value(3), 0.5);
+        QCOMPARE(target.color(), QString("#ff0000"));
+    }
+
+    void testSwapContentKeepsIdentity() {
+        Cue a(1.0, "A");
+        a.setColor("#111111");
+        a.setChannelProfile(1, "aProfile");
+        Cue b(2.0, "B");
+        b.setColor("#222222");
+        b.setChannelProfile(2, "bProfile");
+
+        const QString aId = a.id();
+        const QString bId = b.id();
+        a.swapContentWith(b);
+
+        QCOMPARE(a.id(), aId);
+        QCOMPARE(a.number(), 1.0);
+        QCOMPARE(a.name(), QString("A"));
+        QCOMPARE(b.id(), bId);
+        QCOMPARE(b.number(), 2.0);
+
+        // content exchanged
+        QCOMPARE(a.color(), QString("#222222"));
+        QCOMPARE(a.channelProfiles().value(2), QString("bProfile"));
+        QVERIFY(!a.channelProfiles().contains(1));
+        QCOMPARE(b.color(), QString("#111111"));
+        QCOMPARE(b.channelProfiles().value(1), QString("aProfile"));
+    }
 };
 
 QTEST_MAIN(TestCue)

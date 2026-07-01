@@ -51,6 +51,8 @@ class MainWindow : public QMainWindow {
     void addCue();
     void deleteCue();
     void renumberCues();
+    void showJumpDialog();
+    void toggleLockEditing();
 
     // playback actions
     void go();
@@ -161,6 +163,17 @@ class MainWindow : public QMainWindow {
     QAction* m_renumberAction;
     QAction* m_undoAction;
     QAction* m_redoAction;
+    QAction* m_cloneCueAction;
+    QAction* m_cloneToEndAction;
+    QAction* m_copyCueAction;
+    QAction* m_pasteCueAction;
+    QAction* m_pasteMergeAction;
+    QAction* m_pasteSwapAction;
+    QAction* m_fillDownAction;
+    QAction* m_jumpToSelectedAction;
+    QAction* m_jumpAction;
+    QAction* m_lockEditingAction;
+    bool m_editingLocked = false;
 
     // playback actions
     QAction* m_goAction;

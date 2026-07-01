@@ -274,6 +274,123 @@ void CueListView::duplicateSelectedCue() {
     m_filterBar->updateFilterOptions();
 }
 
+void CueListView::selectSourceRow(int sourceRow) {
+    if (sourceRow < 0)
+        return;
+    QModelIndex sourceIndex = m_model->index(sourceRow, 0);
+    QModelIndex proxyIndex = m_proxyModel->mapFromSource(sourceIndex);
+    if (proxyIndex.isValid())
+        m_tableView->selectRow(proxyIndex.row());
+}
+
+void CueListView::insertCueAt(int index, const Cue& cue) {
+    CueList* cueList = m_app->show()->cueList();
+    const int clamped = std::clamp(index, 0, cueList->count());
+    m_app->undoStack()->push(new AddCueCommand(cueList, cue, clamped));
+    cueList->insertCue(clamped, cue);
+    selectSourceRow(clamped);
+    m_filterBar->updateFilterOptions();
+}
+
+// midpoint number that keeps the clone in order between a cue and its successor
+static double interpolatedNumber(const CueList* cueList, int idx) {
+    const double a = cueList->at(idx).number();
+    const double b = (idx + 1 < cueList->count()) ? cueList->at(idx + 1).number() : a + 1.0;
+    return b > a ? (a + b) / 2.0 : a + 0.1;
+}
+
+void CueListView::cloneCueAfter() {
+    int idx = selectedCueIndex();
+    if (idx < 0)
+        return;
+    CueList* cueList = m_app->show()->cueList();
+    Cue clone = cueList->at(idx);
+    clone.regenerateId();
+    clone.setNumber(interpolatedNumber(cueList, idx));
+    insertCueAt(idx + 1, clone);
+}
+
+void CueListView::copySelectedCue() {
+    int idx = selectedCueIndex();
+    if (idx < 0)
+        return;
+    m_clipboard = m_app->show()->cueList()->at(idx);
+}
+
+void CueListView::pasteCue() {
+    if (!m_clipboard)
+        return;
+    CueList* cueList = m_app->show()->cueList();
+    Cue pasted = *m_clipboard;
+    pasted.regenerateId();
+
+    int idx = selectedCueIndex();
+    if (idx < 0) {
+        pasted.setNumber(cueList->nextCueNumber());
+        m_app->undoStack()->push(new AddCueCommand(cueList, pasted));
+        cueList->addCue(pasted);
+        selectSourceRow(cueList->count() - 1);
+        m_filterBar->updateFilterOptions();
+        return;
+    }
+    pasted.setNumber(interpolatedNumber(cueList, idx));
+    insertCueAt(idx + 1, pasted);
+}
+
+void CueListView::pasteCueMerge() {
+    int idx = selectedCueIndex();
+    if (!m_clipboard || idx < 0)
+        return;
+    CueList* cueList = m_app->show()->cueList();
+    Cue oldCue = cueList->at(idx);
+    Cue newCue = oldCue;
+    newCue.mergeContentFrom(*m_clipboard);
+    m_app->undoStack()->push(new EditCueCommand(cueList, idx, oldCue, newCue));
+    cueList->updateCue(idx, newCue);
+}
+
+void CueListView::pasteCueSwap() {
+    int idx = selectedCueIndex();
+    if (!m_clipboard || idx < 0)
+        return;
+    CueList* cueList = m_app->show()->cueList();
+    Cue oldCue = cueList->at(idx);
+    Cue newCue = oldCue;
+    Cue stored = *m_clipboard;
+    newCue.swapContentWith(stored);
+    m_app->undoStack()->push(new EditCueCommand(cueList, idx, oldCue, newCue));
+    cueList->updateCue(idx, newCue);
+    m_clipboard = stored; // clipboard keeps the content swapped out of the cue
+}
+
+void CueListView::fillDown() {
+    int idx = selectedCueIndex();
+    CueList* cueList = m_app->show()->cueList();
+    if (idx < 0 || idx + 1 >= cueList->count())
+        return;
+    Cue source = cueList->at(idx);
+    Cue oldCue = cueList->at(idx + 1);
+    Cue newCue = oldCue;
+    newCue.mergeContentFrom(source);
+    m_app->undoStack()->push(new EditCueCommand(cueList, idx + 1, oldCue, newCue));
+    cueList->updateCue(idx + 1, newCue);
+    selectSourceRow(idx + 1);
+}
+
+void CueListView::jumpToSelectedCue() {
+    int idx = selectedCueIndex();
+    if (idx < 0)
+        return;
+    m_app->playbackEngine()->setStandbyIndex(idx);
+}
+
+void CueListView::setEditingLocked(bool locked) {
+    m_tableView->setEditTriggers(locked ? QAbstractItemView::NoEditTriggers
+                                        : QAbstractItemView::DoubleClicked |
+                                              QAbstractItemView::EditKeyPressed |
+                                              QAbstractItemView::AnyKeyPressed);
+}
+
 void CueListView::onSelectionChanged() { emit cueSelected(selectedCueIndex()); }
 
 void CueListView::onCueReordered(int fromIndex, int toIndex) {

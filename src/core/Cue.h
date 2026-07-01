@@ -204,6 +204,15 @@ class Cue {
     [[nodiscard]] bool skip() const noexcept { return m_skip; }
     void setSkip(bool skip) { m_skip = skip; }
 
+    // additively merge another cue's playable content into this one (maps and
+    // lists unite with the other winning on key collisions; scalar content is
+    // overwritten). Identity is preserved: id, number, name, notes stay.
+    void mergeContentFrom(const Cue& other);
+
+    // exchange all playable content with another cue; each keeps its own
+    // identity (id, number, name, notes).
+    void swapContentWith(Cue& other);
+
     QJsonObject toJson() const;
     [[nodiscard]] static Cue fromJson(const QJsonObject& json);
 
