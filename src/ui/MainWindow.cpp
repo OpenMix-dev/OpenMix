@@ -613,8 +613,9 @@ void MainWindow::createToolBars() {
     m_playbackToolBar->addSeparator();
     m_playbackToolBar->addAction(m_panicAction);
 
-    // GO/Stop icons (play/stop) are universal, so drop their text labels
-    for (QAction* a : {m_goAction, m_stopAction}) {
+    // GO/Stop/PANIC icons are self-explanatory; drop their labels and rely on
+    // the tooltips set on each action for hover discovery
+    for (QAction* a : {m_goAction, m_stopAction, m_panicAction}) {
         if (auto* b = qobject_cast<QToolButton*>(m_playbackToolBar->widgetForAction(a)))
             b->setToolButtonStyle(Qt::ToolButtonIconOnly);
     }
@@ -769,9 +770,9 @@ void MainWindow::createBubbleBar() {
     m_bubbleBar->addButton("connection", Icons::network(), tr("Connection (F7)"));
     m_bubbleBar->addButton("actors", Icons::actorSetup(), tr("Actor Setup (F9)"));
     m_bubbleBar->addButton("ensembles", Icons::actor(), tr("Ensembles (F10)"));
-    m_bubbleBar->addButton("positions", Icons::sliders(), tr("Positions (F11)"));
-    m_bubbleBar->addButton("timecode", Icons::sliders(), tr("Timecode Triggers (F12)"));
-    m_bubbleBar->addButton("activeCueInfo", Icons::sliders(), tr("Active Cue Info"));
+    m_bubbleBar->addButton("positions", Icons::location(), tr("Positions (F11)"));
+    m_bubbleBar->addButton("timecode", Icons::clock(), tr("Timecode Triggers (F12)"));
+    m_bubbleBar->addButton("activeCueInfo", Icons::info(), tr("Active Cue Info"));
 
     connect(m_bubbleBar, &BubbleBar::buttonClicked, this, &MainWindow::onBubbleButtonClicked);
 

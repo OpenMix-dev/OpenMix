@@ -4,7 +4,7 @@
 #include <QMap>
 #include <QWidget>
 
-class QHBoxLayout;
+class QGridLayout;
 
 namespace OpenMix {
 
@@ -33,7 +33,7 @@ class BubbleBar : public QWidget {
     void setupUi();
     void updatePosition();
 
-    QHBoxLayout* m_layout = nullptr;
+    QGridLayout* m_layout = nullptr;
     QMap<QString, BubbleButton*> m_buttons;
 };
 

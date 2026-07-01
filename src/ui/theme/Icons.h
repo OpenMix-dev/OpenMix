@@ -53,6 +53,9 @@ inline QIcon mediaNext() { return fromPath(":/qlementine/icons/16/navigation/che
 inline QIcon warning() { return fromPath(":/qlementine/icons/16/misc/warning.svg"); }
 
 inline QIcon sliders() { return fromPath(":/qlementine/icons/16/navigation/sliders-vertical.svg"); }
+inline QIcon clock() { return fromPath(":/qlementine/icons/16/misc/clock.svg"); }
+inline QIcon location() { return fromPath(":/qlementine/icons/16/misc/location.svg"); }
+inline QIcon info() { return fromPath(":/qlementine/icons/16/misc/info.svg"); }
 inline QIcon audioVolume() { return fromPath(":/qlementine/icons/16/audio/speaker-2.svg"); }
 inline QIcon network() { return fromPath(":/qlementine/icons/16/hardware/network.svg"); }
 inline QIcon refresh() { return fromPath(":/qlementine/icons/16/action/refresh.svg"); }
