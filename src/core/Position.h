@@ -31,7 +31,7 @@ class Position {
     [[nodiscard]] double delay() const noexcept { return m_delay; }
     void setDelay(double ms) { m_delay = ms; }
 
-    // pan, normalized -1.0 (full left) .. 0.0 (centre) .. +1.0 (full right)
+    // pan, normalized -1.0 (full left) .. 0.0 (center) .. +1.0 (full right)
     [[nodiscard]] double pan() const noexcept { return m_pan; }
     void setPan(double pan) { m_pan = pan; }
 

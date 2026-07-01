@@ -104,7 +104,7 @@ set(SOURCES
     src/core/FadeEngine.cpp
     src/core/Position.cpp
     src/core/CueZero.cpp
-    src/core/ChannelUtilisation.cpp
+    src/core/ChannelUtilization.cpp
     src/core/TimecodeTrigger.cpp
     src/core/ChannelMonitor.cpp
     src/core/ScribbleController.cpp
@@ -131,7 +131,7 @@ set(SOURCES
     src/ui/PositionPanel.cpp
     src/ui/TimecodePanel.cpp
     src/ui/CueZeroDialog.cpp
-    src/ui/ChannelUtilisationDialog.cpp
+    src/ui/ChannelUtilizationDialog.cpp
     src/ui/AllocateSpareDialog.cpp
     src/ui/ActiveCueInfoPanel.cpp
     src/ui/FxSetupDialog.cpp
@@ -214,7 +214,7 @@ set(HEADERS
     src/core/FadeEngine.h
     src/core/Position.h
     src/core/CueZero.h
-    src/core/ChannelUtilisation.h
+    src/core/ChannelUtilization.h
     src/core/TimecodeTrigger.h
     src/core/ChannelMonitor.h
     src/core/ScribbleController.h
@@ -242,7 +242,7 @@ set(HEADERS
     src/ui/PositionPanel.h
     src/ui/TimecodePanel.h
     src/ui/CueZeroDialog.h
-    src/ui/ChannelUtilisationDialog.h
+    src/ui/ChannelUtilizationDialog.h
     src/ui/AllocateSpareDialog.h
     src/ui/ActiveCueInfoPanel.h
     src/ui/FxSetupDialog.h

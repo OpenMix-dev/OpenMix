@@ -16,6 +16,6 @@ struct ChannelUsage {
 // cues that use it. A cue uses a channel when the channel appears in the cue's
 // effective DCA mapping (its own custom mapping, else the show mapping) or in the
 // cue's per-channel profile / level / position assignments. Sorted by channel.
-[[nodiscard]] QList<ChannelUsage> computeChannelUtilisation(const Show* show);
+[[nodiscard]] QList<ChannelUsage> computeChannelUtilization(const Show* show);
 
 } // namespace OpenMix

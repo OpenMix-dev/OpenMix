@@ -33,7 +33,7 @@ class TestTmixImport : public QObject {
             QVERIFY(q.exec("CREATE TABLE positions (id INTEGER PRIMARY KEY, name TEXT, "
                            "shortName TEXT, delay NUMERIC, pan NUMERIC)"));
             QVERIFY(q.exec("INSERT INTO positions (id,name,shortName,delay,pan) "
-                           "VALUES(0,'Centre Stage','CS',12,-0.5)"));
+                           "VALUES(0,'Center Stage','CS',12,-0.5)"));
             QVERIFY(q.exec("CREATE TABLE cues (number INTEGER, point INTEGER, name TEXT, "
                            "dca01Channels TEXT, dca01Label TEXT)"));
             QVERIFY(q.exec("INSERT INTO cues (number,point,name,dca01Channels,dca01Label) "

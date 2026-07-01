@@ -1,4 +1,4 @@
-#include "core/ChannelUtilisation.h"
+#include "core/ChannelUtilization.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
 #include "core/DCAMapping.h"
@@ -8,7 +8,7 @@
 
 using namespace OpenMix;
 
-class TestChannelUtilisation : public QObject {
+class TestChannelUtilization : public QObject {
     Q_OBJECT
 
     static QMap<int, int> counts(const QList<ChannelUsage>& usage) {
@@ -32,7 +32,7 @@ class TestChannelUtilisation : public QObject {
         c2.setChannelLevel(6, 0.5);
         show.cueList()->addCue(c2);
 
-        const QMap<int, int> c = counts(computeChannelUtilisation(&show));
+        const QMap<int, int> c = counts(computeChannelUtilization(&show));
         QCOMPARE(c.value(5), 1);
         QCOMPARE(c.value(6), 2); // c1 via DCA mapping, c2 via level override
         QCOMPARE(c.value(7), 1); // c1 via profile
@@ -44,16 +44,16 @@ class TestChannelUtilisation : public QObject {
         Cue c(1.0, "One"); // no custom mapping -> falls back to show mapping
         show.cueList()->addCue(c);
 
-        const QMap<int, int> counts = TestChannelUtilisation::counts(computeChannelUtilisation(&show));
+        const QMap<int, int> counts = TestChannelUtilization::counts(computeChannelUtilization(&show));
         QCOMPARE(counts.value(3), 1);
     }
 
     void testEmptyShow() {
         Show show;
-        QVERIFY(computeChannelUtilisation(&show).isEmpty());
-        QVERIFY(computeChannelUtilisation(nullptr).isEmpty());
+        QVERIFY(computeChannelUtilization(&show).isEmpty());
+        QVERIFY(computeChannelUtilization(nullptr).isEmpty());
     }
 };
 
-QTEST_MAIN(TestChannelUtilisation)
-#include "test_channel_utilisation.moc"
+QTEST_MAIN(TestChannelUtilization)
+#include "test_channel_utilization.moc"

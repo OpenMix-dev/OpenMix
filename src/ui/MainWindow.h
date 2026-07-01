@@ -101,7 +101,7 @@ class MainWindow : public QMainWindow {
     void showFeatureGuide();
     void showEditHistoryDialog();
     void exportCuesToCsv();
-    void showChannelUtilisationDialog();
+    void showChannelUtilizationDialog();
 
     // bubble bar interaction
     void onBubbleButtonClicked(const QString& id, bool checked);
@@ -215,7 +215,7 @@ class MainWindow : public QMainWindow {
     QAction* m_cueZeroAction;
     QAction* m_editHistoryAction;
     QAction* m_exportCsvAction;
-    QAction* m_channelUtilisationAction;
+    QAction* m_channelUtilizationAction;
     QAction* m_showLogViewerAction;
 
     // settings actions

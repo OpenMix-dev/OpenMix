@@ -1,8 +1,8 @@
-#include "ChannelUtilisationDialog.h"
+#include "ChannelUtilizationDialog.h"
 #include "app/Application.h"
 #include "core/Actor.h"
 #include "core/ActorProfileLibrary.h"
-#include "core/ChannelUtilisation.h"
+#include "core/ChannelUtilization.h"
 #include "core/Show.h"
 
 #include <QDialogButtonBox>
@@ -13,9 +13,9 @@
 
 namespace OpenMix {
 
-ChannelUtilisationDialog::ChannelUtilisationDialog(Application* app, QWidget* parent)
+ChannelUtilizationDialog::ChannelUtilizationDialog(Application* app, QWidget* parent)
     : QDialog(parent) {
-    setWindowTitle(tr("Channel Utilisation"));
+    setWindowTitle(tr("Channel Utilization"));
     resize(520, 520);
 
     QVBoxLayout* layout = new QVBoxLayout(this);
@@ -33,7 +33,7 @@ ChannelUtilisationDialog::ChannelUtilisationDialog(Application* app, QWidget* pa
 
     const ActorProfileLibrary* actors = app && app->show() ? app->show()->actorProfileLibrary()
                                                            : nullptr;
-    const QList<ChannelUsage> usage = computeChannelUtilisation(app ? app->show() : nullptr);
+    const QList<ChannelUsage> usage = computeChannelUtilization(app ? app->show() : nullptr);
     table->setRowCount(usage.size());
     for (int row = 0; row < usage.size(); ++row) {
         const ChannelUsage& u = usage.at(row);

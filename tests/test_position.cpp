@@ -27,7 +27,7 @@ class TestPosition : public QObject {
     }
 
     void position_defaultsAndEmptyBuses() {
-        Position p("Centre");
+        Position p("Center");
         const Position restored = Position::fromJson(p.toJson());
         QCOMPARE(restored.pan(), 0.0);
         QCOMPARE(restored.delay(), 0.0);

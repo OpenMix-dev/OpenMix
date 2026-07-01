@@ -1,4 +1,4 @@
-#include "ChannelUtilisation.h"
+#include "ChannelUtilization.h"
 #include "Cue.h"
 #include "CueList.h"
 #include "DCAMapping.h"
@@ -10,7 +10,7 @@
 
 namespace OpenMix {
 
-QList<ChannelUsage> computeChannelUtilisation(const Show* show) {
+QList<ChannelUsage> computeChannelUtilization(const Show* show) {
     QList<ChannelUsage> result;
     if (!show)
         return result;

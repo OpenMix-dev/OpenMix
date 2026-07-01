@@ -10,7 +10,7 @@ using namespace OpenMix;
 
 namespace {
 
-// records every driver call as a readable string so fire behaviour can be
+// records every driver call as a readable string so fire behavior can be
 // asserted without real hardware. Always reports Connected once connect() runs.
 class RecordingMixer : public MixerProtocol {
   public:

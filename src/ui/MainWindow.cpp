@@ -9,7 +9,7 @@
 #include "HelpDialog.h"
 #include "FxSetupDialog.h"
 #include "WelcomeDialog.h"
-#include "ChannelUtilisationDialog.h"
+#include "ChannelUtilizationDialog.h"
 #include "CueListView.h"
 #include "CueTableModel.h"
 #include "CueZeroDialog.h"
@@ -321,10 +321,10 @@ void MainWindow::createActions() {
     m_exportCsvAction->setToolTip(tr("Export the cue list to a CSV file"));
     connect(m_exportCsvAction, &QAction::triggered, this, &MainWindow::exportCuesToCsv);
 
-    m_channelUtilisationAction = new QAction(tr("Channel &Utilisation"), this);
-    m_channelUtilisationAction->setToolTip(tr("Show which cues use each input channel"));
-    connect(m_channelUtilisationAction, &QAction::triggered, this,
-            &MainWindow::showChannelUtilisationDialog);
+    m_channelUtilizationAction = new QAction(tr("Channel &Utilization"), this);
+    m_channelUtilizationAction->setToolTip(tr("Show which cues use each input channel"));
+    connect(m_channelUtilizationAction, &QAction::triggered, this,
+            &MainWindow::showChannelUtilizationDialog);
 
     m_showLogViewerAction = new QAction(tr("Application &Log..."), this);
     m_showLogViewerAction->setShortcut(Qt::Key_F8);
@@ -525,7 +525,7 @@ void MainWindow::createMenus() {
     m_viewMenu->addAction(m_cueZeroAction);
     m_viewMenu->addSeparator();
     m_viewMenu->addAction(m_editHistoryAction);
-    m_viewMenu->addAction(m_channelUtilisationAction);
+    m_viewMenu->addAction(m_channelUtilizationAction);
     m_viewMenu->addAction(m_exportCsvAction);
     m_viewMenu->addAction(m_showLogViewerAction);
 
@@ -1336,7 +1336,7 @@ void MainWindow::showFeatureGuide() {
         "<p>Settings &rarr; Remote Control covers MIDI Show Control, inbound OSC, and outbound "
         "QLab/DAW with pre-roll. Timecode Triggers (F12) fire cues at an incoming timecode.</p>"
         "<h3>Monitoring &amp; reporting</h3>"
-        "<p>Mixer Feedback (F6) and Active Cue Info track live state. Channel Utilisation shows "
+        "<p>Mixer Feedback (F6) and Active Cue Info track live state. Channel Utilization shows "
         "which cues touch each channel; Export to CSV and Export Notes produce paperwork; Edit "
         "History browses the undo stack.</p>");
     HelpDialog dialog(tr("Feature Guide"), html, this);
@@ -1359,8 +1359,8 @@ void MainWindow::showEditHistoryDialog() {
     dialog.exec();
 }
 
-void MainWindow::showChannelUtilisationDialog() {
-    ChannelUtilisationDialog dialog(m_app, this);
+void MainWindow::showChannelUtilizationDialog() {
+    ChannelUtilizationDialog dialog(m_app, this);
     dialog.exec();
 }
 
