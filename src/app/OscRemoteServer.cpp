@@ -102,6 +102,8 @@ void OscRemoteServer::registerMethods() {
     lo_server_thread_add_method(m_server, "/stop", nullptr, hStop, this);
     lo_server_thread_add_method(m_server, "/cue/stop", nullptr, hStop, this);
     lo_server_thread_add_method(m_server, "/ctrl/stop", nullptr, hStop, this);
+    lo_server_thread_add_method(m_server, "/ctrl/stopall", nullptr, hStop, this);
+    lo_server_thread_add_method(m_server, "/ctrl/pauseresumeall", nullptr, hStop, this);
     lo_server_thread_add_method(m_server, "/next", nullptr, hNext, this);
     lo_server_thread_add_method(m_server, "/prev", nullptr, hPrev, this);
     lo_server_thread_add_method(m_server, "/previous", nullptr, hPrev, this);
