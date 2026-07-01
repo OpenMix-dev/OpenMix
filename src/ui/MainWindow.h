@@ -57,6 +57,7 @@ class MainWindow : public QMainWindow {
     void renumberCues();
     void showJumpDialog();
     void toggleLockEditing();
+    void recordOffsets();
 
     // playback actions
     void go();
@@ -187,6 +188,7 @@ class MainWindow : public QMainWindow {
     QAction* m_pasteSwapAction;
     QAction* m_fillDownAction;
     QAction* m_cloneOffsetsAction;
+    QAction* m_recordOffsetsAction;
     QAction* m_jumpToSelectedAction;
     QAction* m_jumpAction;
     QAction* m_lockEditingAction;

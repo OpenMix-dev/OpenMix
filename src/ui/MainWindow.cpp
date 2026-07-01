@@ -202,6 +202,11 @@ void MainWindow::createActions() {
     connect(m_cloneOffsetsAction, &QAction::triggered, this,
             [this]() { m_cueListView->cloneOffsets(); });
 
+    m_recordOffsetsAction = new QAction(tr("&Record Offsets"), this);
+    m_recordOffsetsAction->setToolTip(
+        tr("Capture the console's current fader levels into the selected cue"));
+    connect(m_recordOffsetsAction, &QAction::triggered, this, &MainWindow::recordOffsets);
+
     m_jumpToSelectedAction = new QAction(tr("&Jump to Selected Cue"), this);
     m_jumpToSelectedAction->setToolTip(tr("Set the selected cue as standby without firing"));
     connect(m_jumpToSelectedAction, &QAction::triggered, this,
@@ -454,6 +459,7 @@ void MainWindow::createMenus() {
     m_editMenu->addAction(m_pasteSwapAction);
     m_editMenu->addAction(m_fillDownAction);
     m_editMenu->addAction(m_cloneOffsetsAction);
+    m_editMenu->addAction(m_recordOffsetsAction);
     m_editMenu->addSeparator();
     m_editMenu->addAction(m_renumberAction);
     m_editMenu->addAction(m_jumpToSelectedAction);
@@ -971,6 +977,22 @@ void MainWindow::showJumpDialog() {
                                  tr("No cue numbered %1.").arg(number));
 }
 
+void MainWindow::recordOffsets() {
+    if (!m_app->mixer() || !m_app->mixer()->isConnected()) {
+        QMessageBox::information(this, tr("Record Offsets"), tr("Connect to a console first."));
+        return;
+    }
+    const int count = m_cueListView->recordOffsets();
+    if (count == 0) {
+        QMessageBox::information(
+            this, tr("Record Offsets"),
+            tr("No fader values are available yet. Try again once the console has reported "
+               "its state."));
+    } else {
+        statusBar()->showMessage(tr("Recorded %n channel offset(s)", "", count), 3000);
+    }
+}
+
 void MainWindow::toggleLockEditing() {
     m_editingLocked = m_lockEditingAction->isChecked();
     m_cueListView->setEditingLocked(m_editingLocked);
@@ -1125,6 +1147,7 @@ void MainWindow::updateActions() {
     m_pasteSwapAction->setEnabled(editable && hasSelection && m_cueListView->hasClipboardCue());
     m_fillDownAction->setEnabled(editable && hasSelection);
     m_cloneOffsetsAction->setEnabled(editable && hasSelection);
+    m_recordOffsetsAction->setEnabled(editable && hasSelection);
     m_jumpToSelectedAction->setEnabled(hasSelection);
     m_jumpAction->setEnabled(hasCues);
 }

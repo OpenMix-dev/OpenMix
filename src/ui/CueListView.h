@@ -45,7 +45,8 @@ class CueListView : public QWidget {
     void pasteCueMerge(); // merge clipboard content into the selected cue
     void pasteCueSwap();  // exchange content between clipboard and selected cue
     void fillDown();      // copy the selected cue's content into the next cue
-    void cloneOffsets();  // copy just the selected cue's level offsets to the next cue
+    void cloneOffsets();      // copy just the selected cue's level offsets to the next cue
+    int recordOffsets();      // capture live console faders into the selected cue; returns count
     void jumpToSelectedCue(); // set the selected cue as standby without firing
     void setEditingLocked(bool locked); // make the cue table read-only
     void setRowHeight(int pixels);      // cue-table row height

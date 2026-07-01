@@ -6,6 +6,7 @@
 #include <QString>
 #include <QVariant>
 #include <functional>
+#include <optional>
 
 namespace OpenMix {
 
@@ -62,6 +63,13 @@ class MixerProtocol : public QObject {
     // driver-mapped palette index. Default no-op; OSC/SCP drivers override.
     virtual void setChannelName(int channel, const QString& name);
     virtual void setChannelColor(int channel, int color);
+
+    // read back a channel's current fader (normalized 0..1) from the driver's
+    // parameter cache, or nullopt if unsupported / not yet known. Used to capture
+    // live console levels into a cue. channel is 1-based.
+    [[nodiscard]] virtual std::optional<double> readChannelFader(int /*channel*/) {
+        return std::nullopt;
+    }
 
     virtual void refresh() = 0;
     virtual int latencyMs() const = 0;

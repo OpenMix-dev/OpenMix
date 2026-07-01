@@ -55,6 +55,7 @@ class X32Protocol : public MixerProtocol {
 
     // semantic channel setters (used by actor-voice recall and fades)
     void setChannelFader(int channel, double level) override;
+    [[nodiscard]] std::optional<double> readChannelFader(int channel) override;
     void setChannelMute(int channel, bool muted) override;
     void setChannelPreamp(int channel, double gainDb) override;
     void setChannelHpf(int channel, bool on, double freqHz) override;

@@ -10,6 +10,7 @@
 #include "core/ShortcutManager.h"
 #include "core/Show.h"
 #include "core/UndoCommands.h"
+#include "protocol/MixerProtocol.h"
 
 #include <QApplication>
 #include <QFocusEvent>
@@ -393,6 +394,32 @@ void CueListView::cloneOffsets() {
     m_app->undoStack()->push(new EditCueCommand(cueList, idx + 1, oldCue, newCue));
     cueList->updateCue(idx + 1, newCue);
     selectSourceRow(idx + 1);
+}
+
+int CueListView::recordOffsets() {
+    MixerProtocol* mixer = m_app->mixer();
+    const int idx = selectedCueIndex();
+    CueList* cueList = m_app->show()->cueList();
+    if (!mixer || !mixer->isConnected() || idx < 0)
+        return 0;
+
+    Cue oldCue = cueList->at(idx);
+    Cue newCue = oldCue;
+    int count = 0;
+    const int channels = mixer->capabilities().inputChannels;
+    for (int ch = 1; ch <= channels; ++ch) {
+        if (const std::optional<double> level = mixer->readChannelFader(ch)) {
+            newCue.setChannelLevel(ch, *level);
+            ++count;
+        }
+    }
+    if (count == 0)
+        return 0;
+
+    m_app->undoStack()->push(new EditCueCommand(cueList, idx, oldCue, newCue));
+    cueList->updateCue(idx, newCue);
+    selectSourceRow(idx);
+    return count;
 }
 
 void CueListView::jumpToSelectedCue() {

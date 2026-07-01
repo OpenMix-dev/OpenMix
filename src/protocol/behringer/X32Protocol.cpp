@@ -275,6 +275,13 @@ void X32Protocol::setChannelFader(int channel, double level) {
     sendParameter(x32Channel(channel) + "/mix/fader", clampUnit(level));
 }
 
+std::optional<double> X32Protocol::readChannelFader(int channel) {
+    const QVariant value = getParameter(x32Channel(channel) + "/mix/fader");
+    if (!value.isValid())
+        return std::nullopt;
+    return value.toDouble();
+}
+
 void X32Protocol::setChannelMute(int channel, bool muted) {
     // /mix/on: 1 = on (unmuted), 0 = muted
     sendParameter(x32Channel(channel) + "/mix/on", muted ? 0 : 1);
