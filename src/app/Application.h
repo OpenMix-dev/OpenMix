@@ -26,6 +26,7 @@ class OscRemoteServer;
 class QLabClient;
 class TimecodeTriggerList;
 class ChannelMonitor;
+class ScribbleController;
 struct DiscoveredConsole;
 
 class Application : public QObject {
@@ -76,6 +77,9 @@ class Application : public QObject {
     // timecode triggers + channel monitor
     [[nodiscard]] TimecodeTriggerList* timecodeTriggers() { return m_timecodeTriggers; }
     [[nodiscard]] ChannelMonitor* channelMonitor() { return m_channelMonitor; }
+
+    // scribble-strip driver (actor names, cue number, silence/clip colours)
+    [[nodiscard]] ScribbleController* scribbleController() { return m_scribbleController; }
 
     // mixer connection
     void connectToMixer(const QString& type, const QString& host, int port);
@@ -142,6 +146,9 @@ class Application : public QObject {
     // timecode-triggered cues + channel silence/clip monitoring
     TimecodeTriggerList* m_timecodeTriggers;
     ChannelMonitor* m_channelMonitor;
+
+    // scribble-strip driver
+    ScribbleController* m_scribbleController;
 };
 
 } // namespace OpenMix

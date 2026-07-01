@@ -298,6 +298,16 @@ void WingProtocol::setChannelDynamics(int channel, bool on, double thresholdDb, 
     sendParameter(ch + "/dyn/gain", static_cast<float>(makeupDb));
 }
 
+void WingProtocol::setChannelName(int channel, const QString& name) {
+    // WING channel name node (best-effort; console truncates to display width)
+    sendParameter(wingChannel(channel) + "/$name", name);
+}
+
+void WingProtocol::setChannelColour(int channel, int colour) {
+    // WING channel colour index (best-effort; palette differs from X32)
+    sendParameter(wingChannel(channel) + "/col", colour);
+}
+
 void WingProtocol::refresh() {
     if (m_connectionState != ConnectionState::Connected)
         return;

@@ -36,6 +36,7 @@ add_executable(test_show
     ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
     ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Ensemble.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueZero.cpp
 )
@@ -57,6 +58,7 @@ add_executable(test_actor_profiles
     ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Ensemble.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueZero.cpp
 )
@@ -269,3 +271,38 @@ add_executable(test_cuezero
 target_link_libraries(test_cuezero PRIVATE Qt6::Core Qt6::Test)
 target_include_directories(test_cuezero PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME CueZeroTest COMMAND test_cuezero)
+
+# --- ensembles + scribble strips ---
+
+add_executable(test_ensembles
+    test_ensembles.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Ensemble.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Show.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueZero.cpp
+)
+target_link_libraries(test_ensembles PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(test_ensembles PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME EnsemblesTest COMMAND test_ensembles)
+
+add_executable(test_scribble
+    test_scribble.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ScribbleController.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+)
+target_link_libraries(test_scribble PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(test_scribble PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME ScribbleTest COMMAND test_scribble)

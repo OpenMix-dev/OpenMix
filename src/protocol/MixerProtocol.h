@@ -54,6 +54,11 @@ class MixerProtocol : public QObject {
     virtual void setChannelDynamics(int channel, bool on, double thresholdDb, double ratio,
                                     double attackMs, double releaseMs, double makeupDb);
 
+    // scribble-strip name and colour. channel is 1-based; colour is a
+    // driver-mapped palette index. Default no-op; OSC/SCP drivers override.
+    virtual void setChannelName(int channel, const QString& name);
+    virtual void setChannelColour(int channel, int colour);
+
     virtual void refresh() = 0;
     virtual int latencyMs() const = 0;
     virtual const MixerCapabilities& capabilities() const;

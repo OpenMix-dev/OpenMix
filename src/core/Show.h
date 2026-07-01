@@ -4,6 +4,7 @@
 #include "CueList.h"
 #include "CueZero.h"
 #include "DCAMapping.h"
+#include "Ensemble.h"
 #include "Position.h"
 #include <QJsonObject>
 #include <QObject>
@@ -62,6 +63,9 @@ class Show : public QObject {
     [[nodiscard]] PositionLibrary* positionLibrary() { return &m_positionLibrary; }
     [[nodiscard]] const PositionLibrary* positionLibrary() const { return &m_positionLibrary; }
 
+    [[nodiscard]] EnsembleLibrary* ensembleLibrary() { return &m_ensembleLibrary; }
+    [[nodiscard]] const EnsembleLibrary* ensembleLibrary() const { return &m_ensembleLibrary; }
+
     [[nodiscard]] CueZero* cueZero() { return &m_cueZero; }
     [[nodiscard]] const CueZero* cueZero() const { return &m_cueZero; }
 
@@ -85,6 +89,7 @@ class Show : public QObject {
     void connectDcaMappingSignals();
     void connectActorLibrarySignals();
     void connectPositionLibrarySignals();
+    void connectEnsembleLibrarySignals();
     void connectCueZeroSignals();
 
     QString m_name;
@@ -96,6 +101,7 @@ class Show : public QObject {
     DCAMapping m_dcaMapping;
     ActorProfileLibrary m_actorProfileLibrary;
     PositionLibrary m_positionLibrary;
+    EnsembleLibrary m_ensembleLibrary;
     CueZero m_cueZero;
     bool m_isDirty = false;
 };

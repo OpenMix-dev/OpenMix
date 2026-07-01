@@ -17,6 +17,7 @@
 #include "core/PlaybackEngine.h"
 #include "core/PlaybackGuard.h"
 #include "core/PlaybackLogger.h"
+#include "core/ScribbleController.h"
 #include "core/ShortcutManager.h"
 #include "core/Show.h"
 #include "io/AutosaveManager.h"
@@ -73,6 +74,9 @@ Application::Application(QObject* parent) : QObject(parent) {
     // timecode triggers + channel monitor
     m_timecodeTriggers = new TimecodeTriggerList(this);
     m_channelMonitor = new ChannelMonitor(this);
+
+    // scribble-strip driver
+    m_scribbleController = new ScribbleController(this);
 
     // application logging
     m_appLogger = new AppLogger(this);
@@ -201,6 +205,16 @@ void Application::initialize() {
                 m_playbackEngine->goToNumber(cueNumber);
                 m_playbackEngine->go();
             });
+
+    // scribble strips: actor names + cue number + silence/clip colouring
+    m_scribbleController->setActorLibrary(m_show->actorProfileLibrary());
+    m_scribbleController->setCueList(m_show->cueList());
+    connect(m_show->actorProfileLibrary(), &ActorProfileLibrary::changed, m_scribbleController,
+            &ScribbleController::onActorLibraryChanged);
+    connect(m_channelMonitor, &ChannelMonitor::channelStateChanged, m_scribbleController,
+            &ScribbleController::onChannelStateChanged);
+    connect(m_playbackEngine, &PlaybackEngine::currentCueChanged, m_scribbleController,
+            &ScribbleController::onCurrentCueChanged);
 }
 
 void Application::setupMixerConnection(const QString& type, const QString& host, int port) {
@@ -216,6 +230,9 @@ void Application::setupMixerConnection(const QString& type, const QString& host,
     // live console metering -> channel silence/clip monitor
     connect(m_mixer, &MixerProtocol::channelMeter, m_channelMonitor,
             [this](int channel, float level) { m_channelMonitor->onLevel(channel, level); });
+
+    // scribble strips push actor names/colours to this console
+    m_scribbleController->setMixer(m_mixer);
 
     m_mixer->connect(host, port);
 
@@ -255,6 +272,7 @@ void Application::connectToDiscoveredConsole(const DiscoveredConsole& console) {
 void Application::disconnectFromMixer() {
     if (m_mixer) {
         m_connectionLogBridge->detachFromMixer();
+        m_scribbleController->setMixer(nullptr);
         m_mixer->disconnect();
         m_playbackEngine->setMixer(nullptr);
         delete m_mixer;

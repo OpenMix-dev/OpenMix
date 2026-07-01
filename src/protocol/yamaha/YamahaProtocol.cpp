@@ -151,6 +151,14 @@ QByteArray YamahaProtocol::buildChannelDynamicsThreshold(int ch, double threshol
     return scpSet(AddrDynaThreshold, ch, 0, std::clamp(deci, -540, 0));
 }
 
+QByteArray YamahaProtocol::buildChannelName(int ch, const QString& name) const {
+    return scpSet(AddrChannelName, ch, 0, name);
+}
+
+QByteArray YamahaProtocol::buildChannelColour(int ch, int colour) const {
+    return scpSet(AddrChannelColor, ch, 0, colour);
+}
+
 // --------------------------------------------------------------------------
 // Semantic setters (send when connected, and cache).
 // --------------------------------------------------------------------------
@@ -199,6 +207,14 @@ void YamahaProtocol::setChannelDynamics(int ch, bool on, double thresholdDb, dou
     Q_UNUSED(releaseMs);
     Q_UNUSED(makeupDb);
     sendCommand(buildChannelDynamicsThreshold(ch - 1, thresholdDb));
+}
+
+void YamahaProtocol::setChannelName(int ch, const QString& name) {
+    sendCommand(buildChannelName(ch - 1, name));
+}
+
+void YamahaProtocol::setChannelColour(int ch, int colour) {
+    sendCommand(buildChannelColour(ch - 1, colour));
 }
 
 // --------------------------------------------------------------------------

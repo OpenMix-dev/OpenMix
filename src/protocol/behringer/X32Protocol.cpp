@@ -309,6 +309,16 @@ void X32Protocol::setChannelDynamics(int channel, bool on, double thresholdDb, d
     sendParameter(ch + "/dyn/mgain", linNorm(makeupDb, 0.0, 24.0));
 }
 
+void X32Protocol::setChannelName(int channel, const QString& name) {
+    // scribble-strip label; the console truncates to its display width
+    sendParameter(x32Channel(channel) + "/config/name", name);
+}
+
+void X32Protocol::setChannelColour(int channel, int colour) {
+    // /config/color is a palette index (0..15)
+    sendParameter(x32Channel(channel) + "/config/color", colour);
+}
+
 void X32Protocol::refresh() {
     if (m_connectionState != ConnectionState::Connected)
         return;

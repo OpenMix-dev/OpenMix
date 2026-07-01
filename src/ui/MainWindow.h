@@ -18,6 +18,7 @@ class ConnectionPanel;
 class MixerFeedbackPanel;
 class DCAMappingPanel;
 class ActorSetupPanel;
+class EnsemblePanel;
 class PopOutWindow;
 class BubbleBar;
 class PlaybackGuard;
@@ -58,6 +59,7 @@ class MainWindow : public QMainWindow {
     void toggleMixerFeedbackPanel();
     void toggleDCAMappingPanel();
     void toggleActorSetupPanel();
+    void toggleEnsemblePanel();
 
     // update UI state
     void updateTitle();
@@ -111,12 +113,14 @@ class MainWindow : public QMainWindow {
     MixerFeedbackPanel* m_mixerFeedbackPanel;
     DCAMappingPanel* m_dcaMappingPanel;
     ActorSetupPanel* m_actorSetupPanel;
+    EnsemblePanel* m_ensemblePanel;
 
     // pop-out windows
     PopOutWindow* m_connectionPopOut;
     PopOutWindow* m_mixerFeedbackPopOut;
     PopOutWindow* m_dcaMappingPopOut;
     PopOutWindow* m_actorSetupPopOut;
+    PopOutWindow* m_ensemblePopOut;
 
     // bubble bar
     BubbleBar* m_bubbleBar;
@@ -163,6 +167,7 @@ class MainWindow : public QMainWindow {
     QAction* m_showMixerFeedbackAction;
     QAction* m_showDCAMappingAction;
     QAction* m_showActorSetupAction;
+    QAction* m_showEnsembleAction;
     QAction* m_showLogViewerAction;
 
     // settings actions

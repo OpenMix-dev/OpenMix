@@ -95,11 +95,13 @@ set(SOURCES
     src/core/ActorProfile.cpp
     src/core/Actor.cpp
     src/core/ActorProfileLibrary.cpp
+    src/core/Ensemble.cpp
     src/core/FadeEngine.cpp
     src/core/Position.cpp
     src/core/CueZero.cpp
     src/core/TimecodeTrigger.cpp
     src/core/ChannelMonitor.cpp
+    src/core/ScribbleController.cpp
     src/core/AppLogger.cpp
     src/core/ConnectionLogBridge.cpp
     src/ui/MainWindow.cpp
@@ -117,6 +119,7 @@ set(SOURCES
     src/ui/MacroPreviewWidget.cpp
     src/ui/DCAMappingPanel.cpp
     src/ui/ActorSetupPanel.cpp
+    src/ui/EnsemblePanel.cpp
     src/ui/RemoteControlDialog.cpp
     src/ui/PopOutWindow.cpp
     src/ui/BubbleButton.cpp
@@ -187,12 +190,14 @@ set(HEADERS
     src/core/ActorProfile.h
     src/core/Actor.h
     src/core/ActorProfileLibrary.h
+    src/core/Ensemble.h
     src/core/FadeCurve.h
     src/core/FadeEngine.h
     src/core/Position.h
     src/core/CueZero.h
     src/core/TimecodeTrigger.h
     src/core/ChannelMonitor.h
+    src/core/ScribbleController.h
     src/core/AppLogger.h
     src/core/ConnectionLogBridge.h
     src/ui/MainWindow.h
@@ -211,6 +216,7 @@ set(HEADERS
     src/ui/DCAMappingPanel.h
     src/ui/ActorSetupPanel.h
     src/ui/ActorGroupIo.h
+    src/ui/EnsemblePanel.h
     src/ui/RemoteControlDialog.h
     src/ui/PopOutWindow.h
     src/ui/BubbleButton.h

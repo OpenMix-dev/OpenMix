@@ -61,6 +61,10 @@ class X32Protocol : public MixerProtocol {
     void setChannelDynamics(int channel, bool on, double thresholdDb, double ratio, double attackMs,
                             double releaseMs, double makeupDb) override;
 
+    // scribble strips
+    void setChannelName(int channel, const QString& name) override;
+    void setChannelColour(int channel, int colour) override;
+
     // keep-alive
     void refresh() override;
 

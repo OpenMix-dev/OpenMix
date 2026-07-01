@@ -56,6 +56,8 @@ class YamahaProtocol : public MixerProtocol {
     static constexpr auto AddrEqBandGain = "MIXER:Current/InCh/PEQ/Band/Gain";
     static constexpr auto AddrEqBandQ = "MIXER:Current/InCh/PEQ/Band/Q";
     static constexpr auto AddrDynaThreshold = "MIXER:Current/InCh/Dyna2/Threshold";
+    static constexpr auto AddrChannelName = "MIXER:Current/InCh/Label/Name";
+    static constexpr auto AddrChannelColor = "MIXER:Current/InCh/Label/Color";
     static constexpr auto SceneLib = "MIXER:Lib/Scene";
 
     explicit YamahaProtocol(const MixerCapabilities& caps, QObject* parent = nullptr);
@@ -99,6 +101,10 @@ class YamahaProtocol : public MixerProtocol {
     void setChannelDynamics(int ch, bool on, double thresholdDb, double ratio, double attackMs,
                             double releaseMs, double makeupDb) override;
 
+    // scribble strips (SCP channel label name + colour index)
+    void setChannelName(int ch, const QString& name) override;
+    void setChannelColour(int ch, int colour) override;
+
     // --- pure command builders: produce the exact SCP ASCII bytes (LF-terminated). ---
     [[nodiscard]] static QByteArray scpSet(const QString& address, int idx1, int idx2, int value);
     [[nodiscard]] static QByteArray scpSet(const QString& address, int idx1, int idx2,
@@ -124,6 +130,8 @@ class YamahaProtocol : public MixerProtocol {
     [[nodiscard]] QByteArray buildChannelEqBandGain(int ch, int band, double gainDb) const;
     [[nodiscard]] QByteArray buildChannelEqBandQ(int ch, int band, double q) const;
     [[nodiscard]] QByteArray buildChannelDynamicsThreshold(int ch, double thresholdDb) const;
+    [[nodiscard]] QByteArray buildChannelName(int ch, const QString& name) const;
+    [[nodiscard]] QByteArray buildChannelColour(int ch, int colour) const;
 
   protected:
     // Head-amp (preamp) gain scaling.  CL/QL/Rivage transmit centi-dB; the DM7

@@ -22,11 +22,12 @@ MixerConfig MixerConfig::fromJson(const QJsonObject& json) {
 
 Show::Show(QObject* parent)
     : QObject(parent), m_cueList(this), m_dcaMapping(this), m_actorProfileLibrary(this),
-      m_positionLibrary(this), m_cueZero(this) {
+      m_positionLibrary(this), m_ensembleLibrary(this), m_cueZero(this) {
     connectCueListSignals();
     connectDcaMappingSignals();
     connectActorLibrarySignals();
     connectPositionLibrarySignals();
+    connectEnsembleLibrarySignals();
     connectCueZeroSignals();
     newShow();
 }
@@ -76,6 +77,10 @@ void Show::connectPositionLibrarySignals() {
     connect(&m_positionLibrary, &PositionLibrary::changed, this, &Show::checkModifiedState);
 }
 
+void Show::connectEnsembleLibrarySignals() {
+    connect(&m_ensembleLibrary, &EnsembleLibrary::changed, this, &Show::checkModifiedState);
+}
+
 void Show::connectCueZeroSignals() {
     connect(&m_cueZero, &CueZero::changed, this, &Show::checkModifiedState);
 }
@@ -92,13 +97,14 @@ void Show::newShow() {
     m_dcaMapping.clear();
     m_actorProfileLibrary.clear();
     m_positionLibrary.clear();
+    m_ensembleLibrary.clear();
     m_cueZero.clear();
     m_isDirty = false;
 }
 
 QJsonObject Show::toJson() const {
     QJsonObject json;
-    json["version"] = "1.2";
+    json["version"] = "1.3";
     json["name"] = m_name;
     json["author"] = m_author;
     json["notes"] = m_notes;
@@ -107,6 +113,7 @@ QJsonObject Show::toJson() const {
     json["dcaMapping"] = m_dcaMapping.toJson();
     json["actors"] = m_actorProfileLibrary.toJson();
     json["positions"] = m_positionLibrary.toJson();
+    json["ensembles"] = m_ensembleLibrary.toJson();
     json["cueZero"] = m_cueZero.toJson();
     return json;
 }
@@ -141,6 +148,13 @@ void Show::fromJson(const QJsonObject& json) {
         m_positionLibrary.loadFromJson(json["positions"].toObject());
     } else {
         m_positionLibrary.clear();
+    }
+
+    // ensemble library (added in show version 1.3)
+    if (json.contains("ensembles")) {
+        m_ensembleLibrary.loadFromJson(json["ensembles"].toObject());
+    } else {
+        m_ensembleLibrary.clear();
     }
 
     // Cue Zero base state (added in show version 1.2)

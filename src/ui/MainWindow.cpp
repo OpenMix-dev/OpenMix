@@ -7,6 +7,7 @@
 #include "CueListView.h"
 #include "CueTableModel.h"
 #include "DCAMappingPanel.h"
+#include "EnsemblePanel.h"
 #include "LogViewerDialog.h"
 #include "MixerFeedbackPanel.h"
 #include "PopOutWindow.h"
@@ -197,6 +198,13 @@ void MainWindow::createActions() {
     m_showActorSetupAction->setToolTip(tr("Show/hide actor setup panel (F9)"));
     connect(m_showActorSetupAction, &QAction::triggered, this, &MainWindow::toggleActorSetupPanel);
 
+    m_showEnsembleAction = new QAction(Icons::actorSetup(), tr("&Ensembles"), this);
+    m_showEnsembleAction->setCheckable(true);
+    m_showEnsembleAction->setChecked(false);
+    m_showEnsembleAction->setShortcut(Qt::Key_F10);
+    m_showEnsembleAction->setToolTip(tr("Show/hide ensembles panel (F10)"));
+    connect(m_showEnsembleAction, &QAction::triggered, this, &MainWindow::toggleEnsemblePanel);
+
     m_showLogViewerAction = new QAction(tr("Application &Log..."), this);
     m_showLogViewerAction->setShortcut(Qt::Key_F8);
     m_showLogViewerAction->setToolTip(tr("Show application log (F8)"));
@@ -262,6 +270,7 @@ void MainWindow::registerShortcuts() {
     sm->registerAction("view.mixerFeedback", m_showMixerFeedbackAction, QKeySequence(Qt::Key_F6));
     sm->registerAction("view.connection", m_showConnectionAction, QKeySequence(Qt::Key_F7));
     sm->registerAction("view.actorSetup", m_showActorSetupAction, QKeySequence(Qt::Key_F9));
+    sm->registerAction("view.ensembles", m_showEnsembleAction, QKeySequence(Qt::Key_F10));
     sm->registerAction("view.logViewer", m_showLogViewerAction, QKeySequence(Qt::Key_F8));
 
     // settings actions
@@ -309,6 +318,7 @@ void MainWindow::createMenus() {
     m_viewMenu->addAction(m_showMixerFeedbackAction);
     m_viewMenu->addAction(m_showConnectionAction);
     m_viewMenu->addAction(m_showActorSetupAction);
+    m_viewMenu->addAction(m_showEnsembleAction);
     m_viewMenu->addSeparator();
     m_viewMenu->addAction(m_showLogViewerAction);
 
@@ -394,6 +404,16 @@ void MainWindow::createPopOutWindows() {
         m_showActorSetupAction->setChecked(visible);
         m_bubbleBar->setButtonActive("actors", visible);
     });
+
+    m_ensemblePanel = new EnsemblePanel(m_app, nullptr);
+    m_ensemblePopOut = new PopOutWindow("ensembles", tr("Ensembles"), this);
+    m_ensemblePopOut->setContentWidget(m_ensemblePanel);
+    m_ensemblePopOut->setMinimumContentSize(420, 480);
+
+    connect(m_ensemblePopOut, &PopOutWindow::visibilityChanged, [this](bool visible) {
+        m_showEnsembleAction->setChecked(visible);
+        m_bubbleBar->setButtonActive("ensembles", visible);
+    });
 }
 
 void MainWindow::createBubbleBar() {
@@ -403,6 +423,7 @@ void MainWindow::createBubbleBar() {
     m_bubbleBar->addButton("mixer", Icons::audioVolume(), tr("Mixer Feedback (F6)"));
     m_bubbleBar->addButton("connection", Icons::network(), tr("Connection (F7)"));
     m_bubbleBar->addButton("actors", Icons::actorSetup(), tr("Actor Setup (F9)"));
+    m_bubbleBar->addButton("ensembles", Icons::actor(), tr("Ensembles (F10)"));
 
     connect(m_bubbleBar, &BubbleBar::buttonClicked, this, &MainWindow::onBubbleButtonClicked);
 
@@ -419,6 +440,8 @@ void MainWindow::onBubbleButtonClicked(const QString& id, [[maybe_unused]] bool 
         toggleConnectionPanel();
     } else if (id == "actors") {
         toggleActorSetupPanel();
+    } else if (id == "ensembles") {
+        toggleEnsemblePanel();
     }
 }
 
@@ -696,6 +719,15 @@ void MainWindow::toggleActorSetupPanel() {
     } else {
         m_actorSetupPopOut->showAndRestore();
         m_actorSetupPanel->refresh();
+    }
+}
+
+void MainWindow::toggleEnsemblePanel() {
+    if (m_ensemblePopOut->isVisible()) {
+        m_ensemblePopOut->hide();
+    } else {
+        m_ensemblePopOut->showAndRestore();
+        m_ensemblePanel->refresh();
     }
 }
 
