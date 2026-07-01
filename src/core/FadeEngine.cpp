@@ -76,22 +76,38 @@ void FadeEngine::advance(double dtMs) {
     if (m_fades.isEmpty())
         return;
 
-    QStringList completedKeys;
-
-    for (int i = 0; i < m_fades.size();) {
-        Fade& f = m_fades[i];
+    // Compute this tick's values without invoking any callback yet, and copy
+    // out each apply function. This makes advance() re-entrancy-safe: an apply
+    // callback (or a fadeCompleted slot) may call start()/cancel() and realloc
+    // m_fades without invalidating a reference we're holding mid-iteration.
+    struct Step {
+        QString key;
+        double value;
+        bool done;
+        ApplyFn apply;
+    };
+    QVector<Step> steps;
+    steps.reserve(m_fades.size());
+    for (Fade& f : m_fades) {
         f.elapsedMs += dtMs;
-        double t = std::clamp(f.elapsedMs / f.durationMs, 0.0, 1.0);
-        double value = f.from + (f.to - f.from) * ease(f.curve, t);
-        f.apply(value);
+        const double t = std::clamp(f.elapsedMs / f.durationMs, 0.0, 1.0);
+        const double value = f.from + (f.to - f.from) * ease(f.curve, t);
+        steps.append({f.key, value, t >= 1.0, f.apply});
+    }
 
-        if (t >= 1.0) {
-            completedKeys.append(f.key);
-            m_fades.removeAt(i);
-        } else {
-            ++i;
+    // Remove completed fades before running callbacks so a callback sees a
+    // consistent container.
+    QStringList completedKeys;
+    for (const Step& s : steps) {
+        if (s.done) {
+            completedKeys.append(s.key);
+            cancel(s.key);
         }
     }
+
+    // Now invoke callbacks from local copies; safe even if they mutate m_fades.
+    for (const Step& s : steps)
+        s.apply(s.value);
 
     if (m_fades.isEmpty())
         m_timer.stop();

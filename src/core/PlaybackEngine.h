@@ -143,7 +143,6 @@ class PlaybackEngine : public QObject {
     void executeMacroCue(const Cue& cue);
     void executeGoToCue(const Cue& cue);
     void executeStopCue(const Cue& cue);
-    void executeNextMacroChild();
     void handleAutoFollow(const Cue& cue);
 
     // DCA filtering helpers
@@ -191,9 +190,6 @@ class PlaybackEngine : public QObject {
     QTimer m_autoFollowTimer;
     bool m_autoFollowArmed = false;
 
-    QString m_currentMacroId;
-    int m_macroChildIndex = 0;
-    QStringList m_macroPendingChildren;
 
     CueValidator* m_validator = nullptr;
     PlaybackGuard* m_guard = nullptr;

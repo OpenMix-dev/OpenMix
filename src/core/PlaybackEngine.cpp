@@ -150,9 +150,6 @@ void PlaybackEngine::toggleChannelMute(int channel) {
 void PlaybackEngine::stop() {
     m_autoFollowTimer.stop();
     m_autoFollowArmed = false;
-    m_currentMacroId.clear();
-    m_macroChildIndex = 0;
-    m_macroPendingChildren.clear();
 
     setState(PlaybackState::Stopped);
     setCurrentIndex(-1);
@@ -691,72 +688,20 @@ void PlaybackEngine::executeMacroCue(const Cue& cue) {
         return;
     }
 
-    if (cue.macroExecutionMode() == MacroExecutionMode::Parallel) {
-        for (const QString& childId : childIds) {
-            const Cue* childCue = m_cueList->findById(childId);
-            if (childCue) {
-                executeCueInternal(*childCue);
-                emit macroChildExecuted(cue.id(), childId);
-            }
-        }
-        emit cueCompleted(m_currentIndex);
-        handleAutoFollow(cue);
-    } else {
-        m_currentMacroId = cue.id();
-        m_macroChildIndex = 0;
-        m_macroPendingChildren = childIds;
-
-        const Cue* firstChild = m_cueList->findById(childIds.first());
-        if (firstChild) {
-            m_macroPendingChildren.removeFirst();
-            executeCueInternal(*firstChild);
-            emit macroChildExecuted(cue.id(), childIds.first());
-            m_macroChildIndex = 1;
-
-            if (m_macroPendingChildren.isEmpty()) {
-                const Cue* macroCue = m_cueList->findById(m_currentMacroId);
-
-                m_currentMacroId.clear();
-                m_macroPendingChildren.clear();
-                m_macroChildIndex = 0;
-
-                emit cueCompleted(m_currentIndex);
-                if (macroCue) {
-                    handleAutoFollow(*macroCue);
-                }
-            } else {
-                executeNextMacroChild();
-            }
-        }
-    }
-}
-
-void PlaybackEngine::executeNextMacroChild() {
-    if (m_currentMacroId.isEmpty() || !m_cueList) {
-        m_currentMacroId.clear();
-        m_macroPendingChildren.clear();
-        m_macroChildIndex = 0;
-        return;
-    }
-
-    while (!m_macroPendingChildren.isEmpty()) {
-        QString childId = m_macroPendingChildren.takeFirst();
+    // Parallel and sequential modes both fire the children synchronously in
+    // order. Use only local state so a child that is itself a macro cannot
+    // clobber this macro's iteration (nested-macro safety). executeCueInternal
+    // is recursion-depth-guarded, so a macro cycle cannot overflow the stack.
+    const QString macroId = cue.id();
+    for (const QString& childId : childIds) {
         const Cue* childCue = m_cueList->findById(childId);
-        if (!childCue)
-            continue;
-        executeCueInternal(*childCue);
-        emit macroChildExecuted(m_currentMacroId, childId);
-        m_macroChildIndex++;
+        if (childCue) {
+            executeCueInternal(*childCue);
+            emit macroChildExecuted(macroId, childId);
+        }
     }
-
-    const Cue* macroCue = m_cueList->findById(m_currentMacroId);
-    m_currentMacroId.clear();
-    m_macroPendingChildren.clear();
-    m_macroChildIndex = 0;
-
     emit cueCompleted(m_currentIndex);
-    if (macroCue)
-        handleAutoFollow(*macroCue);
+    handleAutoFollow(cue);
 }
 
 void PlaybackEngine::executeGoToCue(const Cue& cue) {
@@ -802,10 +747,6 @@ void PlaybackEngine::executeGoToCue(const Cue& cue) {
 void PlaybackEngine::executeStopCue(const Cue& cue) {
     m_autoFollowTimer.stop();
     m_autoFollowArmed = false;
-
-    m_currentMacroId.clear();
-    m_macroPendingChildren.clear();
-    m_macroChildIndex = 0;
 
     switch (cue.stopBehavior()) {
     case StopBehavior::StopOnly:
