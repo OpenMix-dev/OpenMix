@@ -818,8 +818,8 @@ QTreeView::branch:open:has-children:has-siblings {
 QToolTip {
     background-color: #252830;
     border: 1px solid #3d4451;
-    border-radius: 6px;
-    padding: 6px 10px;
+    border-radius: 4px;
+    padding: 2px 6px;
     color: #f0f1f3;
     font-size: 11px;
 }
