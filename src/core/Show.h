@@ -7,7 +7,9 @@
 #include "Ensemble.h"
 #include "Position.h"
 #include <QJsonObject>
+#include <QList>
 #include <QObject>
+#include <QPair>
 #include <QString>
 
 namespace OpenMix {
@@ -75,6 +77,14 @@ class Show : public QObject {
     [[nodiscard]] MixerConfig mixerConfig() const { return m_mixerConfig; }
     void setMixerConfig(const MixerConfig& config) { m_mixerConfig = config; checkModifiedState(); }
 
+    // ganged input-channel pairs; on fire a level applied to one channel is
+    // mirrored to its partner. Show-level, shared across all cues.
+    [[nodiscard]] QList<QPair<int, int>> channelGangs() const { return m_channelGangs; }
+    void setChannelGangs(const QList<QPair<int, int>>& gangs) {
+        m_channelGangs = gangs;
+        checkModifiedState();
+    }
+
     QJsonObject toJson() const;
     void fromJson(const QJsonObject& json);
 
@@ -98,6 +108,7 @@ class Show : public QObject {
     QString m_filePath;
     CueList m_cueList;
     MixerConfig m_mixerConfig;
+    QList<QPair<int, int>> m_channelGangs; // ganged input-channel pairs
     DCAMapping m_dcaMapping;
     ActorProfileLibrary m_actorProfileLibrary;
     PositionLibrary m_positionLibrary;

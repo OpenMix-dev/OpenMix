@@ -105,6 +105,11 @@ void Application::initialize() {
     m_playbackEngine->setDCAMapping(m_show->dcaMapping());
     m_playbackEngine->setActorLibrary(m_show->actorProfileLibrary());
     m_playbackEngine->setPositionLibrary(m_show->positionLibrary());
+    m_playbackEngine->setChannelGangs(m_show->channelGangs());
+
+    // re-seed L/R gangs whenever a project is loaded (fromJson re-emits nameChanged)
+    connect(m_show, &Show::nameChanged, this,
+            [this]() { m_playbackEngine->setChannelGangs(m_show->channelGangs()); });
 
     if (m_mixer) {
         m_playbackEngine->setMixer(m_mixer);

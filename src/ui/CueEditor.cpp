@@ -10,6 +10,7 @@
 #include "theme/Theme.h"
 
 #include <QCheckBox>
+#include <QColorDialog>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
@@ -41,6 +42,16 @@ CueEditor::CueEditor(Application* app, QWidget* parent) : QWidget(parent), m_app
         connect(m_actorLibrary, &ActorProfileLibrary::changed, this,
                 &CueEditor::onActorLibraryChanged);
     }
+
+    // reflect the engine's check-mode state (it is engine-wide, not per-cue)
+    if (m_app && m_app->playbackEngine()) {
+        PlaybackEngine* engine = m_app->playbackEngine();
+        const QSignalBlocker blocker(m_checkModeCheck);
+        m_checkModeCheck->setChecked(engine->checkMode());
+        connect(engine, &PlaybackEngine::checkModeChanged, this,
+                &CueEditor::onEngineCheckModeChanged);
+    }
+    updateGangsUI();
 }
 
 void CueEditor::setupUi() {
@@ -69,6 +80,19 @@ void CueEditor::setupUi() {
     m_typeCombo->addItem(tr("Go To"), static_cast<int>(CueType::GoTo));
     m_typeCombo->addItem(tr("Wait"), static_cast<int>(CueType::Wait));
     basicLayout->addRow(tr("Type:"), m_typeCombo);
+
+    QWidget* colourRow = new QWidget(this);
+    QHBoxLayout* colourLayout = new QHBoxLayout(colourRow);
+    colourLayout->setContentsMargins(0, 0, 0, 0);
+    m_colourEdit = new QLineEdit(colourRow);
+    m_colourEdit->setPlaceholderText(tr("#rrggbb"));
+    m_colourPickButton = new QPushButton(tr("Pick..."), colourRow);
+    colourLayout->addWidget(m_colourEdit);
+    colourLayout->addWidget(m_colourPickButton);
+    basicLayout->addRow(tr("Colour:"), colourRow);
+
+    m_skipCheck = new QCheckBox(tr("Skip on standby advance"), this);
+    basicLayout->addRow(tr("Skip:"), m_skipCheck);
 
     m_mainLayout->addWidget(basicGroup);
 
@@ -181,6 +205,10 @@ void CueEditor::setupUi() {
     createChannelProfilesSection();
     m_mainLayout->addWidget(m_channelProfilesGroup);
 
+    // per-FX-unit mutes + console snippets
+    createFxMutesSection();
+    m_mainLayout->addWidget(m_fxMutesGroup);
+
     // linked QLab (DAW remote) cue
     QGroupBox* qlabGroup = new QGroupBox(tr("QLab / DAW Remote"), this);
     QFormLayout* qlabLayout = new QFormLayout(qlabGroup);
@@ -189,6 +217,18 @@ void CueEditor::setupUi() {
     m_qLabCueEdit->setToolTip(tr("Fire this QLab cue when the OpenMix cue executes"));
     qlabLayout->addRow(tr("QLab cue:"), m_qLabCueEdit);
     m_mainLayout->addWidget(qlabGroup);
+
+    // L/R gangs (show-level) + soundcheck (check) mode toggle
+    QGroupBox* rehearsalGroup = new QGroupBox(tr("Gangs & Rehearsal"), this);
+    QFormLayout* rehearsalLayout = new QFormLayout(rehearsalGroup);
+    m_gangEdit = new QLineEdit(rehearsalGroup);
+    m_gangEdit->setPlaceholderText(tr("L/R pairs, e.g. 1-2, 3-4"));
+    m_gangEdit->setToolTip(tr("Ganged channel pairs; a level on one mirrors to its partner"));
+    rehearsalLayout->addRow(tr("L/R gangs:"), m_gangEdit);
+    m_checkModeCheck =
+        new QCheckBox(tr("Soundcheck mode (GO holds on current cue)"), rehearsalGroup);
+    rehearsalLayout->addRow(tr("Rehearsal:"), m_checkModeCheck);
+    m_mainLayout->addWidget(rehearsalGroup);
 
     // notes group
     QGroupBox* notesGroup = new QGroupBox(tr("Notes"), this);
@@ -219,6 +259,54 @@ void CueEditor::setupUi() {
     connect(m_fadeCurveCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &CueEditor::onFadeCurveChanged);
     connect(m_qLabCueEdit, &QLineEdit::textChanged, this, &CueEditor::onQLabCueChanged);
+
+    connect(m_colourEdit, &QLineEdit::textChanged, this, &CueEditor::onColourChanged);
+    connect(m_colourPickButton, &QPushButton::clicked, this, &CueEditor::onColourPick);
+    connect(m_skipCheck, &QCheckBox::toggled, this, &CueEditor::onSkipChanged);
+    connect(m_snippetsEdit, &QLineEdit::textChanged, this, &CueEditor::onSnippetsChanged);
+    connect(m_gangEdit, &QLineEdit::editingFinished, this, &CueEditor::onGangsChanged);
+    connect(m_checkModeCheck, &QCheckBox::toggled, this, &CueEditor::onCheckModeToggled);
+}
+
+void CueEditor::createFxMutesSection() {
+    m_fxMutesGroup = new QGroupBox(tr("FX Mutes & Snippets"), this);
+    QVBoxLayout* layout = new QVBoxLayout(m_fxMutesGroup);
+    layout->setContentsMargins(4, 4, 4, 4);
+
+    QFormLayout* snippetForm = new QFormLayout();
+    m_snippetsEdit = new QLineEdit(m_fxMutesGroup);
+    m_snippetsEdit->setPlaceholderText(tr("Snippet indices, e.g. 1, 4, 7"));
+    m_snippetsEdit->setToolTip(tr("Console snippets recalled when this cue fires"));
+    snippetForm->addRow(tr("Snippets:"), m_snippetsEdit);
+    layout->addLayout(snippetForm);
+
+    QLabel* hint =
+        new QLabel(tr("Per FX unit: enable to set its mute state on fire."), m_fxMutesGroup);
+    hint->setWordWrap(true);
+    hint->setStyleSheet(QString("color: %1;").arg(Theme::Colors::TextSecondary));
+    layout->addWidget(hint);
+
+    QGridLayout* grid = new QGridLayout();
+    grid->setContentsMargins(0, 0, 0, 0);
+    grid->setSpacing(4);
+    for (int i = 1; i <= 8; ++i) {
+        FxMuteWidgets widgets;
+        widgets.enable = new QCheckBox(tr("FX %1").arg(i), m_fxMutesGroup);
+        widgets.muted = new QCheckBox(tr("Muted"), m_fxMutesGroup);
+        widgets.muted->setEnabled(false);
+
+        const int row = (i - 1) / 2;
+        const int col = ((i - 1) % 2) * 2;
+        grid->addWidget(widgets.enable, row, col);
+        grid->addWidget(widgets.muted, row, col + 1);
+
+        connect(widgets.enable, &QCheckBox::toggled, widgets.muted, &QCheckBox::setEnabled);
+        connect(widgets.enable, &QCheckBox::toggled, this, &CueEditor::onFxMuteChanged);
+        connect(widgets.muted, &QCheckBox::toggled, this, &CueEditor::onFxMuteChanged);
+
+        m_fxMuteWidgets.append(widgets);
+    }
+    layout->addLayout(grid);
 }
 
 void CueEditor::createChannelProfilesSection() {
@@ -372,6 +460,19 @@ void CueEditor::updateFromCue() {
         // linked QLab cue
         m_qLabCueEdit->setText(cue->qLabCue());
 
+        // colour + skip
+        m_colourEdit->setText(cue->colour());
+        m_skipCheck->setChecked(cue->skip());
+
+        // console snippets
+        QStringList snippetStrs;
+        for (int snippet : cue->snippets())
+            snippetStrs << QString::number(snippet);
+        m_snippetsEdit->setText(snippetStrs.join(", "));
+
+        // per-FX-unit mutes
+        updateFxMutesUI();
+
         // per-channel profile + level
         rebuildChannelTable();
         populateChannelTable();
@@ -390,9 +491,16 @@ void CueEditor::updateFromCue() {
         m_fadeTimeSpin->setValue(0.0);
         m_fadeCurveCombo->setCurrentIndex(0);
         m_qLabCueEdit->clear();
+        m_colourEdit->clear();
+        m_skipCheck->setChecked(false);
+        m_snippetsEdit->clear();
+        updateFxMutesUI();
         if (m_channelTable)
             m_channelTable->setRowCount(0);
     }
+
+    // L/R gangs are show-level, so refresh them regardless of the selected cue
+    updateGangsUI();
 
     m_updatingUi = false;
 }
@@ -419,6 +527,33 @@ void CueEditor::updateDCAOverridesUI() {
     }
 }
 
+void CueEditor::updateFxMutesUI() {
+    Cue* cue = currentCue();
+    const QMap<int, bool> mutes = cue ? cue->fxMutes() : QMap<int, bool>();
+
+    for (int i = 0; i < m_fxMuteWidgets.size(); ++i) {
+        const int fxUnit = i + 1;
+        const bool set = mutes.contains(fxUnit);
+        FxMuteWidgets& widgets = m_fxMuteWidgets[i];
+
+        widgets.enable->setChecked(set);
+        widgets.muted->setChecked(set && mutes.value(fxUnit));
+        widgets.muted->setEnabled(set);
+    }
+}
+
+void CueEditor::updateGangsUI() {
+    if (!m_gangEdit || !m_app || !m_app->show())
+        return;
+
+    QStringList parts;
+    for (const auto& gang : m_app->show()->channelGangs())
+        parts << QString("%1-%2").arg(gang.first).arg(gang.second);
+
+    const QSignalBlocker blocker(m_gangEdit);
+    m_gangEdit->setText(parts.join(", "));
+}
+
 void CueEditor::setEnabled(bool enabled) {
     m_numberSpin->setEnabled(enabled);
     m_nameEdit->setEnabled(enabled);
@@ -432,6 +567,12 @@ void CueEditor::setEnabled(bool enabled) {
     m_fadeCurveCombo->setEnabled(enabled);
     m_qLabCueEdit->setEnabled(enabled);
     m_channelProfilesGroup->setEnabled(enabled);
+    m_colourEdit->setEnabled(enabled);
+    m_colourPickButton->setEnabled(enabled);
+    m_skipCheck->setEnabled(enabled);
+    m_snippetsEdit->setEnabled(enabled);
+    m_fxMutesGroup->setEnabled(enabled);
+    // m_gangEdit and m_checkModeCheck stay enabled: show-/engine-level, not per-cue
 }
 
 void CueEditor::onNumberChanged(double value) {
@@ -770,6 +911,115 @@ void CueEditor::onActorLibraryChanged() {
     rebuildChannelTable();
     populateChannelTable();
     m_updatingUi = false;
+}
+
+void CueEditor::onColourChanged(const QString& text) {
+    if (m_updatingUi)
+        return;
+    Cue* cue = currentCue();
+    if (!cue)
+        return;
+    cue->setColour(text.trimmed());
+    m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
+    emit cueModified();
+}
+
+void CueEditor::onColourPick() {
+    const QColor initial(m_colourEdit->text().trimmed());
+    const QColor chosen = QColorDialog::getColor(initial.isValid() ? initial : QColor(Qt::white),
+                                                 this, tr("Cue Colour"));
+    if (chosen.isValid())
+        m_colourEdit->setText(chosen.name()); // fires onColourChanged
+}
+
+void CueEditor::onSkipChanged(bool checked) {
+    if (m_updatingUi)
+        return;
+    Cue* cue = currentCue();
+    if (!cue)
+        return;
+    cue->setSkip(checked);
+    m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
+    emit cueModified();
+}
+
+void CueEditor::onSnippetsChanged(const QString& text) {
+    if (m_updatingUi)
+        return;
+    Cue* cue = currentCue();
+    if (!cue)
+        return;
+
+    QList<int> snippets;
+    const QStringList parts = text.split(',', Qt::SkipEmptyParts);
+    for (const QString& part : parts) {
+        bool ok = false;
+        const int n = part.trimmed().toInt(&ok);
+        if (ok && !snippets.contains(n))
+            snippets.append(n);
+    }
+
+    cue->setSnippets(snippets);
+    m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
+    emit cueModified();
+}
+
+void CueEditor::onFxMuteChanged() {
+    if (m_updatingUi)
+        return;
+    Cue* cue = currentCue();
+    if (!cue)
+        return;
+
+    QMap<int, bool> mutes;
+    for (int i = 0; i < m_fxMuteWidgets.size(); ++i) {
+        if (m_fxMuteWidgets[i].enable->isChecked())
+            mutes[i + 1] = m_fxMuteWidgets[i].muted->isChecked();
+    }
+
+    cue->setFxMutes(mutes);
+    m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
+    emit cueModified();
+}
+
+void CueEditor::onGangsChanged() {
+    if (m_updatingUi || !m_app || !m_app->show())
+        return;
+
+    QList<QPair<int, int>> gangs;
+    const QStringList parts = m_gangEdit->text().split(',', Qt::SkipEmptyParts);
+    for (const QString& part : parts) {
+        const QStringList nums = part.split('-', Qt::SkipEmptyParts);
+        if (nums.size() != 2)
+            continue;
+        bool ok1 = false;
+        bool ok2 = false;
+        const int a = nums[0].trimmed().toInt(&ok1);
+        const int b = nums[1].trimmed().toInt(&ok2);
+        if (ok1 && ok2 && a > 0 && b > 0)
+            gangs.append(qMakePair(a, b));
+    }
+
+    m_app->show()->setChannelGangs(gangs);
+    if (m_app->playbackEngine())
+        m_app->playbackEngine()->setChannelGangs(gangs);
+
+    updateGangsUI(); // reflect the normalized form back into the field
+    emit cueModified();
+}
+
+void CueEditor::onCheckModeToggled(bool checked) {
+    if (m_updatingUi)
+        return;
+    if (m_app && m_app->playbackEngine())
+        m_app->playbackEngine()->setCheckMode(checked);
+}
+
+void CueEditor::onEngineCheckModeChanged(bool enabled) {
+    if (!m_checkModeCheck || m_checkModeCheck->isChecked() == enabled)
+        return;
+    const QSignalBlocker blocker(m_checkModeCheck);
+    m_checkModeCheck->setChecked(enabled);
 }
 
 } // namespace OpenMix

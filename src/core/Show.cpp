@@ -1,4 +1,5 @@
 #include "Show.h"
+#include <QJsonArray>
 
 namespace OpenMix {
 
@@ -99,6 +100,7 @@ void Show::newShow() {
     m_positionLibrary.clear();
     m_ensembleLibrary.clear();
     m_cueZero.clear();
+    m_channelGangs.clear();
     m_isDirty = false;
 }
 
@@ -115,6 +117,16 @@ QJsonObject Show::toJson() const {
     json["positions"] = m_positionLibrary.toJson();
     json["ensembles"] = m_ensembleLibrary.toJson();
     json["cueZero"] = m_cueZero.toJson();
+
+    QJsonArray gangArray;
+    for (const auto& gang : m_channelGangs) {
+        QJsonArray pair;
+        pair.append(gang.first);
+        pair.append(gang.second);
+        gangArray.append(pair);
+    }
+    json["channelGangs"] = gangArray;
+
     return json;
 }
 
@@ -162,6 +174,18 @@ void Show::fromJson(const QJsonObject& json) {
         m_cueZero.loadFromJson(json["cueZero"].toObject());
     } else {
         m_cueZero.clear();
+    }
+
+    // ganged input-channel pairs
+    m_channelGangs.clear();
+    if (json.contains("channelGangs")) {
+        const QJsonArray gangArray = json["channelGangs"].toArray();
+        for (const QJsonValue& val : gangArray) {
+            const QJsonArray pair = val.toArray();
+            if (pair.size() == 2) {
+                m_channelGangs.append(qMakePair(pair.at(0).toInt(), pair.at(1).toInt()));
+            }
+        }
     }
 
     m_isDirty = false;

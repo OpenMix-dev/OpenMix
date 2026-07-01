@@ -50,6 +50,9 @@ class X32Protocol : public MixerProtocol {
     // scene/snapshot recall
     void recallScene(int sceneNumber) override;
 
+    // snippet (partial scene) recall
+    void recallSnippet(int snippetNumber) override;
+
     // semantic channel setters (used by actor-voice recall and fades)
     void setChannelFader(int channel, double level) override;
     void setChannelMute(int channel, bool muted) override;

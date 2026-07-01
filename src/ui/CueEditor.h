@@ -56,15 +56,27 @@ class CueEditor : public QWidget {
     void onChannelLevelChanged(int channel);
     void onActorLibraryChanged();
 
+    void onColourChanged(const QString& text);
+    void onColourPick();
+    void onSkipChanged(bool checked);
+    void onSnippetsChanged(const QString& text);
+    void onFxMuteChanged();
+    void onGangsChanged();
+    void onCheckModeToggled(bool checked);
+    void onEngineCheckModeChanged(bool enabled);
+
   private:
     void setupUi();
     void createDCATargetingSection();
     void createFadeSection();
     void createChannelProfilesSection();
+    void createFxMutesSection();
     void rebuildChannelTable();
     void populateChannelTable();
     void updateFromCue();
     void updateDCAOverridesUI();
+    void updateFxMutesUI();
+    void updateGangsUI();
     void setEnabled(bool enabled);
     Cue* currentCue();
 
@@ -88,6 +100,26 @@ class CueEditor : public QWidget {
 
     // linked QLab (DAW remote) cue id
     QLineEdit* m_qLabCueEdit = nullptr;
+
+    // per-cue colour + skip flag
+    QLineEdit* m_colourEdit = nullptr;
+    QPushButton* m_colourPickButton = nullptr;
+    QCheckBox* m_skipCheck = nullptr;
+
+    // console snippets recalled on fire (comma-separated indices)
+    QLineEdit* m_snippetsEdit = nullptr;
+
+    // per-FX-unit mute overrides
+    struct FxMuteWidgets {
+        QCheckBox* enable;
+        QCheckBox* muted;
+    };
+    QGroupBox* m_fxMutesGroup = nullptr;
+    QVector<FxMuteWidgets> m_fxMuteWidgets;
+
+    // L/R gangs (show-level) + soundcheck (check) mode toggle
+    QLineEdit* m_gangEdit = nullptr;
+    QCheckBox* m_checkModeCheck = nullptr;
 
     // per-channel actor profile slot + level
     ActorProfileLibrary* m_actorLibrary = nullptr;

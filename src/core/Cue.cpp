@@ -308,6 +308,29 @@ QJsonObject Cue::toJson() const {
         json["channelPositions"] = positionsObj;
     }
 
+    // per-FX-unit mute states: { "<unit>": muted }
+    if (!m_fxMutes.isEmpty()) {
+        QJsonObject fxObj;
+        for (auto it = m_fxMutes.constBegin(); it != m_fxMutes.constEnd(); ++it) {
+            fxObj[QString::number(it.key())] = it.value();
+        }
+        json["fxMutes"] = fxObj;
+    }
+
+    // console snippets recalled on fire
+    if (!m_snippets.isEmpty()) {
+        QJsonArray snippetArray;
+        for (int snippet : m_snippets) {
+            snippetArray.append(snippet);
+        }
+        json["snippets"] = snippetArray;
+    }
+
+    if (!m_colour.isEmpty()) {
+        json["colour"] = m_colour;
+    }
+    json["skip"] = m_skip;
+
     return json;
 }
 
@@ -422,6 +445,25 @@ Cue Cue::fromJson(const QJsonObject& json) {
             cue.m_channelPositions[it.key().toInt()] = it.value().toString();
         }
     }
+
+    // per-FX-unit mute states
+    if (json.contains("fxMutes")) {
+        const QJsonObject fxObj = json["fxMutes"].toObject();
+        for (auto it = fxObj.constBegin(); it != fxObj.constEnd(); ++it) {
+            cue.m_fxMutes[it.key().toInt()] = it.value().toBool();
+        }
+    }
+
+    // console snippets
+    if (json.contains("snippets")) {
+        const QJsonArray snippetArray = json["snippets"].toArray();
+        for (const QJsonValue& val : snippetArray) {
+            cue.m_snippets.append(val.toInt());
+        }
+    }
+
+    cue.m_colour = json["colour"].toString();
+    cue.m_skip = json["skip"].toBool(false);
 
     return cue;
 }

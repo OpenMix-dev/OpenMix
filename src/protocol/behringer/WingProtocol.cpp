@@ -225,6 +225,14 @@ void WingProtocol::recallScene(int sceneNumber) {
     m_transport.send("/action/scenes/recall", sceneNumber);
 }
 
+void WingProtocol::recallSnippet(int snippetNumber) {
+    if (m_connectionState != ConnectionState::Connected)
+        return;
+
+    // WING snippet recall
+    m_transport.send("/-action/gosnippet", snippetNumber);
+}
+
 namespace {
 QString wingChannel(int channel) { return QString("/ch/%1").arg(channel); }
 

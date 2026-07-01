@@ -35,6 +35,24 @@ void PlaybackEngine::setActorLibrary(ActorProfileLibrary* library) { m_actorLibr
 
 void PlaybackEngine::setPositionLibrary(PositionLibrary* library) { m_positionLibrary = library; }
 
+void PlaybackEngine::setChannelGangs(const QList<QPair<int, int>>& gangs) {
+    m_channelGangs = gangs;
+    m_gangPartners.clear();
+    for (const auto& gang : gangs) {
+        if (gang.first == gang.second)
+            continue;
+        m_gangPartners.insert(gang.first, gang.second);
+        m_gangPartners.insert(gang.second, gang.first);
+    }
+}
+
+void PlaybackEngine::setCheckMode(bool enabled) {
+    if (m_checkMode != enabled) {
+        m_checkMode = enabled;
+        emit checkModeChanged(enabled);
+    }
+}
+
 void PlaybackEngine::setValidator(CueValidator* validator) { m_validator = validator; }
 
 void PlaybackEngine::setGuard(PlaybackGuard* guard) { m_guard = guard; }
@@ -87,7 +105,9 @@ void PlaybackEngine::go() {
     if (cue.type() == CueType::Snapshot)
         verifyCue(m_currentIndex, cue);
 
-    advanceStandby();
+    // in check/soundcheck mode GO holds on the current cue so it can be re-fired
+    if (!m_checkMode)
+        advanceStandby();
 }
 
 void PlaybackEngine::stop() {
@@ -141,8 +161,9 @@ void PlaybackEngine::previous() {
 }
 
 void PlaybackEngine::next() {
-    if (m_cueList && m_standbyIndex < m_cueList->count() - 1) {
-        setStandbyIndex(m_standbyIndex + 1);
+    const int idx = nextEnabledIndex(m_standbyIndex);
+    if (idx >= 0) {
+        setStandbyIndex(idx);
     }
 }
 
@@ -196,11 +217,18 @@ void PlaybackEngine::setStandbyIndex(int index) {
 void PlaybackEngine::advanceStandby() {
     if (!m_cueList)
         return;
-    if (m_currentIndex + 1 < m_cueList->count()) {
-        setStandbyIndex(m_currentIndex + 1);
-    } else {
-        setStandbyIndex(-1); // end of list
+    // step over skipped cues; nextEnabledIndex returns -1 at end of list
+    setStandbyIndex(nextEnabledIndex(m_currentIndex));
+}
+
+int PlaybackEngine::nextEnabledIndex(int from) const {
+    if (!m_cueList)
+        return -1;
+    for (int i = from + 1; i < m_cueList->count(); ++i) {
+        if (!m_cueList->at(i).skip())
+            return i;
     }
+    return -1;
 }
 
 void PlaybackEngine::executeCueInternal(const Cue& cue) {
@@ -228,6 +256,12 @@ void PlaybackEngine::executeCueInternal(const Cue& cue) {
 
         // apply named-position pan/delay assignments
         applyChannelPositions(cue);
+
+        // send per-FX-unit mute states
+        applyFxMutes(cue);
+
+        // recall console snippets (partial scene recalls)
+        recallSnippets(cue);
 
         // apply DCA overrides (mute & label only)
         applyDCAOverrides(cue, targetDCAs);
@@ -314,19 +348,32 @@ void PlaybackEngine::applyChannelLevels(const Cue& cue) {
     for (auto it = levels.constBegin(); it != levels.constEnd(); ++it) {
         const int channel = it.key();
         const double target = it.value();
-        const double from = m_appliedChannelLevels.value(channel, target);
+        driveChannelLevel(channel, target, fadeMs, curve);
 
-        if (fadeMs > 0.0 && !qFuzzyCompare(from + 1.0, target + 1.0)) {
-            m_fadeEngine.start(QString("ch:%1").arg(channel), from, target, fadeMs, curve,
-                               [this, channel](double v) {
-                                   if (m_mixer)
-                                       m_mixer->setChannelFader(channel, v);
-                               });
-        } else {
-            m_mixer->setChannelFader(channel, target);
+        // mirror to the ganged partner, unless the cue sets it explicitly
+        const auto partner = m_gangPartners.constFind(channel);
+        if (partner != m_gangPartners.constEnd() && !levels.contains(partner.value())) {
+            driveChannelLevel(partner.value(), target, fadeMs, curve);
         }
-        m_appliedChannelLevels[channel] = target;
     }
+}
+
+void PlaybackEngine::driveChannelLevel(int channel, double target, double fadeMs, FadeCurve curve) {
+    if (!m_mixer)
+        return;
+
+    const double from = m_appliedChannelLevels.value(channel, target);
+
+    if (fadeMs > 0.0 && !qFuzzyCompare(from + 1.0, target + 1.0)) {
+        m_fadeEngine.start(QString("ch:%1").arg(channel), from, target, fadeMs, curve,
+                           [this, channel](double v) {
+                               if (m_mixer)
+                                   m_mixer->setChannelFader(channel, v);
+                           });
+    } else {
+        m_mixer->setChannelFader(channel, target);
+    }
+    m_appliedChannelLevels[channel] = target;
 }
 
 void PlaybackEngine::applyChannelPositions(const Cue& cue) {
@@ -359,6 +406,26 @@ void PlaybackEngine::applyChannelPositions(const Cue& cue) {
             const QString busStr = QString("%1").arg(bus, 2, 10, QChar('0'));
             m_mixer->sendParameter(QString("/ch/%1/mix/%2/pan").arg(ch, busStr), position->pan());
         }
+    }
+}
+
+void PlaybackEngine::applyFxMutes(const Cue& cue) {
+    if (!m_mixer)
+        return;
+
+    // send each FX unit's mute state to the console (documented path /fx/N/mute)
+    const QMap<int, bool> mutes = cue.fxMutes();
+    for (auto it = mutes.constBegin(); it != mutes.constEnd(); ++it) {
+        m_mixer->sendParameter(QString("/fx/%1/mute").arg(it.key()), it.value() ? 1 : 0);
+    }
+}
+
+void PlaybackEngine::recallSnippets(const Cue& cue) {
+    if (!m_mixer)
+        return;
+
+    for (int snippet : cue.snippets()) {
+        m_mixer->recallSnippet(snippet);
     }
 }
 

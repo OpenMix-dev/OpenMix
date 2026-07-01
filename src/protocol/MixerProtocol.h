@@ -40,6 +40,10 @@ class MixerProtocol : public QObject {
     virtual void recallSnapshot(const Cue& cue) = 0;
     virtual void recallScene(int sceneNumber) = 0;
 
+    // recall a console snippet (partial scene) by index. Default no-op so drivers
+    // opt in; OSC drivers (X32/Wing) override with the console's snippet action.
+    virtual void recallSnippet(int /*snippet*/) {}
+
     // semantic per-channel setters used by actor-voice recall and timed fades.
     // Default to no-op so drivers opt in; network OSC drivers (X32/Wing) override.
     // channel is 1-based; level is normalized 0..1; other units are real-world

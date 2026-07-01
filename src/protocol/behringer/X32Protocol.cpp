@@ -263,6 +263,14 @@ void X32Protocol::recallScene(int sceneNumber) {
     m_transport.send("/-action/goscene", sceneNumber);
 }
 
+void X32Protocol::recallSnippet(int snippetNumber) {
+    if (m_connectionState != ConnectionState::Connected)
+        return;
+
+    // X32 snippet recall: /-action/gosnippet followed by snippet number
+    m_transport.send("/-action/gosnippet", snippetNumber);
+}
+
 void X32Protocol::setChannelFader(int channel, double level) {
     sendParameter(x32Channel(channel) + "/mix/fader", clampUnit(level));
 }
