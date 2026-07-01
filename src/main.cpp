@@ -42,9 +42,9 @@ class CenteredToolTipFilter : public QObject {
                             .boundingRect(QRect(0, 0, 600, 1000), Qt::TextWordWrap, tip)
                             .width() +
                         20; // padding + border
-                    const QPoint anchor =
-                        widget->mapToGlobal(QPoint(widget->width() / 2, widget->height() + 2));
-                    QToolTip::showText(QPoint(anchor.x() - boxWidth / 2, anchor.y()), html, widget);
+                    const QPoint cursor = static_cast<QHelpEvent*>(event)->globalPos();
+                    QToolTip::showText(QPoint(cursor.x() - boxWidth / 2, cursor.y() + 16), html,
+                                       widget);
                     return true;
                 }
             }
