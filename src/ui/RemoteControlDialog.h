@@ -54,6 +54,10 @@ class RemoteControlDialog : public QDialog {
     QSpinBox* m_reaperPreRoll = nullptr;
     QCheckBox* m_reaperAutoDetect = nullptr;
     QSpinBox* m_reaperListenPort = nullptr;
+
+    QCheckBox* m_cuePlayerEnabled = nullptr;
+    QLineEdit* m_cuePlayerHost = nullptr;
+    QSpinBox* m_cuePlayerPort = nullptr;
 };
 
 } // namespace OpenMix

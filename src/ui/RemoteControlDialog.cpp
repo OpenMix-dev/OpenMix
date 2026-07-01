@@ -1,6 +1,7 @@
 #include "RemoteControlDialog.h"
 #include "app/Application.h"
 #include "app/OscRemoteServer.h"
+#include "app/CuePlayerClient.h"
 #include "app/QLabClient.h"
 #include "app/ReaperClient.h"
 #include "midi/MidiInputManager.h"
@@ -103,6 +104,19 @@ void RemoteControlDialog::setupUi() {
     reaperForm->addRow(tr("Listen port:"), m_reaperListenPort);
     layout->addWidget(reaperBox);
 
+    // --- Cue Player (cpsound) ---------------------------------------------
+    auto* cpBox = new QGroupBox(tr("Cue Player (cpsound)"), this);
+    auto* cpForm = new QFormLayout(cpBox);
+    m_cuePlayerEnabled = new QCheckBox(tr("Advance Cue Player on GO"), cpBox);
+    m_cuePlayerHost = new QLineEdit(cpBox);
+    m_cuePlayerHost->setPlaceholderText(tr("127.0.0.1"));
+    m_cuePlayerPort = new QSpinBox(cpBox);
+    m_cuePlayerPort->setRange(1, 65535);
+    cpForm->addRow(m_cuePlayerEnabled);
+    cpForm->addRow(tr("Host:"), m_cuePlayerHost);
+    cpForm->addRow(tr("Port:"), m_cuePlayerPort);
+    layout->addWidget(cpBox);
+
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &RemoteControlDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, this, &RemoteControlDialog::reject);
@@ -138,6 +152,12 @@ void RemoteControlDialog::loadValues() {
         m_reaperPreRoll->setValue(reaper->preRollSeconds());
         m_reaperAutoDetect->setChecked(reaper->autoDetect());
         m_reaperListenPort->setValue(reaper->listenPort());
+    }
+
+    if (CuePlayerClient* cp = m_app->cuePlayerClient()) {
+        m_cuePlayerEnabled->setChecked(cp->isEnabled());
+        m_cuePlayerHost->setText(cp->host());
+        m_cuePlayerPort->setValue(cp->port());
     }
 }
 
@@ -183,6 +203,15 @@ void RemoteControlDialog::applyValues() {
         reaper->setListenPort(m_reaperListenPort->value());
         reaper->setAutoDetect(m_reaperAutoDetect->isChecked());
         reaper->saveToSettings();
+    }
+
+    if (CuePlayerClient* cp = m_app->cuePlayerClient()) {
+        cp->setEnabled(m_cuePlayerEnabled->isChecked());
+        cp->setTarget(m_cuePlayerHost->text().trimmed().isEmpty()
+                          ? QStringLiteral("127.0.0.1")
+                          : m_cuePlayerHost->text().trimmed(),
+                      m_cuePlayerPort->value());
+        cp->saveToSettings();
     }
 }
 

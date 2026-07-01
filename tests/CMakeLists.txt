@@ -168,6 +168,14 @@ target_link_libraries(test_reaper_client PRIVATE Qt6::Core Qt6::Test PkgConfig::
 target_include_directories(test_reaper_client PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME ReaperClientTest COMMAND test_reaper_client)
 
+add_executable(test_cueplayer_client
+    test_cueplayer_client.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/CuePlayerClient.cpp
+)
+target_link_libraries(test_cueplayer_client PRIVATE Qt6::Core Qt6::Test PkgConfig::LIBLO)
+target_include_directories(test_cueplayer_client PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME CuePlayerClientTest COMMAND test_cueplayer_client)
+
 add_executable(test_undo_commands
     test_undo_commands.cpp
     ${CMAKE_SOURCE_DIR}/src/core/UndoCommands.cpp
