@@ -18,6 +18,6 @@ void MixerProtocol::setChannelEqOn(int, bool) {}
 void MixerProtocol::setChannelEqBand(int, int, bool, int, double, double, double) {}
 void MixerProtocol::setChannelDynamics(int, bool, double, double, double, double, double) {}
 void MixerProtocol::setChannelName(int, const QString&) {}
-void MixerProtocol::setChannelColour(int, int) {}
+void MixerProtocol::setChannelColor(int, int) {}
 
 } // namespace OpenMix

@@ -307,7 +307,7 @@ target_link_libraries(test_scribble PRIVATE Qt6::Core Qt6::Test)
 target_include_directories(test_scribble PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME ScribbleTest COMMAND test_scribble)
 
-# --- fx mutes, snippets, gangs, colour/skip, check mode ---
+# --- fx mutes, snippets, gangs, color/skip, check mode ---
 
 add_executable(test_show_control
     test_show_control.cpp

@@ -81,15 +81,15 @@ void CueEditor::setupUi() {
     m_typeCombo->addItem(tr("Wait"), static_cast<int>(CueType::Wait));
     basicLayout->addRow(tr("Type:"), m_typeCombo);
 
-    QWidget* colourRow = new QWidget(this);
-    QHBoxLayout* colourLayout = new QHBoxLayout(colourRow);
-    colourLayout->setContentsMargins(0, 0, 0, 0);
-    m_colourEdit = new QLineEdit(colourRow);
-    m_colourEdit->setPlaceholderText(tr("#rrggbb"));
-    m_colourPickButton = new QPushButton(tr("Pick..."), colourRow);
-    colourLayout->addWidget(m_colourEdit);
-    colourLayout->addWidget(m_colourPickButton);
-    basicLayout->addRow(tr("Colour:"), colourRow);
+    QWidget* colorRow = new QWidget(this);
+    QHBoxLayout* colorLayout = new QHBoxLayout(colorRow);
+    colorLayout->setContentsMargins(0, 0, 0, 0);
+    m_colorEdit = new QLineEdit(colorRow);
+    m_colorEdit->setPlaceholderText(tr("#rrggbb"));
+    m_colorPickButton = new QPushButton(tr("Pick..."), colorRow);
+    colorLayout->addWidget(m_colorEdit);
+    colorLayout->addWidget(m_colorPickButton);
+    basicLayout->addRow(tr("Color:"), colorRow);
 
     m_skipCheck = new QCheckBox(tr("Skip on standby advance"), this);
     basicLayout->addRow(tr("Skip:"), m_skipCheck);
@@ -260,8 +260,8 @@ void CueEditor::setupUi() {
             &CueEditor::onFadeCurveChanged);
     connect(m_qLabCueEdit, &QLineEdit::textChanged, this, &CueEditor::onQLabCueChanged);
 
-    connect(m_colourEdit, &QLineEdit::textChanged, this, &CueEditor::onColourChanged);
-    connect(m_colourPickButton, &QPushButton::clicked, this, &CueEditor::onColourPick);
+    connect(m_colorEdit, &QLineEdit::textChanged, this, &CueEditor::onColorChanged);
+    connect(m_colorPickButton, &QPushButton::clicked, this, &CueEditor::onColorPick);
     connect(m_skipCheck, &QCheckBox::toggled, this, &CueEditor::onSkipChanged);
     connect(m_snippetsEdit, &QLineEdit::textChanged, this, &CueEditor::onSnippetsChanged);
     connect(m_gangEdit, &QLineEdit::editingFinished, this, &CueEditor::onGangsChanged);
@@ -460,8 +460,8 @@ void CueEditor::updateFromCue() {
         // linked QLab cue
         m_qLabCueEdit->setText(cue->qLabCue());
 
-        // colour + skip
-        m_colourEdit->setText(cue->colour());
+        // color + skip
+        m_colorEdit->setText(cue->color());
         m_skipCheck->setChecked(cue->skip());
 
         // console snippets
@@ -491,7 +491,7 @@ void CueEditor::updateFromCue() {
         m_fadeTimeSpin->setValue(0.0);
         m_fadeCurveCombo->setCurrentIndex(0);
         m_qLabCueEdit->clear();
-        m_colourEdit->clear();
+        m_colorEdit->clear();
         m_skipCheck->setChecked(false);
         m_snippetsEdit->clear();
         updateFxMutesUI();
@@ -567,8 +567,8 @@ void CueEditor::setEnabled(bool enabled) {
     m_fadeCurveCombo->setEnabled(enabled);
     m_qLabCueEdit->setEnabled(enabled);
     m_channelProfilesGroup->setEnabled(enabled);
-    m_colourEdit->setEnabled(enabled);
-    m_colourPickButton->setEnabled(enabled);
+    m_colorEdit->setEnabled(enabled);
+    m_colorPickButton->setEnabled(enabled);
     m_skipCheck->setEnabled(enabled);
     m_snippetsEdit->setEnabled(enabled);
     m_fxMutesGroup->setEnabled(enabled);
@@ -913,23 +913,23 @@ void CueEditor::onActorLibraryChanged() {
     m_updatingUi = false;
 }
 
-void CueEditor::onColourChanged(const QString& text) {
+void CueEditor::onColorChanged(const QString& text) {
     if (m_updatingUi)
         return;
     Cue* cue = currentCue();
     if (!cue)
         return;
-    cue->setColour(text.trimmed());
+    cue->setColor(text.trimmed());
     m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
     emit cueModified();
 }
 
-void CueEditor::onColourPick() {
-    const QColor initial(m_colourEdit->text().trimmed());
+void CueEditor::onColorPick() {
+    const QColor initial(m_colorEdit->text().trimmed());
     const QColor chosen = QColorDialog::getColor(initial.isValid() ? initial : QColor(Qt::white),
-                                                 this, tr("Cue Colour"));
+                                                 this, tr("Cue Color"));
     if (chosen.isValid())
-        m_colourEdit->setText(chosen.name()); // fires onColourChanged
+        m_colorEdit->setText(chosen.name()); // fires onColorChanged
 }
 
 void CueEditor::onSkipChanged(bool checked) {

@@ -78,7 +78,7 @@ class Application : public QObject {
     [[nodiscard]] TimecodeTriggerList* timecodeTriggers() { return m_timecodeTriggers; }
     [[nodiscard]] ChannelMonitor* channelMonitor() { return m_channelMonitor; }
 
-    // scribble-strip driver (actor names, cue number, silence/clip colours)
+    // scribble-strip driver (actor names, cue number, silence/clip colors)
     [[nodiscard]] ScribbleController* scribbleController() { return m_scribbleController; }
 
     // mixer connection

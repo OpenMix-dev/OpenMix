@@ -52,15 +52,15 @@ void ScribbleController::setCueNumberChannel(int channel) {
     m_cueChannel = channel > 0 ? channel : 0;
 }
 
-void ScribbleController::setStateColour(ChannelState state, int colour) {
+void ScribbleController::setStateColor(ChannelState state, int color) {
     const int idx = static_cast<int>(state);
     if (idx >= 0 && idx < 3)
-        m_stateColours[idx] = colour;
+        m_stateColors[idx] = color;
 }
 
-int ScribbleController::stateColour(ChannelState state) const {
+int ScribbleController::stateColor(ChannelState state) const {
     const int idx = static_cast<int>(state);
-    return (idx >= 0 && idx < 3) ? m_stateColours[idx] : m_stateColours[0];
+    return (idx >= 0 && idx < 3) ? m_stateColors[idx] : m_stateColors[0];
 }
 
 void ScribbleController::refreshNames() {
@@ -90,7 +90,7 @@ void ScribbleController::onChannelStateChanged(int channel, int state) {
     int idx = state;
     if (idx < 0 || idx >= 3)
         idx = static_cast<int>(ChannelState::Normal);
-    m_mixer->setChannelColour(channel, m_stateColours[idx]);
+    m_mixer->setChannelColor(channel, m_stateColors[idx]);
 }
 
 void ScribbleController::onCurrentCueChanged(int cueIndex) {

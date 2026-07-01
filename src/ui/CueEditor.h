@@ -56,8 +56,8 @@ class CueEditor : public QWidget {
     void onChannelLevelChanged(int channel);
     void onActorLibraryChanged();
 
-    void onColourChanged(const QString& text);
-    void onColourPick();
+    void onColorChanged(const QString& text);
+    void onColorPick();
     void onSkipChanged(bool checked);
     void onSnippetsChanged(const QString& text);
     void onFxMuteChanged();
@@ -101,9 +101,9 @@ class CueEditor : public QWidget {
     // linked QLab (DAW remote) cue id
     QLineEdit* m_qLabCueEdit = nullptr;
 
-    // per-cue colour + skip flag
-    QLineEdit* m_colourEdit = nullptr;
-    QPushButton* m_colourPickButton = nullptr;
+    // per-cue color + skip flag
+    QLineEdit* m_colorEdit = nullptr;
+    QPushButton* m_colorPickButton = nullptr;
     QCheckBox* m_skipCheck = nullptr;
 
     // console snippets recalled on fire (comma-separated indices)

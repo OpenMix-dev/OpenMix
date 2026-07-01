@@ -326,8 +326,8 @@ QJsonObject Cue::toJson() const {
         json["snippets"] = snippetArray;
     }
 
-    if (!m_colour.isEmpty()) {
-        json["colour"] = m_colour;
+    if (!m_color.isEmpty()) {
+        json["color"] = m_color;
     }
     json["skip"] = m_skip;
 
@@ -462,7 +462,7 @@ Cue Cue::fromJson(const QJsonObject& json) {
         }
     }
 
-    cue.m_colour = json["colour"].toString();
+    cue.m_color = json["color"].toString();
     cue.m_skip = json["skip"].toBool(false);
 
     return cue;

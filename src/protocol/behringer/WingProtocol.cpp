@@ -311,9 +311,9 @@ void WingProtocol::setChannelName(int channel, const QString& name) {
     sendParameter(wingChannel(channel) + "/$name", name);
 }
 
-void WingProtocol::setChannelColour(int channel, int colour) {
-    // WING channel colour index (best-effort; palette differs from X32)
-    sendParameter(wingChannel(channel) + "/col", colour);
+void WingProtocol::setChannelColor(int channel, int color) {
+    // WING channel color index (best-effort; palette differs from X32)
+    sendParameter(wingChannel(channel) + "/col", color);
 }
 
 void WingProtocol::refresh() {

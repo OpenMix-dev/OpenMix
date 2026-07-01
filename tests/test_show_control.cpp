@@ -90,12 +90,12 @@ class TestShowControl : public QObject {
         QCOMPARE(loaded.snippets(), QList<int>({3, 7, 9}));
     }
 
-    void cue_colour_roundtrip() {
+    void cue_color_roundtrip() {
         Cue cue;
-        cue.setColour("#ff8800");
+        cue.setColor("#ff8800");
 
         Cue loaded = Cue::fromJson(cue.toJson());
-        QCOMPARE(loaded.colour(), QString("#ff8800"));
+        QCOMPARE(loaded.color(), QString("#ff8800"));
     }
 
     void cue_skip_roundtrip() {

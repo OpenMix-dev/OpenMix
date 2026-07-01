@@ -211,7 +211,7 @@ void Application::initialize() {
                 m_playbackEngine->go();
             });
 
-    // scribble strips: actor names + cue number + silence/clip colouring
+    // scribble strips: actor names + cue number + silence/clip coloring
     m_scribbleController->setActorLibrary(m_show->actorProfileLibrary());
     m_scribbleController->setCueList(m_show->cueList());
     connect(m_show->actorProfileLibrary(), &ActorProfileLibrary::changed, m_scribbleController,
@@ -236,7 +236,7 @@ void Application::setupMixerConnection(const QString& type, const QString& host,
     connect(m_mixer, &MixerProtocol::channelMeter, m_channelMonitor,
             [this](int channel, float level) { m_channelMonitor->onLevel(channel, level); });
 
-    // scribble strips push actor names/colours to this console
+    // scribble strips push actor names/colors to this console
     m_scribbleController->setMixer(m_mixer);
 
     m_mixer->connect(host, port);

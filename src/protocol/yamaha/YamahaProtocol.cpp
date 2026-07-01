@@ -155,8 +155,8 @@ QByteArray YamahaProtocol::buildChannelName(int ch, const QString& name) const {
     return scpSet(AddrChannelName, ch, 0, name);
 }
 
-QByteArray YamahaProtocol::buildChannelColour(int ch, int colour) const {
-    return scpSet(AddrChannelColor, ch, 0, colour);
+QByteArray YamahaProtocol::buildChannelColor(int ch, int color) const {
+    return scpSet(AddrChannelColor, ch, 0, color);
 }
 
 // --------------------------------------------------------------------------
@@ -213,8 +213,8 @@ void YamahaProtocol::setChannelName(int ch, const QString& name) {
     sendCommand(buildChannelName(ch - 1, name));
 }
 
-void YamahaProtocol::setChannelColour(int ch, int colour) {
-    sendCommand(buildChannelColour(ch - 1, colour));
+void YamahaProtocol::setChannelColor(int ch, int color) {
+    sendCommand(buildChannelColor(ch - 1, color));
 }
 
 // --------------------------------------------------------------------------

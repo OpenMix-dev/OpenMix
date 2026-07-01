@@ -196,9 +196,9 @@ class Cue {
     }
     void removeSnippet(int snippet) { m_snippets.removeAll(snippet); }
 
-    // display colour (hex string, e.g. "#ff0000"); empty = list default
-    [[nodiscard]] QString colour() const { return m_colour; }
-    void setColour(const QString& colour) { m_colour = colour; }
+    // display color (hex string, e.g. "#ff0000"); empty = list default
+    [[nodiscard]] QString color() const { return m_color; }
+    void setColor(const QString& color) { m_color = color; }
 
     // when true, standby advance (next / auto-advance) steps over this cue
     [[nodiscard]] bool skip() const noexcept { return m_skip; }
@@ -254,7 +254,7 @@ class Cue {
 
     QMap<int, bool> m_fxMutes; // fx unit index -> muted
     QList<int> m_snippets;     // console snippet indices recalled on fire
-    QString m_colour;          // display colour (hex)
+    QString m_color;          // display color (hex)
     bool m_skip = false;       // skip during standby advance
 };
 

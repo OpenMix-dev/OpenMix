@@ -13,11 +13,11 @@ using namespace OpenMix;
 class RecordingMixer : public MixerProtocol {
   public:
     QList<QPair<int, QString>> nameCalls;
-    QList<QPair<int, int>> colourCalls;
+    QList<QPair<int, int>> colorCalls;
     bool linked = true;
 
     void setChannelName(int ch, const QString& name) override { nameCalls.append({ch, name}); }
-    void setChannelColour(int ch, int colour) override { colourCalls.append({ch, colour}); }
+    void setChannelColor(int ch, int color) override { colorCalls.append({ch, color}); }
 
     [[nodiscard]] QString protocolName() const override { return "mock"; }
     [[nodiscard]] QString protocolDescription() const override { return "mock"; }
@@ -99,19 +99,19 @@ class TestScribble : public QObject {
         QVERIFY(online.hasName(1, "Cleo")); // pushed on attach
     }
 
-    void channelState_mapsToColour() {
+    void channelState_mapsToColor() {
         RecordingMixer mixer;
         ScribbleController ctl;
         ctl.setMixer(&mixer);
-        mixer.colourCalls.clear();
+        mixer.colorCalls.clear();
 
         ctl.onChannelStateChanged(7, static_cast<int>(ChannelState::Clipping));
-        QCOMPARE(mixer.colourCalls.size(), 1);
-        QCOMPARE(mixer.colourCalls[0].first, 7);
-        QCOMPARE(mixer.colourCalls[0].second, ctl.stateColour(ChannelState::Clipping));
+        QCOMPARE(mixer.colorCalls.size(), 1);
+        QCOMPARE(mixer.colorCalls[0].first, 7);
+        QCOMPARE(mixer.colorCalls[0].second, ctl.stateColor(ChannelState::Clipping));
 
         ctl.onChannelStateChanged(7, static_cast<int>(ChannelState::Silent));
-        QCOMPARE(mixer.colourCalls[1].second, ctl.stateColour(ChannelState::Silent));
+        QCOMPARE(mixer.colorCalls[1].second, ctl.stateColor(ChannelState::Silent));
     }
 
     void cueNumber_writtenToConfiguredChannel() {
@@ -167,12 +167,12 @@ class TestScribble : public QObject {
         ctl.setMixer(&mixer);
         ctl.setEnabled(false);
         mixer.nameCalls.clear();
-        mixer.colourCalls.clear();
+        mixer.colorCalls.clear();
 
         ctl.refreshNames();
         ctl.onChannelStateChanged(3, static_cast<int>(ChannelState::Clipping));
         QVERIFY(mixer.nameCalls.isEmpty());
-        QVERIFY(mixer.colourCalls.isEmpty());
+        QVERIFY(mixer.colorCalls.isEmpty());
     }
 };
 

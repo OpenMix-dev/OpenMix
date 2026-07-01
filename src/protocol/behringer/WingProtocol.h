@@ -68,7 +68,7 @@ class WingProtocol : public MixerProtocol {
 
     // scribble strips
     void setChannelName(int channel, const QString& name) override;
-    void setChannelColour(int channel, int colour) override;
+    void setChannelColor(int channel, int color) override;
 
     // keep-alive
     void refresh() override;

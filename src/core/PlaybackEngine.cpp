@@ -460,7 +460,7 @@ void PlaybackEngine::verifyCue(int index, const Cue& cue) {
     const QJsonObject params = filterParametersForDCAs(cue, targetDCAs);
 
     // only numeric params (faders/levels/toggles) are verifiable by value;
-    // names/colours are skipped.
+    // names/colors are skipped.
     QStringList toVerify;
     for (auto it = params.begin(); it != params.end(); ++it) {
         if (it.value().isDouble())

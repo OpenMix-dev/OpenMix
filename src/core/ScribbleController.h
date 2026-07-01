@@ -12,8 +12,8 @@ class CueList;
 
 // Drives console scribble strips from show data. It writes each channel's
 // assigned actor name to that channel's strip, writes the current cue number to
-// a configurable strip, and colours strips from ChannelMonitor silence/clip
-// state. All pushes go through MixerProtocol::setChannelName / setChannelColour,
+// a configurable strip, and colors strips from ChannelMonitor silence/clip
+// state. All pushes go through MixerProtocol::setChannelName / setChannelColor,
 // which are no-ops on drivers that cannot address scribble strips.
 class ScribbleController : public QObject {
     Q_OBJECT
@@ -33,10 +33,10 @@ class ScribbleController : public QObject {
     void setCueNumberChannel(int channel);
     [[nodiscard]] int cueNumberChannel() const noexcept { return m_cueChannel; }
 
-    // driver-mapped colour index shown for each monitor state. Defaults suit the
+    // driver-mapped color index shown for each monitor state. Defaults suit the
     // X32 palette (white / blue / red); configurable so other consoles fit.
-    void setStateColour(ChannelState state, int colour);
-    [[nodiscard]] int stateColour(ChannelState state) const;
+    void setStateColor(ChannelState state, int color);
+    [[nodiscard]] int stateColor(ChannelState state) const;
 
     // push every assigned actor name to its channel now
     void refreshNames();
@@ -55,7 +55,7 @@ class ScribbleController : public QObject {
     int m_cueChannel = 0;
 
     // indexed by int(ChannelState): Normal, Silent, Clipping
-    int m_stateColours[3] = {7, 4, 1};
+    int m_stateColors[3] = {7, 4, 1};
 };
 
 } // namespace OpenMix

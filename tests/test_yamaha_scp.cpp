@@ -142,11 +142,11 @@ class TestYamahaScp : public QObject {
                  QByteArray("set MIXER:Current/InCh/Dyna2/Threshold 0 0 -260\n"));
     }
 
-    void buildScribble_nameAndColour() {
+    void buildScribble_nameAndColor() {
         ScpProbe p;
         QCOMPARE(p.buildChannelName(2, "Vox"),
                  QByteArray("set MIXER:Current/InCh/Label/Name 2 0 \"Vox\"\n"));
-        QCOMPARE(p.buildChannelColour(0, 3),
+        QCOMPARE(p.buildChannelColor(0, 3),
                  QByteArray("set MIXER:Current/InCh/Label/Color 0 0 3\n"));
     }
 

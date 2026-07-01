@@ -322,9 +322,9 @@ void X32Protocol::setChannelName(int channel, const QString& name) {
     sendParameter(x32Channel(channel) + "/config/name", name);
 }
 
-void X32Protocol::setChannelColour(int channel, int colour) {
+void X32Protocol::setChannelColor(int channel, int color) {
     // /config/color is a palette index (0..15)
-    sendParameter(x32Channel(channel) + "/config/color", colour);
+    sendParameter(x32Channel(channel) + "/config/color", color);
 }
 
 void X32Protocol::refresh() {

@@ -101,9 +101,9 @@ class YamahaProtocol : public MixerProtocol {
     void setChannelDynamics(int ch, bool on, double thresholdDb, double ratio, double attackMs,
                             double releaseMs, double makeupDb) override;
 
-    // scribble strips (SCP channel label name + colour index)
+    // scribble strips (SCP channel label name + color index)
     void setChannelName(int ch, const QString& name) override;
-    void setChannelColour(int ch, int colour) override;
+    void setChannelColor(int ch, int color) override;
 
     // --- pure command builders: produce the exact SCP ASCII bytes (LF-terminated). ---
     [[nodiscard]] static QByteArray scpSet(const QString& address, int idx1, int idx2, int value);
@@ -131,7 +131,7 @@ class YamahaProtocol : public MixerProtocol {
     [[nodiscard]] QByteArray buildChannelEqBandQ(int ch, int band, double q) const;
     [[nodiscard]] QByteArray buildChannelDynamicsThreshold(int ch, double thresholdDb) const;
     [[nodiscard]] QByteArray buildChannelName(int ch, const QString& name) const;
-    [[nodiscard]] QByteArray buildChannelColour(int ch, int colour) const;
+    [[nodiscard]] QByteArray buildChannelColor(int ch, int color) const;
 
   protected:
     // Head-amp (preamp) gain scaling.  CL/QL/Rivage transmit centi-dB; the DM7

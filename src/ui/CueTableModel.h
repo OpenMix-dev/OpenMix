@@ -12,9 +12,9 @@ class CueTableModel : public QAbstractTableModel {
     Q_OBJECT
 
   public:
-    // ColColour is appended last so existing column indices stay stable for views
+    // ColColor is appended last so existing column indices stay stable for views
     // that assign per-column delegates/widths by name.
-    enum Column { ColNumber = 0, ColName, ColType, ColGroup, ColTags, ColNotes, ColColour, ColCount };
+    enum Column { ColNumber = 0, ColName, ColType, ColGroup, ColTags, ColNotes, ColColor, ColCount };
 
     explicit CueTableModel(CueList* cueList, QObject* parent = nullptr);
 

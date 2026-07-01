@@ -7,7 +7,7 @@ class QTimer;
 
 namespace OpenMix {
 
-// Per-channel silence/clip state for scribble-strip colouring.
+// Per-channel silence/clip state for scribble-strip coloring.
 enum class ChannelState {
     Normal = 0,   // audio present in band
     Silent = 1,   // below the silence floor for longer than the silence timeout
