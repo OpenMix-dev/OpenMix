@@ -520,16 +520,21 @@ void MainWindow::createMenus() {
     struct ColumnToggle {
         const char* label;
         int column;
+        bool visible; // default visibility
     };
-    const ColumnToggle columnToggles[] = {{"&Group", CueTableModel::ColGroup},
-                                          {"&Tags", CueTableModel::ColTags},
-                                          {"&Notes", CueTableModel::ColNotes},
-                                          {"Colo&r", CueTableModel::ColColor}};
+    const ColumnToggle columnToggles[] = {{"&Group", CueTableModel::ColGroup, true},
+                                          {"&Tags", CueTableModel::ColTags, true},
+                                          {"&Notes", CueTableModel::ColNotes, true},
+                                          {"Colo&r", CueTableModel::ColColor, true},
+                                          {"&DCAs", CueTableModel::ColDca, false},
+                                          {"&Positions", CueTableModel::ColPosition, false},
+                                          {"&FX", CueTableModel::ColFx, false}};
     for (const ColumnToggle& ct : columnToggles) {
         QAction* action = columnsMenu->addAction(tr(ct.label));
         action->setCheckable(true);
-        action->setChecked(true);
+        action->setChecked(ct.visible);
         const int column = ct.column;
+        m_cueListView->setColumnVisible(column, ct.visible); // apply default
         connect(action, &QAction::toggled, this,
                 [this, column](bool on) { m_cueListView->setColumnVisible(column, on); });
     }

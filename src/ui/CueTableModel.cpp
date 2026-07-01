@@ -63,6 +63,28 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
             return cue.notes();
         case ColColor:
             return cue.color();
+        case ColDca: {
+            QStringList parts;
+            const QMap<int, DCAOverride> overrides = cue.dcaOverrides();
+            for (auto it = overrides.begin(); it != overrides.end(); ++it) {
+                if (it.value().label.has_value())
+                    parts << QString("%1:%2").arg(it.key()).arg(*it.value().label);
+            }
+            return parts.join(", ");
+        }
+        case ColPosition: {
+            const int count = cue.channelPositions().size();
+            return count > 0 ? tr("%n ch", "", count) : QString();
+        }
+        case ColFx: {
+            QStringList parts;
+            const QMap<int, bool> mutes = cue.fxMutes();
+            for (auto it = mutes.begin(); it != mutes.end(); ++it) {
+                if (it.value())
+                    parts << QString::number(it.key());
+            }
+            return parts.isEmpty() ? QString() : tr("mute %1").arg(parts.join(", "));
+        }
         }
     }
 
@@ -136,6 +158,12 @@ QVariant CueTableModel::headerData(int section, Qt::Orientation orientation, int
         return tr("Notes");
     case ColColor:
         return tr("Color");
+    case ColDca:
+        return tr("DCAs");
+    case ColPosition:
+        return tr("Positions");
+    case ColFx:
+        return tr("FX");
     }
     return QVariant();
 }

@@ -14,7 +14,19 @@ class CueTableModel : public QAbstractTableModel {
   public:
     // ColColor is appended last so existing column indices stay stable for views
     // that assign per-column delegates/widths by name.
-    enum Column { ColNumber = 0, ColName, ColType, ColGroup, ColTags, ColNotes, ColColor, ColCount };
+    enum Column {
+        ColNumber = 0,
+        ColName,
+        ColType,
+        ColGroup,
+        ColTags,
+        ColNotes,
+        ColColor,
+        ColDca,      // read-only summary of DCA overrides (channel labels)
+        ColPosition, // read-only count of positioned channels
+        ColFx,       // read-only muted FX units
+        ColCount
+    };
 
     explicit CueTableModel(CueList* cueList, QObject* parent = nullptr);
 
