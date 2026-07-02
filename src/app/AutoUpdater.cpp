@@ -17,7 +17,7 @@ namespace {
 // Per-OS appcast feeds published by CI to GitHub Pages. Sparkle/WinSparkle poll
 // these for new versions + signatures.
 constexpr const char* kWindowsAppcast =
-    "https://johnqherman.github.io/OpenMix/appcast-windows.xml";
+    "https://openmix.dev/appcast-windows.xml";
 } // namespace
 
 AutoUpdater::AutoUpdater(QObject* parent) : QObject(parent) {}

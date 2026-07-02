@@ -172,9 +172,10 @@ jobs:
             OpenMix-windows/*
             OpenMix-macos/*
 
-  # generate the Sparkle/WinSparkle appcasts that the app polls, and publish
-  # them to GitHub Pages. Requires a Sparkle EdDSA private key in the
-  # OPENMIX_SPARKLE_ED_PRIVATE_KEY secret (see docs/AUTOUPDATE.md).
+  # generate the Sparkle/WinSparkle appcasts + installer tree and rsync them to
+  # the openmix.dev VPS. Requires a Sparkle EdDSA private key in
+  # OPENMIX_SPARKLE_ED_PRIVATE_KEY and OPENMIX_DEPLOY_* SSH secrets
+  # (see docs/AUTOUPDATE.md).
   appcast:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [release]
@@ -190,14 +191,15 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
 
-      - name: Build appcasts
+      - name: Build appcasts + installer tree
         env:
           SPARKLE_KEY: ${{ secrets.OPENMIX_SPARKLE_ED_PRIVATE_KEY }}
           TAG: ${{ github.ref_name }}
         run: |
           VERSION="${TAG#v}"
-          BASE="https://github.com/johnqherman/OpenMix/releases/download/${TAG}"
-          mkdir -p site
+          BASE="https://openmix.dev/download/${TAG}"
+          mkdir -p site/download/${TAG}
+          cp OpenMix-macos/* OpenMix-windows/* OpenMix-linux/* site/download/${TAG}/ 2>/dev/null || true
 
           # macOS: sign the DMG with Sparkle's EdDSA key and emit a full appcast
           SIGN=$(find /opt/homebrew /usr/local -name sign_update -type f 2>/dev/null | head -1)
@@ -240,9 +242,24 @@ jobs:
           EOF
           fi
 
-      - name: Publish to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
-          keep_files: true
+          # Linux notify-fallback: tiny JSON polled by UpdateChecker
+          cat > site/latest.json <<EOF
+          {"tag_name": "${TAG}", "html_url": "https://openmix.dev/download"}
+          EOF
+
+      - name: Deploy to VPS
+        env:
+          SSH_KEY: ${{ secrets.OPENMIX_DEPLOY_SSH_KEY }}
+          SSH_HOST: ${{ secrets.OPENMIX_DEPLOY_HOST }}
+          SSH_USER: ${{ secrets.OPENMIX_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.OPENMIX_DEPLOY_PATH }}
+        run: |
+          if [ -z "$SSH_KEY" ] || [ -z "$SSH_HOST" ]; then
+            echo "::error::Missing OPENMIX_DEPLOY_* secrets; cannot publish to VPS"
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # keep old release dirs (keep_files-style); appcasts + latest.json overwrite
+          rsync -avz -e "ssh -i ~/.ssh/deploy" site/ "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/"

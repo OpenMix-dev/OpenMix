@@ -23,7 +23,7 @@
 
     <!-- Sparkle auto-update -->
     <key>SUFeedURL</key>
-    <string>https://johnqherman.github.io/OpenMix/appcast-macos.xml</string>
+    <string>https://openmix.dev/appcast-macos.xml</string>
     <key>SUEnableAutomaticChecks</key>
     <true/>
     <key>SUAutomaticallyUpdate</key>
