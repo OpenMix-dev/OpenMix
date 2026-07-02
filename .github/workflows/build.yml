@@ -124,20 +124,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: brew install qt@6 liblo
+      # official Qt macOS binaries are universal (arm64 + x86_64); brew's are
+      # arm64-only, which would make the DMG Apple-silicon-only
+      - name: Install Qt (universal)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.11.0"
+          host: "mac"
+          target: "desktop"
+          arch: "clang_64"
+
+      # brew liblo is arm64-only too; build it universal from source
+      - name: Build liblo (universal)
+        run: |
+          curl -fsSL -o liblo.tar.gz https://downloads.sourceforge.net/liblo/liblo-0.31.tar.gz
+          tar xf liblo.tar.gz
+          cd liblo-0.31
+          ./configure --prefix="$HOME/liblo-universal" \
+            --disable-tests --disable-examples --disable-tools \
+            CFLAGS="-arch arm64 -arch x86_64 -mmacosx-version-min=12.0"
+          make -j3 && make install
 
       - name: ccache
         uses: hendrikmuhs/ccache-action@v1
         with:
-          key: ${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-universal-${{ hashFiles('**/CMakeLists.txt') }}
 
       - name: Configure
         run: |
-          export PATH="/opt/homebrew/opt/qt@6/bin:$PATH"
+          export PKG_CONFIG_PATH="$HOME/liblo-universal/lib/pkgconfig:$PKG_CONFIG_PATH"
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt@6
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
 
       - name: Build
         # cap parallelism: full -j exhausts the 7GB arm64 runner on Qt PCH
@@ -149,10 +168,14 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
 
-      - name: Package (DMG)
+      - name: Verify universal binary
         run: |
-          export PATH="/opt/homebrew/opt/qt@6/bin:$PATH"
-          cd build && cpack -G DragNDrop
+          lipo -info build/OpenMix.app/Contents/MacOS/OpenMix
+          lipo -info build/OpenMix.app/Contents/MacOS/OpenMix | grep -q x86_64
+          lipo -info build/OpenMix.app/Contents/MacOS/OpenMix | grep -q arm64
+
+      - name: Package (DMG)
+        run: cd build && cpack -G DragNDrop
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
