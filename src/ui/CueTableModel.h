@@ -26,6 +26,7 @@ class CueTableModel : public QAbstractTableModel {
         ColNumber,    // Cue number
         ColName,      // Text (cue name)
         ColFx,        // read-only muted FX units
+        ColScene,     // read-only console scene numbers
         ColSnip,      // read-only console snippet indices
         ColExternal,  // linked external-playback cue (QLab/SCS/Cue Player)
         ColType,

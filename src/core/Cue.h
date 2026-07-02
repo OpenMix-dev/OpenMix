@@ -196,6 +196,21 @@ class Cue {
     }
     void removeSnippet(int snippet) { m_snippets.removeAll(snippet); }
 
+    // console scene numbers recalled on fire
+    [[nodiscard]] QList<int> scenes() const { return m_scenes; }
+    void setScenes(const QList<int>& scenes) { m_scenes = scenes; }
+    void addScene(int scene) {
+        if (!m_scenes.contains(scene))
+            m_scenes.append(scene);
+    }
+    void removeScene(int scene) { m_scenes.removeAll(scene); }
+
+    // per-channel FX-on state applied on fire (channel -> fx active)
+    [[nodiscard]] QMap<int, bool> channelFX() const { return m_channelFX; }
+    void setChannelFX(const QMap<int, bool>& fx) { m_channelFX = fx; }
+    void setChannelFX(int channel, bool active) { m_channelFX[channel] = active; }
+    void removeChannelFX(int channel) { m_channelFX.remove(channel); }
+
     // display color (hex string, e.g. "#ff0000"); empty = list default
     [[nodiscard]] QString color() const { return m_color; }
     void setColor(const QString& color) { m_color = color; }
@@ -263,6 +278,8 @@ class Cue {
 
     QMap<int, bool> m_fxMutes; // fx unit index -> muted
     QList<int> m_snippets;     // console snippet indices recalled on fire
+    QList<int> m_scenes;       // console scene numbers recalled on fire
+    QMap<int, bool> m_channelFX; // channel -> fx active
     QString m_color;          // display color (hex)
     bool m_skip = false;       // skip during standby advance
 };

@@ -94,6 +94,7 @@ void CueListView::setupUi() {
     m_tableView->setColumnWidth(CueTableModel::ColNumber, 78);
     m_tableView->setColumnWidth(CueTableModel::ColName, 220);
     m_tableView->setColumnWidth(CueTableModel::ColFx, 70);
+    m_tableView->setColumnWidth(CueTableModel::ColScene, 70);
     m_tableView->setColumnWidth(CueTableModel::ColSnip, 70);
     m_tableView->setColumnWidth(CueTableModel::ColExternal, 90);
     m_tableView->setColumnWidth(CueTableModel::ColType, 90);
@@ -192,6 +193,7 @@ void CueListView::setupDelegates() {
     // painting a selection block over it
     m_tableView->setItemDelegateForColumn(CueTableModel::ColColor, m_textDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColFx, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColScene, m_textDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColSnip, m_textDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColExternal, m_textDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColFade, m_textDelegate);

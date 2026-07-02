@@ -241,6 +241,11 @@ void Cue::mergeContentFrom(const Cue& other) {
     for (int snippet : other.m_snippets)
         if (!m_snippets.contains(snippet))
             m_snippets.append(snippet);
+    for (int scene : other.m_scenes)
+        if (!m_scenes.contains(scene))
+            m_scenes.append(scene);
+    for (auto it = other.m_channelFX.begin(); it != other.m_channelFX.end(); ++it)
+        m_channelFX.insert(it.key(), it.value());
 
     // parameter bag: other's keys overlay
     for (auto it = other.m_parameters.begin(); it != other.m_parameters.end(); ++it)
@@ -272,6 +277,8 @@ void Cue::swapContentWith(Cue& other) {
     std::swap(m_channelLevels, other.m_channelLevels);
     std::swap(m_fxMutes, other.m_fxMutes);
     std::swap(m_snippets, other.m_snippets);
+    std::swap(m_scenes, other.m_scenes);
+    std::swap(m_channelFX, other.m_channelFX);
     std::swap(m_color, other.m_color);
     std::swap(m_skip, other.m_skip);
 }
@@ -414,6 +421,20 @@ QJsonObject Cue::toJson() const {
         json["snippets"] = snippetArray;
     }
 
+    if (!m_scenes.isEmpty()) {
+        QJsonArray sceneArray;
+        for (int scene : m_scenes)
+            sceneArray.append(scene);
+        json["scenes"] = sceneArray;
+    }
+
+    if (!m_channelFX.isEmpty()) {
+        QJsonObject fxChanObj;
+        for (auto it = m_channelFX.constBegin(); it != m_channelFX.constEnd(); ++it)
+            fxChanObj[QString::number(it.key())] = it.value();
+        json["channelFX"] = fxChanObj;
+    }
+
     if (!m_color.isEmpty()) {
         json["color"] = m_color;
     }
@@ -548,6 +569,18 @@ Cue Cue::fromJson(const QJsonObject& json) {
         for (const QJsonValue& val : snippetArray) {
             cue.m_snippets.append(val.toInt());
         }
+    }
+
+    if (json.contains("scenes")) {
+        const QJsonArray sceneArray = json["scenes"].toArray();
+        for (const QJsonValue& val : sceneArray)
+            cue.m_scenes.append(val.toInt());
+    }
+
+    if (json.contains("channelFX")) {
+        const QJsonObject fxChanObj = json["channelFX"].toObject();
+        for (auto it = fxChanObj.constBegin(); it != fxChanObj.constEnd(); ++it)
+            cue.m_channelFX[it.key().toInt()] = it.value().toBool();
     }
 
     cue.m_color = json["color"].toString();

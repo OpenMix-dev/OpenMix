@@ -115,6 +115,12 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
             return cue.notes();
         case ColColor:
             return QVariant(); // shown as a ● dot via the decoration role
+        case ColScene: {
+            QStringList parts;
+            for (int s : cue.scenes())
+                parts << QString::number(s);
+            return parts.join(", ");
+        }
         case ColSnip: {
             QStringList parts;
             for (int s : cue.snippets())
@@ -226,6 +232,8 @@ QVariant CueTableModel::headerData(int section, Qt::Orientation orientation, int
         return tr("Notes");
     case ColColor:
         return QString::fromUtf8("\xE2\x97\x8F"); // ●
+    case ColScene:
+        return tr("Scene");
     case ColSnip:
         return tr("Snip");
     case ColExternal:

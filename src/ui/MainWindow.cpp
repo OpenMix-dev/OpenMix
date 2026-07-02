@@ -537,6 +537,7 @@ void MainWindow::createMenus() {
         bool visible; // default visibility
     };
     const ColumnToggle columnToggles[] = {{"&FX", CueTableModel::ColFx, true},
+                                          {"S&cene", CueTableModel::ColScene, true},
                                           {"&Snip", CueTableModel::ColSnip, true},
                                           {"&QLab", CueTableModel::ColExternal, true},
                                           {"T&ype", CueTableModel::ColType, false},
