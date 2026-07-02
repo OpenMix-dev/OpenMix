@@ -210,7 +210,6 @@ jobs:
           if [ -n "$SPARKLE_KEY" ] && [ -n "$SIGN" ] && [ -n "$DMG" ]; then
             echo "$SPARKLE_KEY" > /tmp/ed_key
             SIG=$("$SIGN" -f /tmp/ed_key "$DMG")   # prints sparkle:edSignature=... length=...
-            LEN=$(stat -f%z "$DMG")
             cat > site/appcast-macos.xml <<EOF
           <?xml version="1.0"?>
           <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
@@ -219,7 +218,7 @@ jobs:
                 <title>OpenMix ${VERSION}</title>
                 <sparkle:version>${VERSION}</sparkle:version>
                 <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
-                <enclosure url="${BASE}/$(basename "$DMG")" ${SIG} sparkle:version="${VERSION}" length="${LEN}" type="application/octet-stream"/>
+                <enclosure url="${BASE}/$(basename "$DMG")" ${SIG} sparkle:version="${VERSION}" type="application/octet-stream"/>
               </item>
             </channel>
           </rss>
@@ -249,6 +248,22 @@ jobs:
           cat > site/latest.json <<EOF
           {"tag_name": "${TAG}", "html_url": "https://openmix.dev/download"}
           EOF
+
+          # download landing page: nginx autoindex is off, so /download/
+          # 403s without an index.html. list the current release's files.
+          {
+            echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            echo '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            echo "<title>Download OpenMix ${VERSION}</title>"
+            echo '<style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem;line-height:1.7}a{color:#2563eb}</style>'
+            echo "</head><body><h1>Download OpenMix ${VERSION}</h1><ul>"
+            for f in site/download/${TAG}/*; do
+              [ -f "$f" ] || continue
+              n=$(basename "$f")
+              echo "<li><a href=\"${TAG}/${n}\">${n}</a></li>"
+            done
+            echo '</ul></body></html>'
+          } > site/download/index.html
 
       - name: Deploy to VPS
         env:
