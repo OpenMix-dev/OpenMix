@@ -17,9 +17,11 @@
 #include "theme/Theme.h"
 
 #include <QHeaderView>
+#include <QInputDialog>
 #include <QLabel>
 #include <QKeyEvent>
 #include <QMenu>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -121,6 +123,9 @@ void CueListView::setupUi() {
     m_tableView->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_tableView, &QTableView::customContextMenuRequested, this,
             &CueListView::showContextMenu);
+
+    // double-click a recall cell opens a focused assign prompt
+    connect(m_tableView, &QTableView::doubleClicked, this, &CueListView::onCellDoubleClicked);
 
     // connections
     connect(m_tableView->selectionModel(), &QItemSelectionModel::selectionChanged, this,
@@ -597,6 +602,100 @@ void CueListView::beginRenameSelected() {
     if (proxy.isValid()) {
         m_tableView->setCurrentIndex(proxy);
         m_tableView->edit(proxy);
+    }
+}
+
+void CueListView::onCellDoubleClicked(const QModelIndex& proxyIndex) {
+    if (!proxyIndex.isValid())
+        return;
+    const QModelIndex src = m_proxyModel->mapToSource(proxyIndex);
+    const int row = src.row();
+    const int col = src.column();
+    CueList* list = m_app->show()->cueList();
+    if (row < 0 || row >= list->count())
+        return;
+    Cue cue = list->at(row);
+
+    auto commit = [&]() {
+        list->updateCue(row, cue);
+        emit cueSelected(row);
+    };
+    auto parseInts = [](const QString& text) {
+        QList<int> out;
+        for (const QString& part : text.split(QRegularExpression("[,\\s]+"), Qt::SkipEmptyParts)) {
+            bool ok = false;
+            const int v = part.toInt(&ok);
+            if (ok)
+                out.append(v);
+        }
+        return out;
+    };
+
+    // per-DCA assignment cell: set the DCA's label/mute override
+    const int dca = m_model->dcaOfColumn(col);
+    if (dca > 0 && m_model->dcaSubColumn(col) == 0) {
+        const DCAOverride cur = cue.dcaOverride(dca);
+        bool ok = false;
+        const QString label = QInputDialog::getText(
+            this, tr("Assign DCA %1").arg(dca), tr("Label (blank to clear):"), QLineEdit::Normal,
+            cur.label.value_or(QString()), &ok);
+        if (!ok)
+            return;
+        DCAOverride ov;
+        if (!label.isEmpty())
+            ov.label = label;
+        cue.setDCAOverride(dca, ov);
+        commit();
+        return;
+    }
+
+    switch (col) {
+    case CueTableModel::ColScene: {
+        bool ok = false;
+        QStringList cur;
+        for (int s : cue.scenes())
+            cur << QString::number(s);
+        const QString text = QInputDialog::getText(this, tr("Assign Scenes"),
+                                                   tr("Scene numbers (comma separated):"),
+                                                   QLineEdit::Normal, cur.join(", "), &ok);
+        if (ok) {
+            cue.setScenes(parseInts(text));
+            commit();
+        }
+        return;
+    }
+    case CueTableModel::ColSnip: {
+        bool ok = false;
+        QStringList cur;
+        for (int s : cue.snippets())
+            cur << QString::number(s);
+        const QString text = QInputDialog::getText(this, tr("Assign Snippets"),
+                                                   tr("Snippet indices (comma separated):"),
+                                                   QLineEdit::Normal, cur.join(", "), &ok);
+        if (ok) {
+            cue.setSnippets(parseInts(text));
+            commit();
+        }
+        return;
+    }
+    case CueTableModel::ColExternal: {
+        bool ok = false;
+        const QString text =
+            QInputDialog::getText(this, tr("Assign External Cue"), tr("Playback cue id:"),
+                                  QLineEdit::Normal, cue.qLabCue(), &ok);
+        if (ok) {
+            cue.setQLabCue(text.trimmed());
+            commit();
+        }
+        return;
+    }
+    default:
+        // editable text columns edit in place; other cells open the full editor
+        if (col != CueTableModel::ColNumber && col != CueTableModel::ColName &&
+            col != CueTableModel::ColType && col != CueTableModel::ColGroup &&
+            col != CueTableModel::ColTags && col != CueTableModel::ColNotes)
+            emit cueDoubleClicked(row);
+        return;
     }
 }
 
