@@ -137,7 +137,9 @@ jobs:
             -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt@6
 
       - name: Build
-        run: cmake --build build --config Release --parallel
+        # cap parallelism: full -j exhausts the 7GB arm64 runner on Qt PCH
+        # (cc1plus), starving/killing the runner ("lost communication")
+        run: cmake --build build --config Release --parallel 2
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
