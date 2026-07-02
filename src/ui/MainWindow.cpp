@@ -162,7 +162,7 @@ void MainWindow::createActions() {
     m_deleteCueAction->setToolTip(tr("Delete cue (Del)"));
     connect(m_deleteCueAction, &QAction::triggered, this, &MainWindow::deleteCue);
 
-    m_renumberAction = new QAction(tr("&Renumber Cues..."), this);
+    m_renumberAction = new QAction(tr("&Renumber Cues"), this);
     m_renumberAction->setToolTip(tr("Renumber all cues sequentially"));
     connect(m_renumberAction, &QAction::triggered, this, &MainWindow::renumberCues);
 
@@ -259,12 +259,12 @@ void MainWindow::createActions() {
     m_nextCueAction->setToolTip(tr("Next cue (Down)"));
     connect(m_nextCueAction, &QAction::triggered, [this]() { m_app->playbackEngine()->next(); });
 
-    m_panicAction = new QAction(Icons::warning(), tr("PANIC"), this);
+    m_panicAction = new QAction(Icons::warning(), tr("&PANIC"), this);
     m_panicAction->setShortcut(Qt::SHIFT | Qt::Key_Escape);
     m_panicAction->setToolTip(tr("Panic (Shift+Esc)"));
     connect(m_panicAction, &QAction::triggered, this, &MainWindow::panic);
 
-    m_panicRestoreAction = new QAction(Icons::warning(), tr("Panic + Restore"), this);
+    m_panicRestoreAction = new QAction(Icons::warning(), tr("Pa&nic + Restore"), this);
     m_panicRestoreAction->setShortcut(Qt::CTRL | Qt::SHIFT | Qt::Key_Escape);
     m_panicRestoreAction->setToolTip(
         tr("Panic then restore to previous state (Ctrl+Shift+Escape)"));
@@ -342,7 +342,7 @@ void MainWindow::createActions() {
     m_cueZeroAction->setToolTip(tr("Edit the base/reset state recalled before the first cue"));
     connect(m_cueZeroAction, &QAction::triggered, this, &MainWindow::showCueZeroDialog);
 
-    m_editHistoryAction = new QAction(tr("Edit &History"), this);
+    m_editHistoryAction = new QAction(tr("Edit &History..."), this);
     m_editHistoryAction->setToolTip(tr("Browse and step through the edit history"));
     connect(m_editHistoryAction, &QAction::triggered, this, &MainWindow::showEditHistoryDialog);
 
@@ -350,7 +350,7 @@ void MainWindow::createActions() {
     m_exportCsvAction->setToolTip(tr("Export the cue list to a CSV file"));
     connect(m_exportCsvAction, &QAction::triggered, this, &MainWindow::exportCuesToCsv);
 
-    m_channelUtilizationAction = new QAction(tr("Channel &Utilization"), this);
+    m_channelUtilizationAction = new QAction(tr("Channel &Utilization..."), this);
     m_channelUtilizationAction->setToolTip(tr("Show which cues use each input channel"));
     connect(m_channelUtilizationAction, &QAction::triggered, this,
             &MainWindow::showChannelUtilizationDialog);
@@ -365,20 +365,20 @@ void MainWindow::createActions() {
     connect(m_showLogViewerAction, &QAction::triggered, this, &MainWindow::showLogViewerDialog);
 
     // settings actions
-    m_keyboardShortcutsAction = new QAction(tr("Keyboard Shortcuts..."), this);
+    m_keyboardShortcutsAction = new QAction(tr("&Keyboard Shortcuts..."), this);
     m_keyboardShortcutsAction->setToolTip(tr("Configure keyboard shortcuts"));
     connect(m_keyboardShortcutsAction, &QAction::triggered, this,
             &MainWindow::showKeyboardShortcutsDialog);
 
-    m_midiControllerAction = new QAction(tr("MIDI Controller..."), this);
+    m_midiControllerAction = new QAction(tr("&MIDI Controller..."), this);
     m_midiControllerAction->setToolTip(tr("Configure MIDI controller mappings"));
     connect(m_midiControllerAction, &QAction::triggered, this, &MainWindow::showMidiConfigDialog);
 
-    m_remoteControlAction = new QAction(Icons::remoteControl(), tr("Remote Control..."), this);
+    m_remoteControlAction = new QAction(Icons::remoteControl(), tr("&Remote Control..."), this);
     m_remoteControlAction->setToolTip(tr("Configure MSC, inbound OSC, and QLab remote control"));
     connect(m_remoteControlAction, &QAction::triggered, this, &MainWindow::showRemoteControlDialog);
 
-    m_appSettingsAction = new QAction(tr("Settings..."), this);
+    m_appSettingsAction = new QAction(tr("&Settings..."), this);
     m_appSettingsAction->setToolTip(
         tr("Console behavior, scribble highlight, channel monitor, and QLab settings"));
     connect(m_appSettingsAction, &QAction::triggered, this, &MainWindow::showSettingsDialog);

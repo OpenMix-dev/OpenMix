@@ -264,6 +264,8 @@ class VoiceEditorWidget : public QWidget {
         auto* freq = new QDoubleSpinBox(m_eqTable);
         freq->setRange(20.0, 20000.0);
         freq->setDecimals(0);
+        freq->setSuffix(tr(" Hz"));
+        freq->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         freq->setValue(b.freq);
         connect(freq, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
                 [this](double) { notify(); });
@@ -272,6 +274,8 @@ class VoiceEditorWidget : public QWidget {
         auto* gain = new QDoubleSpinBox(m_eqTable);
         gain->setRange(-18.0, 18.0);
         gain->setDecimals(1);
+        gain->setSuffix(tr(" dB"));
+        gain->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         gain->setValue(b.gain);
         connect(gain, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
                 [this](double) { notify(); });

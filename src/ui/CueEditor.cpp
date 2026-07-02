@@ -84,6 +84,7 @@ void CueEditor::setupUi() {
     m_typeCombo->addItem(tr("Stop"), static_cast<int>(CueType::Stop));
     m_typeCombo->addItem(tr("Go To"), static_cast<int>(CueType::GoTo));
     m_typeCombo->addItem(tr("Wait"), static_cast<int>(CueType::Wait));
+    m_typeCombo->addItem(tr("Macro"), static_cast<int>(CueType::Macro));
     basicLayout->addRow(tr("Type:"), m_typeCombo);
 
     QWidget* colorRow = new QWidget(this);
@@ -167,13 +168,13 @@ void CueEditor::setupUi() {
 
         DCAOverrideWidgets widgets;
 
-        widgets.enableMute = new QCheckBox(tr("Set Mute:"), dcaBox);
+        widgets.enableMute = new QCheckBox(tr("Set Mute"), dcaBox);
         widgets.muteValue = new QCheckBox(tr("Muted"), dcaBox);
         widgets.muteValue->setEnabled(false);
         dcaLayout->addWidget(widgets.enableMute, 0, 0);
         dcaLayout->addWidget(widgets.muteValue, 0, 1);
 
-        widgets.enableLabel = new QCheckBox(tr("Set Label:"), dcaBox);
+        widgets.enableLabel = new QCheckBox(tr("Set Label"), dcaBox);
         widgets.labelValue = new QLineEdit(dcaBox);
         widgets.labelValue->setPlaceholderText(tr("DCA label"));
         widgets.labelValue->setEnabled(false);
@@ -442,26 +443,9 @@ void CueEditor::updateFromCue() {
         m_numberSpin->setValue(cue->number());
         m_nameEdit->setText(cue->name());
 
-        // map cue type to combo index
-        int typeIndex = 0;
-        switch (cue->type()) {
-        case CueType::Snapshot:
-            typeIndex = 0;
-            break;
-        case CueType::Stop:
-            typeIndex = 1;
-            break;
-        case CueType::GoTo:
-            typeIndex = 2;
-            break;
-        case CueType::Wait:
-            typeIndex = 3;
-            break;
-        case CueType::Macro:
-            typeIndex = 0;
-            break; // macro not in combo
-        }
-        m_typeCombo->setCurrentIndex(typeIndex);
+        // map cue type to combo index by its stored data (robust to ordering)
+        const int typeIndex = m_typeCombo->findData(static_cast<int>(cue->type()));
+        m_typeCombo->setCurrentIndex(typeIndex < 0 ? 0 : typeIndex);
 
         m_autoFollowCheck->setChecked(cue->autoFollow());
         m_autoFollowDelaySpin->setValue(cue->autoFollowDelay());
@@ -639,21 +623,7 @@ void CueEditor::onTypeChanged(int index) {
         return;
     Cue* cue = currentCue();
     if (cue) {
-        CueType type = CueType::Snapshot;
-        switch (index) {
-        case 0:
-            type = CueType::Snapshot;
-            break;
-        case 1:
-            type = CueType::Stop;
-            break;
-        case 2:
-            type = CueType::GoTo;
-            break;
-        case 3:
-            type = CueType::Wait;
-            break;
-        }
+        const CueType type = static_cast<CueType>(m_typeCombo->itemData(index).toInt());
         cue->setType(type);
         m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
         emit cueModified();
