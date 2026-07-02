@@ -105,6 +105,7 @@ class MainWindow : public QMainWindow {
     void showLogViewerDialog();
     void showQuickStart();
     void showFeatureGuide();
+    void checkForUpdates();
     void showEditHistoryDialog();
     void exportCuesToCsv();
     void showChannelUtilizationDialog();
@@ -243,6 +244,7 @@ class MainWindow : public QMainWindow {
     // help actions
     QAction* m_quickStartAction;
     QAction* m_featureGuideAction;
+    QAction* m_checkUpdatesAction;
     QAction* m_aboutAction;
 
     // status bar

@@ -86,6 +86,7 @@ set(SOURCES
     src/app/ReaperClient.cpp
     src/app/CuePlayerClient.cpp
     src/app/ScsClient.cpp
+    src/app/UpdateChecker.cpp
     src/core/Cue.cpp
     src/core/CueList.cpp
     src/core/Show.cpp
@@ -203,6 +204,7 @@ set(HEADERS
     src/app/ReaperClient.h
     src/app/CuePlayerClient.h
     src/app/ScsClient.h
+    src/app/UpdateChecker.h
     src/core/Cue.h
     src/core/CueList.h
     src/core/Show.h
@@ -393,6 +395,18 @@ install(TARGETS ${PROJECT_NAME}
     BUNDLE DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+# bundle the Qt runtime into the install tree so the Windows (NSIS) and macOS
+# (DragNDrop) installers are self-contained. Linux relies on packaged Qt deps
+# (CPACK_DEBIAN_PACKAGE_SHLIBDEPS below).
+if(WIN32 OR APPLE)
+    qt_generate_deploy_app_script(
+        TARGET ${PROJECT_NAME}
+        OUTPUT_SCRIPT openmix_deploy_script
+        NO_UNSUPPORTED_PLATFORM_ERROR
+    )
+    install(SCRIPT ${openmix_deploy_script})
+endif()
 
 # desktop entry + icon (Linux/BSD)
 if(UNIX AND NOT APPLE)

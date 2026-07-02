@@ -25,6 +25,7 @@
 #include "RemoteControlDialog.h"
 #include "SettingsDialog.h"
 #include "app/Application.h"
+#include "app/UpdateChecker.h"
 #include "app/QLabClient.h"
 #include "core/AppLogger.h"
 #include "core/CueList.h"
@@ -59,6 +60,7 @@
 #include <QPlainTextEdit>
 #include <QTextEdit>
 #include <QToolButton>
+#include <QDesktopServices>
 #include <QMessageBox>
 #include <QTextStream>
 #include <QUndoView>
@@ -406,6 +408,10 @@ void MainWindow::createActions() {
     m_featureGuideAction->setToolTip(tr("Tour of the panels and features"));
     connect(m_featureGuideAction, &QAction::triggered, this, &MainWindow::showFeatureGuide);
 
+    m_checkUpdatesAction = new QAction(tr("Check for &Updates..."), this);
+    m_checkUpdatesAction->setToolTip(tr("See if a newer release is available"));
+    connect(m_checkUpdatesAction, &QAction::triggered, this, &MainWindow::checkForUpdates);
+
     m_aboutAction = new QAction(tr("&About OpenMix"), this);
     m_aboutAction->setToolTip(tr("About this application"));
     connect(m_aboutAction, &QAction::triggered, [this]() {
@@ -600,6 +606,7 @@ void MainWindow::createMenus() {
     m_helpMenu->addSeparator();
     m_helpMenu->addAction(m_quickStartAction);
     m_helpMenu->addAction(m_featureGuideAction);
+    m_helpMenu->addAction(m_checkUpdatesAction);
     m_helpMenu->addAction(m_aboutAction);
 }
 
@@ -1479,6 +1486,34 @@ void MainWindow::showQuickStart() {
         "<tt>.tmix</tt> database directly.</p>");
     HelpDialog dialog(tr("Quick Start"), html, this);
     dialog.exec();
+}
+
+void MainWindow::checkForUpdates() {
+    statusBar()->showMessage(tr("Checking for updates..."), 3000);
+    auto* checker = new UpdateChecker(this);
+    connect(checker, &UpdateChecker::updateAvailable, this,
+            [this, checker](const QString& version, const QString& url) {
+                checker->deleteLater();
+                const auto choice = QMessageBox::question(
+                    this, tr("Update Available"),
+                    tr("OpenMix %1 is available (you have %2).\n\nOpen the download page?")
+                        .arg(version, QCoreApplication::applicationVersion()),
+                    QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+                if (choice == QMessageBox::Yes)
+                    QDesktopServices::openUrl(QUrl(url));
+            });
+    connect(checker, &UpdateChecker::upToDate, this, [this, checker]() {
+        checker->deleteLater();
+        QMessageBox::information(this, tr("Up to Date"),
+                                 tr("You are running the latest version (%1).")
+                                     .arg(QCoreApplication::applicationVersion()));
+    });
+    connect(checker, &UpdateChecker::checkFailed, this, [this, checker](const QString& error) {
+        checker->deleteLater();
+        QMessageBox::warning(this, tr("Update Check Failed"),
+                             tr("Could not check for updates:\n%1").arg(error));
+    });
+    checker->checkForUpdates();
 }
 
 void MainWindow::showFeatureGuide() {
