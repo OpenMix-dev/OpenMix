@@ -15,6 +15,7 @@ namespace OpenMix {
 class Application;
 class CueListView;
 class CueEditor;
+class ChannelStripPanel;
 class ConnectionPanel;
 class MixerFeedbackPanel;
 class DCAMappingPanel;
@@ -70,6 +71,7 @@ class MainWindow : public QMainWindow {
     void toggleConnectionPanel();
     void toggleMixerFeedbackPanel();
     void toggleCueEditorPanel();
+    void toggleChannelStrip();
     void toggleDCAMappingPanel();
     void toggleActorSetupPanel();
     void toggleEnsemblePanel();
@@ -137,6 +139,7 @@ class MainWindow : public QMainWindow {
     // pop-out window contents (owned by pop-out windows)
     ConnectionPanel* m_connectionPanel;
     MixerFeedbackPanel* m_mixerFeedbackPanel;
+    ChannelStripPanel* m_channelStrip;
     DCAMappingPanel* m_dcaMappingPanel;
     ActorSetupPanel* m_actorSetupPanel;
     EnsemblePanel* m_ensemblePanel;
@@ -147,6 +150,7 @@ class MainWindow : public QMainWindow {
     // pop-out windows
     PopOutWindow* m_connectionPopOut;
     PopOutWindow* m_cueEditorPopOut;
+    PopOutWindow* m_mixerFeedbackPopOut;
     PopOutWindow* m_dcaMappingPopOut;
     PopOutWindow* m_actorSetupPopOut;
     PopOutWindow* m_ensemblePopOut;

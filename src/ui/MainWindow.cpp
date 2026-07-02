@@ -2,6 +2,7 @@
 #include "ActorSetupPanel.h"
 #include "BubbleBar.h"
 #include "BubbleButton.h"
+#include "ChannelStripPanel.h"
 #include "ConnectionPanel.h"
 #include "CueEditor.h"
 #include "ActiveCueInfoPanel.h"
@@ -103,11 +104,11 @@ void MainWindow::setupUi() {
 
     m_cueListView = new CueListView(m_app, this);
     m_cueEditor = new CueEditor(m_app, this); // parented to a pop-out below
-    m_mixerFeedbackPanel = new MixerFeedbackPanel(m_app, this);
-    m_mixerFeedbackPanel->setMaximumHeight(240);
+    m_channelStrip = new ChannelStripPanel(m_app, this);
+    m_channelStrip->setMaximumHeight(240);
 
     m_mainSplitter->addWidget(m_cueListView);
-    m_mainSplitter->addWidget(m_mixerFeedbackPanel);
+    m_mainSplitter->addWidget(m_channelStrip);
     m_mainSplitter->setStretchFactor(0, 5);
     m_mainSplitter->setStretchFactor(1, 1);
     m_mainSplitter->setChildrenCollapsible(false);
@@ -295,7 +296,7 @@ void MainWindow::createActions() {
     m_showMixerFeedbackAction->setShortcut(Qt::Key_F6);
     m_showMixerFeedbackAction->setToolTip(tr("Show/hide the channel-status strip (F6)"));
     connect(m_showMixerFeedbackAction, &QAction::triggered, this,
-            &MainWindow::toggleMixerFeedbackPanel);
+            &MainWindow::toggleChannelStrip);
 
     m_showCueEditorAction = new QAction(Icons::sliders(), tr("Cue &Editor"), this);
     m_showCueEditorAction->setCheckable(true);
@@ -713,6 +714,15 @@ void MainWindow::createPopOutWindows() {
 
     connect(m_cueEditorPopOut, &PopOutWindow::visibilityChanged,
             [this](bool visible) { m_showCueEditorAction->setChecked(visible); });
+
+    // DCA fader feedback is a pop-out (the bottom strip shows per-channel status)
+    m_mixerFeedbackPanel = new MixerFeedbackPanel(m_app, nullptr);
+    m_mixerFeedbackPopOut = new PopOutWindow("mixerFeedback", tr("Mixer Feedback"), this);
+    m_mixerFeedbackPopOut->setContentWidget(m_mixerFeedbackPanel);
+    m_mixerFeedbackPopOut->setMinimumContentSize(400, 350);
+
+    connect(m_mixerFeedbackPopOut, &PopOutWindow::visibilityChanged,
+            [this](bool visible) { m_bubbleBar->setButtonActive("mixer", visible); });
 
     m_dcaMappingPanel = new DCAMappingPanel(m_app, nullptr);
     m_dcaMappingPopOut = new PopOutWindow("dcaMapping", tr("DCA Mapping"), this);
@@ -1168,11 +1178,16 @@ void MainWindow::toggleConnectionPanel() {
 }
 
 void MainWindow::toggleMixerFeedbackPanel() {
-    // the mixer feedback is the bottom channel-status strip; toggle its visibility
-    const bool show = !m_mixerFeedbackPanel->isVisible();
-    m_mixerFeedbackPanel->setVisible(show);
+    if (m_mixerFeedbackPopOut->isVisible())
+        m_mixerFeedbackPopOut->hide();
+    else
+        m_mixerFeedbackPopOut->showAndRestore();
+}
+
+void MainWindow::toggleChannelStrip() {
+    const bool show = !m_channelStrip->isVisible();
+    m_channelStrip->setVisible(show);
     m_showMixerFeedbackAction->setChecked(show);
-    m_bubbleBar->setButtonActive("mixer", show);
 }
 
 void MainWindow::toggleCueEditorPanel() {

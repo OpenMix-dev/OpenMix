@@ -114,6 +114,7 @@ set(SOURCES
     src/core/AppLogger.cpp
     src/core/ConnectionLogBridge.cpp
     src/ui/MainWindow.cpp
+    src/ui/ChannelStripPanel.cpp
     src/ui/CueListView.cpp
     src/ui/CueEditor.cpp
     src/ui/CollapsibleSection.cpp
@@ -231,6 +232,7 @@ set(HEADERS
     src/core/AppLogger.h
     src/core/ConnectionLogBridge.h
     src/ui/MainWindow.h
+    src/ui/ChannelStripPanel.h
     src/ui/CueListView.h
     src/ui/CueEditor.h
     src/ui/CollapsibleSection.h
