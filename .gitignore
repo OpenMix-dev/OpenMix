@@ -6,3 +6,6 @@ build/
 *.swp
 
 .DS_Store
+
+# clangd compile database (symlink into build/)
+compile_commands.json
