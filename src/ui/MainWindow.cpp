@@ -563,8 +563,6 @@ void MainWindow::createMenus() {
     const ColumnToggle columnToggles[] = {{"&FX", CueTableModel::ColFx, true},
                                           {"&Snip", CueTableModel::ColSnip, true},
                                           {"&QLab", CueTableModel::ColExternal, true},
-                                          {"&DCAs", CueTableModel::ColDca, true},
-                                          {"&Positions", CueTableModel::ColPosition, true},
                                           {"T&ype", CueTableModel::ColType, false},
                                           {"&Group", CueTableModel::ColGroup, false},
                                           {"&Tags", CueTableModel::ColTags, false},
@@ -579,6 +577,16 @@ void MainWindow::createMenus() {
         connect(action, &QAction::toggled, this,
                 [this, column](bool on) { m_cueListView->setColumnVisible(column, on); });
     }
+    columnsMenu->addSeparator();
+    // per-DCA fx / pos sub-columns (off by default, mirroring the console app)
+    QAction* fxCols = columnsMenu->addAction(tr("DCA F&X Columns"));
+    fxCols->setCheckable(true);
+    connect(fxCols, &QAction::toggled, this,
+            [this](bool on) { m_cueListView->setDcaSubColumnsVisible(1, on); });
+    QAction* posCols = columnsMenu->addAction(tr("DCA P&os Columns"));
+    posCols->setCheckable(true);
+    connect(posCols, &QAction::toggled, this,
+            [this](bool on) { m_cueListView->setDcaSubColumnsVisible(2, on); });
     m_viewMenu->addSeparator();
     m_viewMenu->addAction(m_cueZeroAction);
     m_viewMenu->addSeparator();

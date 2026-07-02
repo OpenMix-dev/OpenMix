@@ -38,7 +38,28 @@ int CueTableModel::rowCount(const QModelIndex& parent) const {
 int CueTableModel::columnCount(const QModelIndex& parent) const {
     if (parent.isValid())
         return 0;
-    return ColCount;
+    return ColCount + m_dcaCount * DcaSubCols;
+}
+
+void CueTableModel::setDcaCount(int count) {
+    count = qBound(0, count, 64);
+    if (count == m_dcaCount)
+        return;
+    beginResetModel();
+    m_dcaCount = count;
+    endResetModel();
+}
+
+int CueTableModel::dcaSubColumn(int col) const {
+    if (col < ColCount || col >= ColCount + m_dcaCount * DcaSubCols)
+        return -1;
+    return (col - ColCount) % DcaSubCols;
+}
+
+int CueTableModel::dcaOfColumn(int col) const {
+    if (col < ColCount || col >= ColCount + m_dcaCount * DcaSubCols)
+        return -1;
+    return (col - ColCount) / DcaSubCols + 1; // 1-based
 }
 
 QVariant CueTableModel::data(const QModelIndex& index, int role) const {
@@ -54,6 +75,22 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
     const Cue& cue = m_cueList->at(row);
 
     if (role == Qt::DisplayRole || role == Qt::EditRole) {
+        // per-DCA triplet columns: [assignment | fx | pos]
+        const int sub = dcaSubColumn(col);
+        if (sub >= 0) {
+            const int dca = dcaOfColumn(col);
+            const DCAOverride ov = cue.dcaOverride(dca);
+            if (sub == 0) { // assignment: the cue's DCA label / mute override
+                if (ov.label.has_value())
+                    return *ov.label;
+                if (ov.mute.has_value())
+                    return *ov.mute ? tr("mute") : tr("on");
+            }
+            // sub 1 (fx) and sub 2 (pos) are per-DCA-channel data OpenMix does
+            // not yet model at this layer; the columns exist and are toggleable
+            return QString();
+        }
+
         switch (col) {
         case ColNumber: {
             const QString num = QString::number(cue.number(), 'f', 1);
@@ -86,19 +123,6 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
         }
         case ColExternal:
             return cue.qLabCue();
-        case ColDca: {
-            QStringList parts;
-            const QMap<int, DCAOverride> overrides = cue.dcaOverrides();
-            for (auto it = overrides.begin(); it != overrides.end(); ++it) {
-                if (it.value().label.has_value())
-                    parts << QString("%1:%2").arg(it.key()).arg(*it.value().label);
-            }
-            return parts.join(", ");
-        }
-        case ColPosition: {
-            const int count = cue.channelPositions().size();
-            return count > 0 ? tr("%n ch", "", count) : QString();
-        }
         case ColFx: {
             QStringList parts;
             const QMap<int, bool> mutes = cue.fxMutes();
@@ -174,6 +198,19 @@ QVariant CueTableModel::headerData(int section, Qt::Orientation orientation, int
         return QVariant();
     }
 
+    // per-DCA triplet headers
+    const int sub = dcaSubColumn(section);
+    if (sub >= 0) {
+        switch (sub) {
+        case 0:
+            return tr("DCA %1").arg(dcaOfColumn(section));
+        case 1:
+            return tr("fx");
+        case 2:
+            return tr("pos");
+        }
+    }
+
     switch (section) {
     case ColNumber:
         return tr("Cue");
@@ -193,10 +230,6 @@ QVariant CueTableModel::headerData(int section, Qt::Orientation orientation, int
         return tr("Snip");
     case ColExternal:
         return tr("QLab");
-    case ColDca:
-        return tr("DCAs");
-    case ColPosition:
-        return tr("Positions");
     case ColFx:
         return tr("FX");
     case ColFade:

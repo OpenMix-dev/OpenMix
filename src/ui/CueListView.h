@@ -53,6 +53,7 @@ class CueListView : public QWidget {
     void setEditingLocked(bool locked); // make the cue table read-only
     void setRowHeight(int pixels);      // cue-table row height
     void setColumnVisible(int column, bool visible);
+    void setDcaSubColumnsVisible(int sub, bool visible); // sub 1=fx, 2=pos
 
     [[nodiscard]] bool hasClipboardCue() const { return m_clipboard.has_value(); }
 

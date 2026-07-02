@@ -17,6 +17,10 @@ class CueTableModel : public QAbstractTableModel {
     // Order mirrors the reference console layout: colour dot, cue number, text,
     // then recall summaries; editing columns (Type/Group/Tags/Notes/Fade) trail
     // and are hidden by default.
+    // Fixed columns first; the per-DCA triplet columns [DCA n | fx | pos] are
+    // appended dynamically after ColCount (see columnCount()). The trailing
+    // fixed columns (Type..Fade) are hidden by default, so the visible order is
+    // colour, Cue, Text, FX, Snip, QLab, then the DCA triplets.
     enum Column {
         ColColor = 0, // ● cue colour dot
         ColNumber,    // Cue number
@@ -24,8 +28,6 @@ class CueTableModel : public QAbstractTableModel {
         ColFx,        // read-only muted FX units
         ColSnip,      // read-only console snippet indices
         ColExternal,  // linked external-playback cue (QLab/SCS/Cue Player)
-        ColDca,       // read-only summary of DCA overrides (channel labels)
-        ColPosition,  // read-only count of positioned channels
         ColType,
         ColGroup,
         ColTags,
@@ -33,6 +35,14 @@ class CueTableModel : public QAbstractTableModel {
         ColFade, // fade duration (instant / seconds)
         ColCount
     };
+
+    // per-DCA columns appended after the fixed ones
+    static constexpr int DcaSubCols = 3; // [assignment | fx | pos]
+    [[nodiscard]] int dcaCount() const { return m_dcaCount; }
+    void setDcaCount(int count);
+    // sub-column 0=assignment, 1=fx, 2=pos, or -1 if col is not a DCA column
+    [[nodiscard]] int dcaSubColumn(int col) const;
+    [[nodiscard]] int dcaOfColumn(int col) const; // 1-based DCA, or -1
 
     explicit CueTableModel(CueList* cueList, QObject* parent = nullptr);
 
@@ -85,6 +95,7 @@ class CueTableModel : public QAbstractTableModel {
     CueList* m_cueList;
     int m_currentIndex = -1;
     int m_standbyIndex = -1;
+    int m_dcaCount = 8;
 
     static const QString s_mimeType;
 };

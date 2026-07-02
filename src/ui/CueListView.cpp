@@ -96,12 +96,18 @@ void CueListView::setupUi() {
     m_tableView->setColumnWidth(CueTableModel::ColFx, 70);
     m_tableView->setColumnWidth(CueTableModel::ColSnip, 70);
     m_tableView->setColumnWidth(CueTableModel::ColExternal, 90);
-    m_tableView->setColumnWidth(CueTableModel::ColDca, 120);
-    m_tableView->setColumnWidth(CueTableModel::ColPosition, 80);
     m_tableView->setColumnWidth(CueTableModel::ColType, 90);
     m_tableView->setColumnWidth(CueTableModel::ColGroup, 100);
     m_tableView->setColumnWidth(CueTableModel::ColTags, 120);
     m_tableView->setColumnWidth(CueTableModel::ColFade, 72);
+
+    // per-DCA triplet columns: narrow, and hide the fx/pos sub-columns by default
+    for (int c = CueTableModel::ColCount; c < m_model->columnCount(); ++c) {
+        const int sub = m_model->dcaSubColumn(c);
+        m_tableView->setColumnWidth(c, sub == 0 ? 60 : 40);
+        if (sub == 1 || sub == 2)
+            m_tableView->setColumnHidden(c, true);
+    }
 
     // columns are user-resizable; remember widths across sessions
     m_tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
@@ -171,6 +177,10 @@ void CueListView::setupDelegates() {
     m_typeDelegate = new CueTypeDelegate(this);
     m_textDelegate = new CueTextDelegate(this);
 
+    // default delegate covers the dynamic per-DCA columns (strips the selection
+    // block so the row's standby/current colour shows through)
+    m_tableView->setItemDelegate(m_textDelegate);
+
     // assign delegates to columns
     m_tableView->setItemDelegateForColumn(CueTableModel::ColNumber, m_numberDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColName, m_textDelegate);
@@ -181,8 +191,6 @@ void CueListView::setupDelegates() {
     // remaining columns: honor the row's standby/current background instead of
     // painting a selection block over it
     m_tableView->setItemDelegateForColumn(CueTableModel::ColColor, m_textDelegate);
-    m_tableView->setItemDelegateForColumn(CueTableModel::ColDca, m_textDelegate);
-    m_tableView->setItemDelegateForColumn(CueTableModel::ColPosition, m_textDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColFx, m_textDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColSnip, m_textDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColExternal, m_textDelegate);
@@ -501,6 +509,12 @@ void CueListView::setRowHeight(int pixels) {
 
 void CueListView::setColumnVisible(int column, bool visible) {
     m_tableView->setColumnHidden(column, !visible);
+}
+
+void CueListView::setDcaSubColumnsVisible(int sub, bool visible) {
+    for (int c = CueTableModel::ColCount; c < m_model->columnCount(); ++c)
+        if (m_model->dcaSubColumn(c) == sub)
+            m_tableView->setColumnHidden(c, !visible);
 }
 
 void CueListView::setEditingLocked(bool locked) {
