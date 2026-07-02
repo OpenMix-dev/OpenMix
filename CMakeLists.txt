@@ -499,7 +499,9 @@ set(CPACK_PACKAGE_INSTALL_DIRECTORY "OpenMix")
 set(CPACK_PACKAGE_CONTACT "OpenMix")
 
 if(WIN32)
-    set(CPACK_GENERATOR "NSIS")
+    # NSIS installer + portable ZIP (install tree is self-contained: Qt
+    # runtime, liblo and WinSparkle DLLs are all deployed into it)
+    set(CPACK_GENERATOR "NSIS;ZIP")
     set(CPACK_NSIS_PACKAGE_NAME "OpenMix")
     set(CPACK_NSIS_DISPLAY_NAME "OpenMix")
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)

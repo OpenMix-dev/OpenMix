@@ -108,13 +108,16 @@ jobs:
         run: |
           $env:PATH = "C:\Qt\6.11.0\msvc2022_64\bin;C:\Program Files (x86)\NSIS;$env:PATH"
           cd build
-          cpack -G NSIS
+          cpack -G "NSIS;ZIP"
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: OpenMix-windows
-          path: build/*.exe
+          # explicit patterns so the raw build/OpenMix.exe binary isn't shipped
+          path: |
+            build/OpenMix-*-win64.exe
+            build/OpenMix-*-win64.zip
 
   build-macos:
     runs-on: macos-latest
