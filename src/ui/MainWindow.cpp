@@ -249,9 +249,9 @@ void MainWindow::createActions() {
     m_stopAction->setToolTip(tr("Stop (Esc)"));
     connect(m_stopAction, &QAction::triggered, this, &MainWindow::stopPlayback);
 
-    m_previousCueAction = new QAction(Icons::mediaPrevious(), tr("&Previous Cue"), this);
+    m_previousCueAction = new QAction(Icons::mediaPrevious(), tr("&Back Cue"), this);
     m_previousCueAction->setShortcut(Qt::Key_Up);
-    m_previousCueAction->setToolTip(tr("Previous cue (Up)"));
+    m_previousCueAction->setToolTip(tr("Back cue (Up)"));
     connect(m_previousCueAction, &QAction::triggered,
             [this]() { m_app->playbackEngine()->previous(); });
 
@@ -486,24 +486,28 @@ void MainWindow::createMenus() {
     m_editMenu->addAction(m_undoAction);
     m_editMenu->addAction(m_redoAction);
     m_editMenu->addSeparator();
-    m_editMenu->addAction(m_addCueAction);
-    m_editMenu->addAction(m_deleteCueAction);
-    m_editMenu->addAction(m_cloneCueAction);
-    m_editMenu->addAction(m_cloneToEndAction);
-    m_editMenu->addSeparator();
     m_editMenu->addAction(m_copyCueAction);
     m_editMenu->addAction(m_pasteCueAction);
     m_editMenu->addAction(m_pasteMergeAction);
     m_editMenu->addAction(m_pasteSwapAction);
+    m_editMenu->addSeparator();
     m_editMenu->addAction(m_fillDownAction);
     m_editMenu->addAction(m_cloneOffsetsAction);
     m_editMenu->addAction(m_recordOffsetsAction);
     m_editMenu->addSeparator();
-    m_editMenu->addAction(m_renumberAction);
-    m_editMenu->addAction(m_jumpToSelectedAction);
-    m_editMenu->addAction(m_jumpAction);
-    m_editMenu->addSeparator();
     m_editMenu->addAction(m_lockEditingAction);
+
+    // cue-management actions grouped into their own menu
+    QMenu* cueListMenu = menuBar()->addMenu(tr("Cue &List"));
+    cueListMenu->addAction(m_addCueAction);
+    cueListMenu->addAction(m_cloneCueAction);
+    cueListMenu->addAction(m_cloneToEndAction);
+    cueListMenu->addAction(m_deleteCueAction);
+    cueListMenu->addSeparator();
+    cueListMenu->addAction(m_jumpToSelectedAction);
+    cueListMenu->addAction(m_jumpAction);
+    cueListMenu->addSeparator();
+    cueListMenu->addAction(m_renumberAction);
 
     m_playbackMenu = menuBar()->addMenu(tr("&Playback"));
     m_playbackMenu->addAction(m_goAction);

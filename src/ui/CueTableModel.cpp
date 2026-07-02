@@ -168,9 +168,9 @@ QVariant CueTableModel::headerData(int section, Qt::Orientation orientation, int
 
     switch (section) {
     case ColNumber:
-        return tr("Q#");
+        return tr("Cue");
     case ColName:
-        return tr("Name");
+        return tr("Text");
     case ColType:
         return tr("Type");
     case ColGroup:
