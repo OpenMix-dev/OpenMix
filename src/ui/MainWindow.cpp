@@ -97,19 +97,20 @@ MainWindow::MainWindow(Application* app, QWidget* parent) : QMainWindow(parent),
 MainWindow::~MainWindow() { saveSettings(); }
 
 void MainWindow::setupUi() {
-    m_mainSplitter = new QSplitter(Qt::Horizontal, this);
+    // cue grid fills the workspace with a channel-status strip beneath it; the
+    // cue editor is a pop-out opened on demand
+    m_mainSplitter = new QSplitter(Qt::Vertical, this);
 
     m_cueListView = new CueListView(m_app, this);
-    m_cueEditor = new CueEditor(m_app, this);
+    m_cueEditor = new CueEditor(m_app, this); // parented to a pop-out below
+    m_mixerFeedbackPanel = new MixerFeedbackPanel(m_app, this);
+    m_mixerFeedbackPanel->setMaximumHeight(240);
 
     m_mainSplitter->addWidget(m_cueListView);
-    m_mainSplitter->addWidget(m_cueEditor);
-    m_mainSplitter->setStretchFactor(0, 2);
+    m_mainSplitter->addWidget(m_mixerFeedbackPanel);
+    m_mainSplitter->setStretchFactor(0, 5);
     m_mainSplitter->setStretchFactor(1, 1);
-
     m_mainSplitter->setChildrenCollapsible(false);
-    m_cueListView->setMinimumWidth(300);
-    m_cueEditor->setMinimumWidth(250);
 
     setCentralWidget(m_mainSplitter);
 }
@@ -288,13 +289,21 @@ void MainWindow::createActions() {
     m_showDCAMappingAction->setToolTip(tr("Show/hide DCA mapping panel (F5)"));
     connect(m_showDCAMappingAction, &QAction::triggered, this, &MainWindow::toggleDCAMappingPanel);
 
-    m_showMixerFeedbackAction = new QAction(Icons::audioVolume(), tr("&Mixer Feedback"), this);
+    m_showMixerFeedbackAction = new QAction(Icons::audioVolume(), tr("Channel &Strip"), this);
     m_showMixerFeedbackAction->setCheckable(true);
-    m_showMixerFeedbackAction->setChecked(false);
+    m_showMixerFeedbackAction->setChecked(true); // strip is shown by default
     m_showMixerFeedbackAction->setShortcut(Qt::Key_F6);
-    m_showMixerFeedbackAction->setToolTip(tr("Show/hide mixer feedback panel (F6)"));
+    m_showMixerFeedbackAction->setToolTip(tr("Show/hide the channel-status strip (F6)"));
     connect(m_showMixerFeedbackAction, &QAction::triggered, this,
             &MainWindow::toggleMixerFeedbackPanel);
+
+    m_showCueEditorAction = new QAction(Icons::sliders(), tr("Cue &Editor"), this);
+    m_showCueEditorAction->setCheckable(true);
+    m_showCueEditorAction->setChecked(false);
+    m_showCueEditorAction->setShortcut(Qt::Key_F4);
+    m_showCueEditorAction->setToolTip(tr("Show/hide the cue editor (F4)"));
+    connect(m_showCueEditorAction, &QAction::triggered, this,
+            &MainWindow::toggleCueEditorPanel);
 
     m_showConnectionAction = new QAction(Icons::network(), tr("&Connection Panel"), this);
     m_showConnectionAction->setCheckable(true);
@@ -511,6 +520,7 @@ void MainWindow::createMenus() {
 
     m_viewMenu = menuBar()->addMenu(tr("&View"));
     m_viewMenu->addAction(m_showDCAMappingAction);
+    m_viewMenu->addAction(m_showCueEditorAction);
     m_viewMenu->addAction(m_showMixerFeedbackAction);
     m_viewMenu->addAction(m_showConnectionAction);
     m_viewMenu->addAction(m_showActorSetupAction);
@@ -692,15 +702,13 @@ void MainWindow::createPopOutWindows() {
         m_bubbleBar->setButtonActive("connection", visible);
     });
 
-    m_mixerFeedbackPanel = new MixerFeedbackPanel(m_app, nullptr);
-    m_mixerFeedbackPopOut = new PopOutWindow("mixerFeedback", tr("Mixer Feedback"), this);
-    m_mixerFeedbackPopOut->setContentWidget(m_mixerFeedbackPanel);
-    m_mixerFeedbackPopOut->setMinimumContentSize(400, 350);
+    // the cue editor lives in a pop-out (the central area is the cue grid + strip)
+    m_cueEditorPopOut = new PopOutWindow("cueEditor", tr("Cue Editor"), this);
+    m_cueEditorPopOut->setContentWidget(m_cueEditor);
+    m_cueEditorPopOut->setMinimumContentSize(340, 620);
 
-    connect(m_mixerFeedbackPopOut, &PopOutWindow::visibilityChanged, [this](bool visible) {
-        m_showMixerFeedbackAction->setChecked(visible);
-        m_bubbleBar->setButtonActive("mixer", visible);
-    });
+    connect(m_cueEditorPopOut, &PopOutWindow::visibilityChanged,
+            [this](bool visible) { m_showCueEditorAction->setChecked(visible); });
 
     m_dcaMappingPanel = new DCAMappingPanel(m_app, nullptr);
     m_dcaMappingPopOut = new PopOutWindow("dcaMapping", tr("DCA Mapping"), this);
@@ -851,8 +859,12 @@ void MainWindow::connectSignals() {
         }
     });
 
-    connect(m_cueListView, &CueListView::cueDoubleClicked,
-            [this](int index) { m_app->playbackEngine()->executeCue(index); });
+    // double-click opens the cue editor for that cue (GO/Space fires cues)
+    connect(m_cueListView, &CueListView::cueDoubleClicked, [this](int index) {
+        m_cueEditor->setCue(index);
+        m_cueEditorPopOut->showAndRestore();
+        m_showCueEditorAction->setChecked(true);
+    });
 
     connect(m_cueEditor, &CueEditor::cueModified, [this]() { m_cueListView->refreshCurrentCue(); });
 
@@ -873,7 +885,7 @@ void MainWindow::loadSettings() {
     settings.beginGroup("MainWindow");
 
     // restore splitter state
-    QByteArray mainSplitterState = settings.value("mainSplitter").toByteArray();
+    QByteArray mainSplitterState = settings.value("mainSplitterV2").toByteArray();
     if (!mainSplitterState.isEmpty()) {
         m_mainSplitter->restoreState(mainSplitterState);
     }
@@ -888,7 +900,7 @@ void MainWindow::saveSettings() {
     QSettings settings("OpenMix", "OpenMix");
     settings.beginGroup("MainWindow");
 
-    settings.setValue("mainSplitter", m_mainSplitter->saveState());
+    settings.setValue("mainSplitterV2", m_mainSplitter->saveState());
 
     settings.endGroup();
 
@@ -1152,10 +1164,19 @@ void MainWindow::toggleConnectionPanel() {
 }
 
 void MainWindow::toggleMixerFeedbackPanel() {
-    if (m_mixerFeedbackPopOut->isVisible()) {
-        m_mixerFeedbackPopOut->hide();
+    // the mixer feedback is the bottom channel-status strip; toggle its visibility
+    const bool show = !m_mixerFeedbackPanel->isVisible();
+    m_mixerFeedbackPanel->setVisible(show);
+    m_showMixerFeedbackAction->setChecked(show);
+    m_bubbleBar->setButtonActive("mixer", show);
+}
+
+void MainWindow::toggleCueEditorPanel() {
+    if (m_cueEditorPopOut->isVisible()) {
+        m_cueEditorPopOut->hide();
     } else {
-        m_mixerFeedbackPopOut->showAndRestore();
+        m_cueEditorPopOut->showAndRestore();
+        m_cueEditor->setCue(m_cueListView->selectedCueIndex());
     }
 }
 

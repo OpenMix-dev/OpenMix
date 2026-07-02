@@ -69,6 +69,7 @@ class MainWindow : public QMainWindow {
     // view actions - pop-out windows
     void toggleConnectionPanel();
     void toggleMixerFeedbackPanel();
+    void toggleCueEditorPanel();
     void toggleDCAMappingPanel();
     void toggleActorSetupPanel();
     void toggleEnsemblePanel();
@@ -145,7 +146,7 @@ class MainWindow : public QMainWindow {
 
     // pop-out windows
     PopOutWindow* m_connectionPopOut;
-    PopOutWindow* m_mixerFeedbackPopOut;
+    PopOutWindow* m_cueEditorPopOut;
     PopOutWindow* m_dcaMappingPopOut;
     PopOutWindow* m_actorSetupPopOut;
     PopOutWindow* m_ensemblePopOut;
@@ -214,6 +215,7 @@ class MainWindow : public QMainWindow {
     // view actions (for menu checkable items)
     QAction* m_showConnectionAction;
     QAction* m_showMixerFeedbackAction;
+    QAction* m_showCueEditorAction;
     QAction* m_showDCAMappingAction;
     QAction* m_showActorSetupAction;
     QAction* m_showEnsembleAction;
