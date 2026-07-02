@@ -3,6 +3,7 @@
 #include "ui/WelcomeDialog.h"
 #include "ui/theme/Theme.h"
 #include <QApplication>
+#include <QIcon>
 #include <QSettings>
 #include <QFile>
 #include <QPalette>
@@ -37,6 +38,7 @@ int main(int argc, char* argv[]) {
     QApplication::setApplicationName("OpenMix");
     QApplication::setApplicationVersion("0.1.0");
     QApplication::setOrganizationName("OpenMix");
+    QApplication::setWindowIcon(QIcon(":/icons/openmix.png"));
 
     oclero::qlementine::icons::initializeIconTheme();
 

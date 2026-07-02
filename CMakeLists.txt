@@ -53,6 +53,14 @@ if(WIN32)
     find_library(LIBLO_LIBRARIES NAMES lo liblo REQUIRED)
     target_include_directories(openmix_liblo INTERFACE ${LIBLO_INCLUDE_DIRS})
     target_link_libraries(openmix_liblo INTERFACE ${LIBLO_LIBRARIES})
+    # the deploy script only bundles Qt; ship liblo's runtime DLL ourselves
+    get_filename_component(_liblo_libdir ${LIBLO_LIBRARIES} DIRECTORY)
+    find_file(LIBLO_DLL NAMES lo.dll liblo.dll
+        HINTS ${_liblo_libdir}/../bin ${LIBLO_INCLUDE_DIRS}/../bin)
+    if(NOT LIBLO_DLL)
+        message(FATAL_ERROR "liblo runtime DLL not found; the installer would ship without it")
+    endif()
+    install(FILES ${LIBLO_DLL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(LIBLO REQUIRED IMPORTED_TARGET liblo)
@@ -439,6 +447,10 @@ if(WIN32)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         WIN32_EXECUTABLE TRUE
     )
+    # embed the app icon into the executable (needs the RC language, which
+    # project(LANGUAGES CXX) leaves off)
+    enable_language(RC)
+    target_sources(${PROJECT_NAME} PRIVATE packaging/openmix.rc)
 elseif(APPLE)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         MACOSX_BUNDLE TRUE
@@ -446,6 +458,10 @@ elseif(APPLE)
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
     )
+    # bundle icon: ship the icns in Resources (Info.plist.in names it)
+    target_sources(${PROJECT_NAME} PRIVATE packaging/openmix.icns)
+    set_source_files_properties(packaging/openmix.icns
+        PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 endif()
 
 # install rules
@@ -488,6 +504,18 @@ if(WIN32)
     set(CPACK_NSIS_DISPLAY_NAME "OpenMix")
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
     set(CPACK_NSIS_MODIFY_PATH OFF)
+    # installer/uninstaller + Add/Remove Programs icons
+    set(CPACK_NSIS_MUI_ICON "${CMAKE_SOURCE_DIR}/packaging/openmix.ico")
+    set(CPACK_NSIS_MUI_UNIICON "${CMAKE_SOURCE_DIR}/packaging/openmix.ico")
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\OpenMix.exe")
+    # start menu entry + desktop shortcut (removed again on uninstall)
+    set(CPACK_PACKAGE_EXECUTABLES "OpenMix" "OpenMix")
+    set(CPACK_NSIS_CREATE_ICONS_EXTRA
+        "CreateShortCut '$DESKTOP\\\\OpenMix.lnk' '$INSTDIR\\\\bin\\\\OpenMix.exe'")
+    set(CPACK_NSIS_DELETE_ICONS_EXTRA
+        "Delete '$DESKTOP\\\\OpenMix.lnk'")
+    # offer to launch the app from the installer's finish page
+    set(CPACK_NSIS_MUI_FINISHPAGE_RUN "bin\\\\OpenMix.exe")
 elseif(APPLE)
     set(CPACK_GENERATOR "DragNDrop")
 else()

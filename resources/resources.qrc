@@ -2,6 +2,7 @@
 <RCC version="1.0">
     <qresource prefix="/">
         <file>styles/main.qss</file>
+        <file>icons/openmix.png</file>
         <file>icons/chevron-up.svg</file>
         <file>icons/chevron-down.svg</file>
     </qresource>
