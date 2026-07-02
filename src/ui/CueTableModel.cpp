@@ -1,6 +1,7 @@
 #include "CueTableModel.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
+#include "core/DCAMapping.h"
 #include "theme/Theme.h"
 #include <QBrush>
 #include <QDataStream>
@@ -85,9 +86,29 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
                     return *ov.label;
                 if (ov.mute.has_value())
                     return *ov.mute ? tr("mute") : tr("on");
+                return QString();
             }
-            // sub 1 (fx) and sub 2 (pos) are per-DCA-channel data OpenMix does
-            // not yet model at this layer; the columns exist and are toggleable
+            // fx / pos: summarise the cue's per-channel FX / position over the
+            // channels assigned to this DCA (via the show's DCA mapping)
+            if (m_dcaMapping) {
+                const QList<int> channels = m_dcaMapping->channelsForDCA(dca);
+                if (sub == 1) { // fx
+                    const QMap<int, bool> fx = cue.channelFX();
+                    int n = 0;
+                    for (int ch : channels)
+                        if (fx.value(ch, false))
+                            ++n;
+                    return n > 0 ? QString::number(n) : QString();
+                }
+                if (sub == 2) { // pos
+                    const QMap<int, QString> pos = cue.channelPositions();
+                    int n = 0;
+                    for (int ch : channels)
+                        if (!pos.value(ch).isEmpty())
+                            ++n;
+                    return n > 0 ? QString::number(n) : QString();
+                }
+            }
             return QString();
         }
 

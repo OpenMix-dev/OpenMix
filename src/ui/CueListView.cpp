@@ -56,6 +56,7 @@ void CueListView::setupUi() {
 
     // create model & proxy
     m_model = new CueTableModel(m_app->show()->cueList(), this);
+    m_model->setDcaMapping(m_app->show()->dcaMapping());
     m_proxyModel = new CueFilterProxyModel(this);
     m_proxyModel->setSourceModel(m_model);
 
