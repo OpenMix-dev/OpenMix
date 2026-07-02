@@ -45,13 +45,26 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(qlementine-icons)
 
-# find liblo for OSC
+# find liblo for OSC; expose one platform-agnostic target (openmix_liblo) so app
+# and tests link the same name on every OS
+add_library(openmix_liblo INTERFACE)
 if(WIN32)
     find_path(LIBLO_INCLUDE_DIRS lo/lo.h REQUIRED)
     find_library(LIBLO_LIBRARIES NAMES lo liblo REQUIRED)
+    target_include_directories(openmix_liblo INTERFACE ${LIBLO_INCLUDE_DIRS})
+    target_link_libraries(openmix_liblo INTERFACE ${LIBLO_LIBRARIES})
+    # the deploy script only bundles Qt; ship liblo's runtime DLL ourselves
+    get_filename_component(_liblo_libdir ${LIBLO_LIBRARIES} DIRECTORY)
+    find_file(LIBLO_DLL NAMES lo.dll liblo.dll
+        HINTS ${_liblo_libdir}/../bin ${LIBLO_INCLUDE_DIRS}/../bin)
+    if(NOT LIBLO_DLL)
+        message(FATAL_ERROR "liblo runtime DLL not found; the installer would ship without it")
+    endif()
+    install(FILES ${LIBLO_DLL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(LIBLO REQUIRED IMPORTED_TARGET liblo)
+    target_link_libraries(openmix_liblo INTERFACE PkgConfig::LIBLO)
 endif()
 
 # RtMidi
@@ -351,12 +364,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 # liblo
-if(WIN32)
-    target_include_directories(${PROJECT_NAME} PRIVATE ${LIBLO_INCLUDE_DIRS})
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBLO_LIBRARIES})
-else()
-    target_link_libraries(${PROJECT_NAME} PRIVATE PkgConfig::LIBLO)
-endif()
+target_link_libraries(${PROJECT_NAME} PRIVATE openmix_liblo)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE RtMidi)
 
@@ -367,18 +375,42 @@ if(WIN32)
     FetchContent_Declare(winsparkle
         URL https://github.com/vslavik/winsparkle/releases/download/v0.8.1/WinSparkle-0.8.1.zip)
     FetchContent_MakeAvailable(winsparkle)
-    set(WINSPARKLE_ROOT ${winsparkle_SOURCE_DIR}/WinSparkle-0.8.1)
-    target_include_directories(${PROJECT_NAME} PRIVATE ${WINSPARKLE_ROOT}/include)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${WINSPARKLE_ROOT}/x64/WinSparkle.lib)
+    # the 0.8.1 zip layout (nesting, x64/Release/ subdir) is fragile; glob for the
+    # header, x64 lib, and x64 dll so the exact structure can't break the build
+    file(GLOB_RECURSE _ws_hdrs "${winsparkle_SOURCE_DIR}/*winsparkle.h")
+    file(GLOB_RECURSE _ws_libs "${winsparkle_SOURCE_DIR}/*WinSparkle.lib")
+    file(GLOB_RECURSE _ws_dlls "${winsparkle_SOURCE_DIR}/*WinSparkle.dll")
+    list(GET _ws_hdrs 0 _ws_hdr)
+    get_filename_component(WINSPARKLE_INCLUDE ${_ws_hdr} DIRECTORY)
+    foreach(f ${_ws_libs})
+        if(f MATCHES "x64")
+            set(WINSPARKLE_LIB ${f})
+        endif()
+    endforeach()
+    foreach(f ${_ws_dlls})
+        if(f MATCHES "x64")
+            set(WINSPARKLE_DLL ${f})
+        endif()
+    endforeach()
+    if(NOT WINSPARKLE_INCLUDE OR NOT WINSPARKLE_LIB OR NOT WINSPARKLE_DLL)
+        message(FATAL_ERROR "WinSparkle header/x64 lib/dll not found under ${winsparkle_SOURCE_DIR}")
+    endif()
+    target_include_directories(${PROJECT_NAME} PRIVATE ${WINSPARKLE_INCLUDE})
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${WINSPARKLE_LIB})
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${WINSPARKLE_ROOT}/x64/WinSparkle.dll $<TARGET_FILE_DIR:${PROJECT_NAME}>)
-    install(FILES ${WINSPARKLE_ROOT}/x64/WinSparkle.dll DESTINATION ${CMAKE_INSTALL_BINDIR})
+            ${WINSPARKLE_DLL} $<TARGET_FILE_DIR:${PROJECT_NAME}>)
+    install(FILES ${WINSPARKLE_DLL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 elseif(APPLE)
     FetchContent_Declare(sparkle
         URL https://github.com/sparkle-project/Sparkle/releases/download/2.6.4/Sparkle-2.6.4.tar.xz)
     FetchContent_MakeAvailable(sparkle)
     target_sources(${PROJECT_NAME} PRIVATE src/app/AutoUpdaterSparkle.mm)
+    # the C++ PCH is built with Objective-C disabled; reusing it for this
+    # Objective-C++ source fails ("Objective-C was disabled in precompiled
+    # file ... but is currently enabled"), so skip the PCH for it
+    set_source_files_properties(src/app/AutoUpdaterSparkle.mm
+        PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
     target_compile_options(${PROJECT_NAME} PRIVATE -F${sparkle_SOURCE_DIR})
     target_link_libraries(${PROJECT_NAME} PRIVATE "-F${sparkle_SOURCE_DIR}" "-framework Sparkle")
     configure_file(${CMAKE_SOURCE_DIR}/packaging/Info.plist.in
@@ -415,6 +447,10 @@ if(WIN32)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         WIN32_EXECUTABLE TRUE
     )
+    # embed the app icon into the executable (needs the RC language, which
+    # project(LANGUAGES CXX) leaves off)
+    enable_language(RC)
+    target_sources(${PROJECT_NAME} PRIVATE packaging/openmix.rc)
 elseif(APPLE)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         MACOSX_BUNDLE TRUE
@@ -422,6 +458,10 @@ elseif(APPLE)
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
     )
+    # bundle icon: ship the icns in Resources (Info.plist.in names it)
+    target_sources(${PROJECT_NAME} PRIVATE packaging/openmix.icns)
+    set_source_files_properties(packaging/openmix.icns
+        PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 endif()
 
 # install rules
@@ -464,6 +504,18 @@ if(WIN32)
     set(CPACK_NSIS_DISPLAY_NAME "OpenMix")
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
     set(CPACK_NSIS_MODIFY_PATH OFF)
+    # installer/uninstaller + Add/Remove Programs icons
+    set(CPACK_NSIS_MUI_ICON "${CMAKE_SOURCE_DIR}/packaging/openmix.ico")
+    set(CPACK_NSIS_MUI_UNIICON "${CMAKE_SOURCE_DIR}/packaging/openmix.ico")
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\OpenMix.exe")
+    # start menu entry + desktop shortcut (removed again on uninstall)
+    set(CPACK_PACKAGE_EXECUTABLES "OpenMix" "OpenMix")
+    set(CPACK_NSIS_CREATE_ICONS_EXTRA
+        "CreateShortCut '$DESKTOP\\\\OpenMix.lnk' '$INSTDIR\\\\bin\\\\OpenMix.exe'")
+    set(CPACK_NSIS_DELETE_ICONS_EXTRA
+        "Delete '$DESKTOP\\\\OpenMix.lnk'")
+    # offer to launch the app from the installer's finish page
+    set(CPACK_NSIS_MUI_FINISHPAGE_RUN "bin\\\\OpenMix.exe")
 elseif(APPLE)
     set(CPACK_GENERATOR "DragNDrop")
 else()

@@ -10,8 +10,8 @@
 namespace OpenMix {
 
 namespace {
-constexpr const char* kLatestReleaseApi =
-    "https://api.github.com/repos/johnqherman/OpenMix/releases/latest";
+// small JSON published by CI: {"tag_name":"vX.Y.Z","html_url":"..."}
+constexpr const char* kLatestReleaseApi = "https://openmix.dev/latest.json";
 }
 
 UpdateChecker::UpdateChecker(QObject* parent)
@@ -58,7 +58,7 @@ void UpdateChecker::checkForUpdates() {
 
         QString url = obj.value("html_url").toString();
         if (url.isEmpty())
-            url = "https://github.com/johnqherman/OpenMix/releases/latest";
+            url = "https://openmix.dev/download";
 
         if (isNewer(tag, QCoreApplication::applicationVersion()))
             emit updateAvailable(tag, url);

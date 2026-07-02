@@ -33,25 +33,39 @@ pipeline hinges on one signing key and a place to host the appcasts.
    the `sparkle:edSignature` in the macOS appcast. Without it, the appcast job
    logs a warning and macOS clients will not accept the update.
 
-## Appcast hosting (GitHub Pages)
+## Appcast + installer hosting (openmix.dev VPS)
 
-The apps poll these URLs (set in `Info.plist.in` `SUFeedURL` and in
-`AutoUpdater.cpp` for WinSparkle):
+Everything is served from the VPS. The apps poll:
 
-- macOS: `https://johnqherman.github.io/OpenMix/appcast-macos.xml`
-- Windows: `https://johnqherman.github.io/OpenMix/appcast-windows.xml`
+- macOS: `https://openmix.dev/appcast-macos.xml` (`Info.plist.in` `SUFeedURL`)
+- Windows: `https://openmix.dev/appcast-windows.xml` (`AutoUpdater.cpp`)
+- Linux notify-fallback: `https://openmix.dev/latest.json` (`UpdateChecker.cpp`)
 
-The `appcast` job in `.github/workflows/build.yml` builds both files on every
-`v*` tag and publishes them to the `gh-pages` branch (via
-`peaceiris/actions-gh-pages`, `keep_files: true` so old entries survive). Enable
-GitHub Pages for the repo, serving from the `gh-pages` branch root.
+Installers live under `https://openmix.dev/download/<tag>/`. The `appcast` job in
+`.github/workflows/build.yml` builds the appcasts + `latest.json`, lays out the
+installer tree, and `rsync`s the whole `site/` over SSH to the VPS webroot on
+every `v*` tag. After upload it prunes `download/` to the newest 5 release dirs
+(version-sorted); the appcasts and `latest.json` at the root are overwritten each
+release.
+
+### Deploy secrets (GitHub Actions)
+
+| Secret | Value |
+|--------|-------|
+| `OPENMIX_DEPLOY_SSH_KEY` | private SSH key whose public half is in the deploy user's `authorized_keys` |
+| `OPENMIX_DEPLOY_HOST` | `openmix.dev` (or the VPS IP) |
+| `OPENMIX_DEPLOY_USER` | deploy user (e.g. `deploy`) |
+| `OPENMIX_DEPLOY_PATH` | webroot rsync target (e.g. `/var/www/openmix.dev`) |
+
+A GitHub Release is still created as a mirror, but the app updater points only at
+openmix.dev.
 
 ## Release flow
 
 1. Bump `VERSION` / `project(... VERSION x.y.z)` in `CMakeLists.txt`.
 2. Tag and push: `git tag vx.y.z && git push origin vx.y.z`.
 3. CI: `build-*` jobs make installers, `release` attaches them to the GitHub
-   Release, `appcast` signs + publishes the appcasts to `gh-pages`.
+   Release, `appcast` signs + rsyncs installers and appcasts to openmix.dev.
 4. Installed clients pick up the update on their next scheduled check.
 
 ## Code signing (required for a clean silent update)
