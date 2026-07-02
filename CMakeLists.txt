@@ -45,13 +45,18 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(qlementine-icons)
 
-# find liblo for OSC
+# find liblo for OSC; expose one platform-agnostic target (openmix_liblo) so app
+# and tests link the same name on every OS
+add_library(openmix_liblo INTERFACE)
 if(WIN32)
     find_path(LIBLO_INCLUDE_DIRS lo/lo.h REQUIRED)
     find_library(LIBLO_LIBRARIES NAMES lo liblo REQUIRED)
+    target_include_directories(openmix_liblo INTERFACE ${LIBLO_INCLUDE_DIRS})
+    target_link_libraries(openmix_liblo INTERFACE ${LIBLO_LIBRARIES})
 else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(LIBLO REQUIRED IMPORTED_TARGET liblo)
+    target_link_libraries(openmix_liblo INTERFACE PkgConfig::LIBLO)
 endif()
 
 # RtMidi
@@ -351,12 +356,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 # liblo
-if(WIN32)
-    target_include_directories(${PROJECT_NAME} PRIVATE ${LIBLO_INCLUDE_DIRS})
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBLO_LIBRARIES})
-else()
-    target_link_libraries(${PROJECT_NAME} PRIVATE PkgConfig::LIBLO)
-endif()
+target_link_libraries(${PROJECT_NAME} PRIVATE openmix_liblo)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE RtMidi)
 

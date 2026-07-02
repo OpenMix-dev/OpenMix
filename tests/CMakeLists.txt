@@ -148,7 +148,7 @@ add_executable(test_osc_remote
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
 )
-target_link_libraries(test_osc_remote PRIVATE Qt6::Core Qt6::Test PkgConfig::LIBLO)
+target_link_libraries(test_osc_remote PRIVATE Qt6::Core Qt6::Test openmix_liblo)
 target_include_directories(test_osc_remote PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME OscRemoteTest COMMAND test_osc_remote)
 
@@ -156,7 +156,7 @@ add_executable(test_qlab_client
     test_qlab_client.cpp
     ${CMAKE_SOURCE_DIR}/src/app/QLabClient.cpp
 )
-target_link_libraries(test_qlab_client PRIVATE Qt6::Core Qt6::Test PkgConfig::LIBLO)
+target_link_libraries(test_qlab_client PRIVATE Qt6::Core Qt6::Test openmix_liblo)
 target_include_directories(test_qlab_client PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME QLabClientTest COMMAND test_qlab_client)
 
@@ -164,7 +164,7 @@ add_executable(test_reaper_client
     test_reaper_client.cpp
     ${CMAKE_SOURCE_DIR}/src/app/ReaperClient.cpp
 )
-target_link_libraries(test_reaper_client PRIVATE Qt6::Core Qt6::Test PkgConfig::LIBLO)
+target_link_libraries(test_reaper_client PRIVATE Qt6::Core Qt6::Test openmix_liblo)
 target_include_directories(test_reaper_client PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME ReaperClientTest COMMAND test_reaper_client)
 
@@ -172,7 +172,7 @@ add_executable(test_cueplayer_client
     test_cueplayer_client.cpp
     ${CMAKE_SOURCE_DIR}/src/app/CuePlayerClient.cpp
 )
-target_link_libraries(test_cueplayer_client PRIVATE Qt6::Core Qt6::Test PkgConfig::LIBLO)
+target_link_libraries(test_cueplayer_client PRIVATE Qt6::Core Qt6::Test openmix_liblo)
 target_include_directories(test_cueplayer_client PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME CuePlayerClientTest COMMAND test_cueplayer_client)
 
@@ -197,7 +197,7 @@ add_executable(test_scs_client
     test_scs_client.cpp
     ${CMAKE_SOURCE_DIR}/src/app/ScsClient.cpp
 )
-target_link_libraries(test_scs_client PRIVATE Qt6::Core Qt6::Test PkgConfig::LIBLO)
+target_link_libraries(test_scs_client PRIVATE Qt6::Core Qt6::Test openmix_liblo)
 target_include_directories(test_scs_client PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME ScsClientTest COMMAND test_scs_client)
 
