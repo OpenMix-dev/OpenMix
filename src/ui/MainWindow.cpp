@@ -497,31 +497,6 @@ void MainWindow::createMenus() {
     m_editMenu->addSeparator();
     m_editMenu->addAction(m_lockEditingAction);
 
-    // cue-management actions grouped into their own menu
-    QMenu* cueListMenu = menuBar()->addMenu(tr("Cue &List"));
-    cueListMenu->addAction(m_addCueAction);
-    cueListMenu->addAction(m_cloneCueAction);
-    cueListMenu->addAction(m_cloneToEndAction);
-    cueListMenu->addAction(m_deleteCueAction);
-    cueListMenu->addSeparator();
-    cueListMenu->addAction(m_jumpToSelectedAction);
-    cueListMenu->addAction(m_jumpAction);
-    cueListMenu->addSeparator();
-    cueListMenu->addAction(m_renumberAction);
-
-    m_playbackMenu = menuBar()->addMenu(tr("&Playback"));
-    m_playbackMenu->addAction(m_goAction);
-    m_playbackMenu->addAction(m_stopAction);
-    m_playbackMenu->addSeparator();
-    m_playbackMenu->addAction(m_previousCueAction);
-    m_playbackMenu->addAction(m_nextCueAction);
-    m_playbackMenu->addSeparator();
-    m_playbackMenu->addAction(m_panicAction);
-    m_playbackMenu->addAction(m_panicRestoreAction);
-    m_playbackMenu->addSeparator();
-    m_playbackMenu->addAction(m_spareBackupAction);
-    m_playbackMenu->addAction(m_recordFadersAction);
-
     m_viewMenu = menuBar()->addMenu(tr("&View"));
     m_viewMenu->addAction(m_showDCAMappingAction);
     m_viewMenu->addAction(m_showCueEditorAction);
@@ -596,18 +571,33 @@ void MainWindow::createMenus() {
     m_viewMenu->addAction(m_exportCsvAction);
     m_viewMenu->addAction(m_showLogViewerAction);
 
-    m_settingsMenu = menuBar()->addMenu(tr("&Settings"));
-    m_settingsMenu->addAction(m_keyboardShortcutsAction);
-    m_settingsMenu->addAction(m_midiControllerAction);
-    m_settingsMenu->addAction(m_remoteControlAction);
-    m_settingsMenu->addSeparator();
-    m_settingsMenu->addAction(m_fxSetupAction);
-    m_settingsMenu->addAction(m_appSettingsAction);
+    // cue-management actions grouped into their own menu (after View)
+    QMenu* cueListMenu = menuBar()->addMenu(tr("Cue &List"));
+    cueListMenu->addAction(m_addCueAction);
+    cueListMenu->addAction(m_cloneCueAction);
+    cueListMenu->addAction(m_cloneToEndAction);
+    cueListMenu->addAction(m_deleteCueAction);
+    cueListMenu->addSeparator();
+    cueListMenu->addAction(m_jumpToSelectedAction);
+    cueListMenu->addAction(m_jumpAction);
+    cueListMenu->addSeparator();
+    cueListMenu->addAction(m_renumberAction);
 
+    // Help folds in setup, configuration and the remaining playback actions so
+    // the menu bar stays at five top-level menus
     m_helpMenu = menuBar()->addMenu(tr("&Help"));
+    m_helpMenu->addAction(m_spareBackupAction);
+    m_helpMenu->addAction(m_recordFadersAction);
+    m_helpMenu->addAction(m_panicRestoreAction);
+    m_helpMenu->addSeparator();
+    m_helpMenu->addAction(m_remoteControlAction);
+    m_helpMenu->addAction(m_midiControllerAction);
+    m_helpMenu->addAction(m_fxSetupAction);
+    m_helpMenu->addAction(m_keyboardShortcutsAction);
+    m_helpMenu->addAction(m_appSettingsAction);
+    m_helpMenu->addSeparator();
     m_helpMenu->addAction(m_quickStartAction);
     m_helpMenu->addAction(m_featureGuideAction);
-    m_helpMenu->addSeparator();
     m_helpMenu->addAction(m_aboutAction);
 }
 
