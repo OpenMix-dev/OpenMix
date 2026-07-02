@@ -263,3 +263,6 @@ jobs:
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           # keep old release dirs (keep_files-style); appcasts + latest.json overwrite
           rsync -avz -e "ssh -i ~/.ssh/deploy" site/ "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/"
+          # prune download/ to the newest 5 release dirs (version-sorted)
+          ssh -i ~/.ssh/deploy "${SSH_USER}@${SSH_HOST}" \
+            "cd '${DEPLOY_PATH}/download' && ls -1d v*/ 2>/dev/null | sed 's:/*\$::' | sort -V | head -n -5 | xargs -r rm -rf --"

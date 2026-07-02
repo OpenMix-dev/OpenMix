@@ -44,8 +44,9 @@ Everything is served from the VPS. The apps poll:
 Installers live under `https://openmix.dev/download/<tag>/`. The `appcast` job in
 `.github/workflows/build.yml` builds the appcasts + `latest.json`, lays out the
 installer tree, and `rsync`s the whole `site/` over SSH to the VPS webroot on
-every `v*` tag. Old `download/<tag>/` dirs are preserved; the appcasts and
-`latest.json` at the root are overwritten each release.
+every `v*` tag. After upload it prunes `download/` to the newest 5 release dirs
+(version-sorted); the appcasts and `latest.json` at the root are overwritten each
+release.
 
 ### Deploy secrets (GitHub Actions)
 
