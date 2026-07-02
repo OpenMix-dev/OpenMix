@@ -1,18 +1,28 @@
 #include "Application.h"
+#include "OscRemoteServer.h"
+#include "CuePlayerClient.h"
+#include "ScsClient.h"
+#include "QLabClient.h"
+#include "ReaperClient.h"
 #include "ui/MainWindow.h"
 #include "core/AppLogger.h"
+#include "core/ChannelMonitor.h"
 #include "core/ConnectionLogBridge.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
+#include "core/CueZero.h"
+#include "core/Position.h"
+#include "core/TimecodeTrigger.h"
 #include "core/CueValidator.h"
 #include "core/DCAMapping.h"
 #include "core/DryRunEngine.h"
-#include "core/OperationMode.h"
 #include "core/PlaybackEngine.h"
 #include "core/PlaybackGuard.h"
 #include "core/PlaybackLogger.h"
+#include "core/ScribbleController.h"
 #include "core/ShortcutManager.h"
 #include "core/Show.h"
+#include "core/SpareBackup.h"
 #include "io/AutosaveManager.h"
 #include "io/CrashRecovery.h"
 #include "midi/MidiInputManager.h"
@@ -45,7 +55,6 @@ Application::Application(QObject* parent) : QObject(parent) {
     m_dryRunEngine = new DryRunEngine(this);
 
     m_shortcutManager = new ShortcutManager(this);
-    m_operationModeManager = new OperationModeManager(this);
 
     m_crashRecovery = new CrashRecovery(this);
 
@@ -57,6 +66,22 @@ Application::Application(QObject* parent) : QObject(parent) {
     m_discoveryService->registerStrategy(std::make_shared<BehringerX32ProbeStrategy>());
     m_discoveryService->registerStrategy(std::make_shared<BehringerWingProbeStrategy>());
     m_discoveryService->registerStrategy(std::make_shared<YamahaOscProbeStrategy>());
+
+    // inbound OSC remote control (QLab / stage-manager)
+    m_oscRemoteServer = new OscRemoteServer(this);
+
+    // outbound QLab / DAW remote
+    m_qLabClient = new QLabClient(this);
+    m_reaperClient = new ReaperClient(this);
+    m_cuePlayerClient = new CuePlayerClient(this);
+    m_scsClient = new ScsClient(this);
+
+    // timecode triggers + channel monitor
+    m_timecodeTriggers = new TimecodeTriggerList(this);
+    m_channelMonitor = new ChannelMonitor(this);
+
+    // scribble-strip driver
+    m_scribbleController = new ScribbleController(this);
 
     // application logging
     m_appLogger = new AppLogger(this);
@@ -83,6 +108,19 @@ Application::~Application() {
 void Application::initialize() {
     m_playbackEngine->setCueList(m_show->cueList());
     m_playbackEngine->setDCAMapping(m_show->dcaMapping());
+    m_playbackEngine->setActorLibrary(m_show->actorProfileLibrary());
+    m_playbackEngine->setPositionLibrary(m_show->positionLibrary());
+    m_playbackEngine->setChannelGangs(m_show->channelGangs());
+    m_playbackEngine->setDimDcaFaders(m_show->dimDcaFaders());
+    m_playbackEngine->setMuteDcaUnassign(m_show->muteDcaUnassign());
+
+    // re-seed gangs + console-behavior toggles whenever a project is loaded
+    // (fromJson re-emits nameChanged)
+    connect(m_show, &Show::nameChanged, this, [this]() {
+        m_playbackEngine->setChannelGangs(m_show->channelGangs());
+        m_playbackEngine->setDimDcaFaders(m_show->dimDcaFaders());
+        m_playbackEngine->setMuteDcaUnassign(m_show->muteDcaUnassign());
+    });
 
     if (m_mixer) {
         m_playbackEngine->setMixer(m_mixer);
@@ -91,6 +129,21 @@ void Application::initialize() {
     m_playbackEngine->setValidator(m_cueValidator);
     m_playbackEngine->setGuard(m_playbackGuard);
     m_playbackEngine->setLogger(m_playbackLogger);
+    m_playbackEngine->setVerifyCues(true);
+
+    // Cue Zero base levels double as the panic/safe values
+    m_playbackGuard->setDefaultSafeValues(m_show->cueZero()->levels());
+
+    connect(m_playbackEngine, &PlaybackEngine::cueDrifted, this,
+            [this](int index, const QStringList& paths) {
+                if (m_appLogger) {
+                    m_appLogger->log(LogLevel::Warning, LogSource::Playback,
+                                     QString("Cue %1 drift on %2 parameter(s): %3")
+                                         .arg(index)
+                                         .arg(paths.size())
+                                         .arg(paths.join(", ")));
+                }
+            });
 
     m_dryRunEngine->setCueList(m_show->cueList());
     m_dryRunEngine->setValidator(m_cueValidator);
@@ -125,12 +178,121 @@ void Application::initialize() {
     });
 
     m_shortcutManager->loadFromSettings();
-    m_operationModeManager->loadFromSettings();
 
     // MIDI input setup
     m_midiInputManager->setPlaybackEngine(m_playbackEngine);
     m_midiInputManager->setPlaybackGuard(m_playbackGuard);
     m_midiInputManager->loadFromSettings();
+
+    // inbound OSC remote control: /cue/go, /ctrl/fadeall, next/prev/goto
+    m_oscRemoteServer->setPlaybackEngine(m_playbackEngine);
+    connect(m_oscRemoteServer, &OscRemoteServer::fadeAllRequested, this, [this]() {
+        if (m_playbackGuard)
+            m_playbackGuard->panic();
+    });
+    m_oscRemoteServer->loadFromSettings();
+    if (m_oscRemoteServer->start(m_oscRemoteServer->port())) {
+        m_appLogger->log(LogLevel::Info, LogSource::System,
+                         QString("OSC remote control listening on port %1")
+                             .arg(m_oscRemoteServer->port()));
+    } else {
+        m_appLogger->log(LogLevel::Warning, LogSource::System,
+                         QString("OSC remote control could not bind port %1")
+                             .arg(m_oscRemoteServer->port()));
+    }
+
+    // outbound QLab/DAW remote: fire a linked QLab cue when a cue executes
+    m_qLabClient->loadFromSettings();
+    connect(m_playbackEngine, &PlaybackEngine::cueExecuted, this, [this](int index) {
+        if (!m_qLabClient->isEnabled() || index < 0 || !m_show->cueList() ||
+            index >= m_show->cueList()->count())
+            return;
+        const Cue& cue = m_show->cueList()->at(index);
+        if (!cue.qLabCue().isEmpty())
+            m_qLabClient->triggerCue(cue.qLabCue());
+    });
+
+    // Cue Player (cpsound): advance the external player on each cue fire
+    m_cuePlayerClient->loadFromSettings();
+    connect(m_playbackEngine, &PlaybackEngine::cueExecuted, this, [this](int index) {
+        if (m_cuePlayerClient->isEnabled() && index >= 0)
+            m_cuePlayerClient->play();
+    });
+
+    // Show Cue System (SCS): fire the master GO on each cue fire
+    m_scsClient->loadFromSettings();
+    connect(m_playbackEngine, &PlaybackEngine::cueExecuted, this, [this](int index) {
+        if (m_scsClient->isEnabled() && index >= 0)
+            m_scsClient->go();
+    });
+
+    // REAPER virtual sound check: drop/jump a marker on each cue fire
+    m_reaperClient->loadFromSettings();
+    connect(m_playbackEngine, &PlaybackEngine::cueExecuted, this, [this](int index) {
+        if (!m_reaperClient->isEnabled() || index < 0 || !m_show->cueList() ||
+            index >= m_show->cueList()->count())
+            return;
+        const Cue& cue = m_show->cueList()->at(index);
+        m_reaperClient->onCueFired(cue.number(), cue.name());
+    });
+
+    // timecode-triggered cues: incoming MTC -> trigger list -> fire cue by number
+    connect(m_midiInputManager, &MidiInputManager::timecodeChanged, m_timecodeTriggers,
+            &TimecodeTriggerList::onTimecode);
+    connect(m_timecodeTriggers, &TimecodeTriggerList::triggerFired, this,
+            [this](double cueNumber, const QString&) {
+                m_playbackEngine->goToNumber(cueNumber);
+                m_playbackEngine->go();
+            });
+
+    // scribble strips: actor names + cue number + silence/clip coloring +
+    // active-channel highlight (DCA mapping resolves a cue's touched channels)
+    m_scribbleController->setActorLibrary(m_show->actorProfileLibrary());
+    m_scribbleController->setCueList(m_show->cueList());
+    m_scribbleController->setDCAMapping(m_show->dcaMapping());
+    connect(m_show->actorProfileLibrary(), &ActorProfileLibrary::changed, m_scribbleController,
+            &ScribbleController::onActorLibraryChanged);
+    connect(m_channelMonitor, &ChannelMonitor::channelStateChanged, m_scribbleController,
+            &ScribbleController::onChannelStateChanged);
+    connect(m_playbackEngine, &PlaybackEngine::currentCueChanged, m_scribbleController,
+            &ScribbleController::onCurrentCueChanged);
+
+    // seed scribble-highlight + channel-monitor tunables persisted by the
+    // Settings dialog
+    {
+        QSettings settings;
+        settings.beginGroup("Scribble");
+        m_scribbleController->setHighlightColor(
+            settings.value("highlightColor", m_scribbleController->highlightColor()).toInt());
+        m_scribbleController->setHighlightEnabled(
+            settings.value("highlightEnabled", false).toBool());
+        settings.endGroup();
+
+        settings.beginGroup("Monitor");
+        m_channelMonitor->setSilenceThreshold(
+            settings.value("silenceThreshold", m_channelMonitor->silenceThreshold()).toDouble());
+        m_channelMonitor->setClipThreshold(
+            settings.value("clipThreshold", m_channelMonitor->clipThreshold()).toDouble());
+        m_channelMonitor->setSilenceTimeoutMs(
+            settings.value("silenceTimeoutMs", m_channelMonitor->silenceTimeoutMs()).toInt());
+        m_channelMonitor->setClipHoldMs(
+            settings.value("clipHoldMs", m_channelMonitor->clipHoldMs()).toInt());
+        settings.endGroup();
+    }
+
+    // spare-backup mic switch: a queued (Later) switch promotes on the next cue
+    // fire; when the switch goes live, apply the covered actor's backup voice to
+    // the spare channel.
+    connect(m_playbackEngine, &PlaybackEngine::cueExecuted, m_show->spareBackup(),
+            &SpareBackup::onCueFired);
+    connect(m_show->spareBackup(), &SpareBackup::stateChanged, this,
+            [this](SpareBackup::State state) {
+                if (state != SpareBackup::State::Active)
+                    return;
+                SpareBackup* spare = m_show->spareBackup();
+                m_playbackEngine->applyBackupSwitch(spare->allocatedChannel(),
+                                                    spare->spareChannel());
+            });
 }
 
 void Application::setupMixerConnection(const QString& type, const QString& host, int port) {
@@ -140,8 +302,41 @@ void Application::setupMixerConnection(const QString& type, const QString& host,
     m_connectionLogBridge->attachToMixer(m_mixer);
     m_appLogger->logConnectionAttempt(type, host, port);
 
-    connect(m_mixer, &MixerProtocol::connected, this, [this]() { emit mixerConnected(); });
+    connect(m_mixer, &MixerProtocol::connected, this, [this]() {
+        emit mixerConnected();
+        m_mixer->requestConsoleNames(100); // populate the snippet/scene name cache
+    });
     connect(m_mixer, &MixerProtocol::disconnected, this, [this]() { emit mixerDisconnected(); });
+
+    // console-reported snippet/scene names -> show name cache
+    connect(m_mixer, &MixerProtocol::consoleNameReceived, this,
+            [this](bool isScene, int index, const QString& name) {
+                if (name.isEmpty())
+                    return;
+                if (isScene)
+                    m_show->consoleNameCache()->setSceneName(index, name);
+                else
+                    m_show->consoleNameCache()->setSnippetName(index, name);
+            });
+
+    // live console metering -> channel silence/clip monitor
+    connect(m_mixer, &MixerProtocol::channelMeter, m_channelMonitor,
+            [this](int channel, float level) { m_channelMonitor->onLevel(channel, level); });
+
+    // record-faders: live console fader moves write into the current cue
+    connect(m_mixer, &MixerProtocol::channelFaderChanged, this, [this](int channel, double level) {
+        if (!m_recordFadersActive || !m_show->cueList())
+            return;
+        const int idx = m_playbackEngine->currentCueIndex();
+        if (idx < 0 || idx >= m_show->cueList()->count())
+            return;
+        Cue cue = m_show->cueList()->at(idx);
+        cue.setChannelLevel(channel, level);
+        m_show->cueList()->updateCue(idx, cue);
+    });
+
+    // scribble strips push actor names/colors to this console
+    m_scribbleController->setMixer(m_mixer);
 
     m_mixer->connect(host, port);
 
@@ -181,6 +376,7 @@ void Application::connectToDiscoveredConsole(const DiscoveredConsole& console) {
 void Application::disconnectFromMixer() {
     if (m_mixer) {
         m_connectionLogBridge->detachFromMixer();
+        m_scribbleController->setMixer(nullptr);
         m_mixer->disconnect();
         m_playbackEngine->setMixer(nullptr);
         delete m_mixer;
@@ -211,6 +407,13 @@ void Application::startupScan() {
     }
 
     m_discoveryService->startScan(3000);
+}
+
+void Application::setRecordFadersActive(bool active) {
+    if (m_recordFadersActive == active)
+        return;
+    m_recordFadersActive = active;
+    emit recordFadersActiveChanged(active);
 }
 
 void Application::setMainWindow(MainWindow* window) { m_mainWindow = window; }

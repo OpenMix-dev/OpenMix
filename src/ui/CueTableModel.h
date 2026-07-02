@@ -7,12 +7,47 @@ namespace OpenMix {
 
 class CueList;
 class Cue;
+class DCAMapping;
 
 class CueTableModel : public QAbstractTableModel {
     Q_OBJECT
 
   public:
-    enum Column { ColNumber = 0, ColName, ColType, ColGroup, ColTags, ColNotes, ColCount };
+    // ColColor is appended last so existing column indices stay stable for views
+    // that assign per-column delegates/widths by name.
+    // Order mirrors the reference console layout: colour dot, cue number, text,
+    // then recall summaries; editing columns (Type/Group/Tags/Notes/Fade) trail
+    // and are hidden by default.
+    // Fixed columns first; the per-DCA triplet columns [DCA n | fx | pos] are
+    // appended dynamically after ColCount (see columnCount()). The trailing
+    // fixed columns (Type..Fade) are hidden by default, so the visible order is
+    // colour, Cue, Text, FX, Snip, QLab, then the DCA triplets.
+    enum Column {
+        ColColor = 0, // ● cue colour dot
+        ColNumber,    // Cue number
+        ColName,      // Text (cue name)
+        ColFx,        // read-only muted FX units
+        ColScene,     // read-only console scene numbers
+        ColSnip,      // read-only console snippet indices
+        ColExternal,  // linked external-playback cue (QLab/SCS/Cue Player)
+        ColType,
+        ColGroup,
+        ColTags,
+        ColNotes,
+        ColFade, // fade duration (instant / seconds)
+        ColCount
+    };
+
+    // per-DCA columns appended after the fixed ones
+    static constexpr int DcaSubCols = 3; // [assignment | fx | pos]
+    [[nodiscard]] int dcaCount() const { return m_dcaCount; }
+    void setDcaCount(int count);
+    // sub-column 0=assignment, 1=fx, 2=pos, or -1 if col is not a DCA column
+    [[nodiscard]] int dcaSubColumn(int col) const;
+    [[nodiscard]] int dcaOfColumn(int col) const; // 1-based DCA, or -1
+
+    // show-level DCA→channel mapping, used to fill per-DCA fx/pos columns
+    void setDcaMapping(DCAMapping* mapping) { m_dcaMapping = mapping; }
 
     explicit CueTableModel(CueList* cueList, QObject* parent = nullptr);
 
@@ -51,9 +86,12 @@ class CueTableModel : public QAbstractTableModel {
                           const QVariant& newValue);
 
   private slots:
+    void onCueAboutToBeAdded(int index);
     void onCueAdded(int index);
+    void onCueAboutToBeRemoved(int index);
     void onCueRemoved(int index);
     void onCueUpdated(int index);
+    void onCueAboutToBeMoved(int from, int to);
     void onCueMoved(int from, int to);
     void onListCleared();
     void onListLoaded();
@@ -62,6 +100,8 @@ class CueTableModel : public QAbstractTableModel {
     CueList* m_cueList;
     int m_currentIndex = -1;
     int m_standbyIndex = -1;
+    int m_dcaCount = 8;
+    DCAMapping* m_dcaMapping = nullptr;
 
     static const QString s_mimeType;
 };

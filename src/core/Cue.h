@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FadeCurve.h"
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QMap>
@@ -80,6 +81,12 @@ class Cue {
         m_autoFollowCondition = condition;
     }
 
+    // fade transition applied to fader/level moves on fire (0 = instant)
+    [[nodiscard]] double fadeTime() const noexcept { return m_fadeTime; }
+    void setFadeTime(double seconds) { m_fadeTime = seconds; }
+    [[nodiscard]] FadeCurve fadeCurve() const noexcept { return m_fadeCurve; }
+    void setFadeCurve(FadeCurve curve) { m_fadeCurve = curve; }
+
     // DCA targeting
     [[nodiscard]] QSet<int> targetedDCAs() const { return m_targetedDCAs; }
     void setTargetedDCAs(const QSet<int>& dcas) { m_targetedDCAs = dcas; }
@@ -132,6 +139,10 @@ class Cue {
     [[nodiscard]] QString group() const { return m_group; }
     void setGroup(const QString& group) { m_group = group; }
 
+    // linked QLab cue id fired on execute (outbound DAW remote)
+    [[nodiscard]] QString qLabCue() const { return m_qLabCue; }
+    void setQLabCue(const QString& cueId) { m_qLabCue = cueId; }
+
     [[nodiscard]] QStringList tags() const { return m_tags; }
     void setTags(const QStringList& tags) { m_tags = tags; }
     void addTag(const QString& tag) {
@@ -140,11 +151,82 @@ class Cue {
     }
     void removeTag(const QString& tag) { m_tags.removeAll(tag); }
 
+    // named-position assignments (channel# -> Position id; resolved at playback
+    // against the show's PositionLibrary to pan/delay sends)
+    [[nodiscard]] QMap<int, QString> channelPositions() const { return m_channelPositions; }
+    void setChannelPositions(const QMap<int, QString>& positions) { m_channelPositions = positions; }
+    void setChannelPosition(int channel, const QString& positionId);
+    [[nodiscard]] QString channelPosition(int channel) const {
+        return m_channelPositions.value(channel);
+    }
+    void clearChannelPosition(int channel) { m_channelPositions.remove(channel); }
+    void clearChannelPositions() { m_channelPositions.clear(); }
+
     [[nodiscard]] QJsonObject parameters() const { return m_parameters; }
     void setParameters(const QJsonObject& params) { m_parameters = params; }
     void setParameter(const QString& path, const QVariant& value);
     [[nodiscard]] QVariant parameter(const QString& path) const;
     void clearParameters() { m_parameters = QJsonObject(); }
+
+    // per-channel active actor-profile slot (channel -> slot id). On fire, the
+    // active actor on each channel has its stored voice for that slot applied.
+    [[nodiscard]] QMap<int, QString> channelProfiles() const { return m_channelProfiles; }
+    void setChannelProfiles(const QMap<int, QString>& profiles) { m_channelProfiles = profiles; }
+    void setChannelProfile(int channel, const QString& slot) { m_channelProfiles[channel] = slot; }
+    void removeChannelProfile(int channel) { m_channelProfiles.remove(channel); }
+
+    // per-channel fader level override (channel -> 0..1)
+    [[nodiscard]] QMap<int, double> channelLevels() const { return m_channelLevels; }
+    void setChannelLevels(const QMap<int, double>& levels) { m_channelLevels = levels; }
+    void setChannelLevel(int channel, double level) { m_channelLevels[channel] = level; }
+    void removeChannelLevel(int channel) { m_channelLevels.remove(channel); }
+
+    // per-FX-unit mute state (fx unit index -> muted). Sent to the console on fire.
+    [[nodiscard]] QMap<int, bool> fxMutes() const { return m_fxMutes; }
+    void setFxMutes(const QMap<int, bool>& mutes) { m_fxMutes = mutes; }
+    void setFxMute(int fxUnit, bool muted) { m_fxMutes[fxUnit] = muted; }
+    void removeFxMute(int fxUnit) { m_fxMutes.remove(fxUnit); }
+
+    // console snippet indices recalled on fire (partial scene recalls)
+    [[nodiscard]] QList<int> snippets() const { return m_snippets; }
+    void setSnippets(const QList<int>& snippets) { m_snippets = snippets; }
+    void addSnippet(int snippet) {
+        if (!m_snippets.contains(snippet))
+            m_snippets.append(snippet);
+    }
+    void removeSnippet(int snippet) { m_snippets.removeAll(snippet); }
+
+    // console scene numbers recalled on fire
+    [[nodiscard]] QList<int> scenes() const { return m_scenes; }
+    void setScenes(const QList<int>& scenes) { m_scenes = scenes; }
+    void addScene(int scene) {
+        if (!m_scenes.contains(scene))
+            m_scenes.append(scene);
+    }
+    void removeScene(int scene) { m_scenes.removeAll(scene); }
+
+    // per-channel FX-on state applied on fire (channel -> fx active)
+    [[nodiscard]] QMap<int, bool> channelFX() const { return m_channelFX; }
+    void setChannelFX(const QMap<int, bool>& fx) { m_channelFX = fx; }
+    void setChannelFX(int channel, bool active) { m_channelFX[channel] = active; }
+    void removeChannelFX(int channel) { m_channelFX.remove(channel); }
+
+    // display color (hex string, e.g. "#ff0000"); empty = list default
+    [[nodiscard]] QString color() const { return m_color; }
+    void setColor(const QString& color) { m_color = color; }
+
+    // when true, standby advance (next / auto-advance) steps over this cue
+    [[nodiscard]] bool skip() const noexcept { return m_skip; }
+    void setSkip(bool skip) { m_skip = skip; }
+
+    // additively merge another cue's playable content into this one (maps and
+    // lists unite with the other winning on key collisions; scalar content is
+    // overwritten). Identity is preserved: id, number, name, notes stay.
+    void mergeContentFrom(const Cue& other);
+
+    // exchange all playable content with another cue; each keeps its own
+    // identity (id, number, name, notes).
+    void swapContentWith(Cue& other);
 
     QJsonObject toJson() const;
     [[nodiscard]] static Cue fromJson(const QJsonObject& json);
@@ -162,6 +244,9 @@ class Cue {
     bool m_autoFollow;
     double m_autoFollowDelay;
     AutoFollowCondition m_autoFollowCondition;
+
+    double m_fadeTime = 0.0; // fade duration (seconds); 0 = instant
+    FadeCurve m_fadeCurve = FadeCurve::EaseInOut;
 
     // DCA targeting
     QSet<int> m_targetedDCAs;              // empty = all DCAs
@@ -181,8 +266,22 @@ class Cue {
 
     QString m_group;
     QStringList m_tags;
+    QString m_qLabCue; // linked QLab cue id (DAW remote)
+
+    // channel# -> Position id (named-position assignments)
+    QMap<int, QString> m_channelPositions;
 
     QJsonObject m_parameters;
+
+    QMap<int, QString> m_channelProfiles; // channel -> active profile slot id
+    QMap<int, double> m_channelLevels;    // channel -> fader level override (0..1)
+
+    QMap<int, bool> m_fxMutes; // fx unit index -> muted
+    QList<int> m_snippets;     // console snippet indices recalled on fire
+    QList<int> m_scenes;       // console scene numbers recalled on fire
+    QMap<int, bool> m_channelFX; // channel -> fx active
+    QString m_color;          // display color (hex)
+    bool m_skip = false;       // skip during standby advance
 };
 
 } // namespace OpenMix

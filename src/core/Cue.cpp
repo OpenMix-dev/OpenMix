@@ -138,6 +138,14 @@ QVariant Cue::parameter(const QString& path) const {
     return QVariant();
 }
 
+void Cue::setChannelPosition(int channel, const QString& positionId) {
+    if (positionId.isEmpty()) {
+        m_channelPositions.remove(channel);
+    } else {
+        m_channelPositions[channel] = positionId;
+    }
+}
+
 void Cue::setDCAOverride(int dca, const DCAOverride& override) {
     if (override.hasOverrides()) {
         m_dcaOverrides[dca] = override;
@@ -180,6 +188,101 @@ void Cue::copyDCAMappingFrom(const DCAMapping* showMapping) {
     }
 }
 
+void Cue::mergeContentFrom(const Cue& other) {
+    // scalar content overwritten from the other cue
+    m_type = other.m_type;
+    m_autoFollow = other.m_autoFollow;
+    m_autoFollowDelay = other.m_autoFollowDelay;
+    m_autoFollowCondition = other.m_autoFollowCondition;
+    m_fadeTime = other.m_fadeTime;
+    m_fadeCurve = other.m_fadeCurve;
+    m_macroExecutionMode = other.m_macroExecutionMode;
+    m_gotoTarget = other.m_gotoTarget;
+    m_gotoAutoExecute = other.m_gotoAutoExecute;
+    m_stopBehavior = other.m_stopBehavior;
+    m_group = other.m_group;
+    m_qLabCue = other.m_qLabCue;
+    m_color = other.m_color;
+    m_skip = other.m_skip;
+
+    // set/map content unites, other winning on collisions
+    m_targetedDCAs.unite(other.m_targetedDCAs);
+    for (auto it = other.m_dcaOverrides.begin(); it != other.m_dcaOverrides.end(); ++it)
+        m_dcaOverrides.insert(it.key(), it.value());
+    for (auto it = other.m_channelPositions.begin(); it != other.m_channelPositions.end(); ++it)
+        m_channelPositions.insert(it.key(), it.value());
+    for (auto it = other.m_channelProfiles.begin(); it != other.m_channelProfiles.end(); ++it)
+        m_channelProfiles.insert(it.key(), it.value());
+    for (auto it = other.m_channelLevels.begin(); it != other.m_channelLevels.end(); ++it)
+        m_channelLevels.insert(it.key(), it.value());
+    for (auto it = other.m_fxMutes.begin(); it != other.m_fxMutes.end(); ++it)
+        m_fxMutes.insert(it.key(), it.value());
+    if (other.m_dcaChannelMapping) {
+        QMap<int, QList<int>> merged = m_dcaChannelMapping.value_or(QMap<int, QList<int>>());
+        for (auto it = other.m_dcaChannelMapping->begin(); it != other.m_dcaChannelMapping->end();
+             ++it)
+            merged.insert(it.key(), it.value());
+        m_dcaChannelMapping = merged;
+    }
+    if (other.m_dcaBusMapping) {
+        QMap<int, QList<int>> merged = m_dcaBusMapping.value_or(QMap<int, QList<int>>());
+        for (auto it = other.m_dcaBusMapping->begin(); it != other.m_dcaBusMapping->end(); ++it)
+            merged.insert(it.key(), it.value());
+        m_dcaBusMapping = merged;
+    }
+
+    // list content unites without duplicating
+    for (const QString& id : other.m_childCueIds)
+        if (!m_childCueIds.contains(id))
+            m_childCueIds.append(id);
+    for (const QString& tag : other.m_tags)
+        if (!m_tags.contains(tag))
+            m_tags.append(tag);
+    for (int snippet : other.m_snippets)
+        if (!m_snippets.contains(snippet))
+            m_snippets.append(snippet);
+    for (int scene : other.m_scenes)
+        if (!m_scenes.contains(scene))
+            m_scenes.append(scene);
+    for (auto it = other.m_channelFX.begin(); it != other.m_channelFX.end(); ++it)
+        m_channelFX.insert(it.key(), it.value());
+
+    // parameter bag: other's keys overlay
+    for (auto it = other.m_parameters.begin(); it != other.m_parameters.end(); ++it)
+        m_parameters.insert(it.key(), it.value());
+}
+
+void Cue::swapContentWith(Cue& other) {
+    std::swap(m_type, other.m_type);
+    std::swap(m_autoFollow, other.m_autoFollow);
+    std::swap(m_autoFollowDelay, other.m_autoFollowDelay);
+    std::swap(m_autoFollowCondition, other.m_autoFollowCondition);
+    std::swap(m_fadeTime, other.m_fadeTime);
+    std::swap(m_fadeCurve, other.m_fadeCurve);
+    std::swap(m_targetedDCAs, other.m_targetedDCAs);
+    std::swap(m_dcaOverrides, other.m_dcaOverrides);
+    std::swap(m_dcaChannelMapping, other.m_dcaChannelMapping);
+    std::swap(m_dcaBusMapping, other.m_dcaBusMapping);
+    std::swap(m_childCueIds, other.m_childCueIds);
+    std::swap(m_macroExecutionMode, other.m_macroExecutionMode);
+    std::swap(m_gotoTarget, other.m_gotoTarget);
+    std::swap(m_gotoAutoExecute, other.m_gotoAutoExecute);
+    std::swap(m_stopBehavior, other.m_stopBehavior);
+    std::swap(m_group, other.m_group);
+    std::swap(m_tags, other.m_tags);
+    std::swap(m_qLabCue, other.m_qLabCue);
+    std::swap(m_channelPositions, other.m_channelPositions);
+    std::swap(m_parameters, other.m_parameters);
+    std::swap(m_channelProfiles, other.m_channelProfiles);
+    std::swap(m_channelLevels, other.m_channelLevels);
+    std::swap(m_fxMutes, other.m_fxMutes);
+    std::swap(m_snippets, other.m_snippets);
+    std::swap(m_scenes, other.m_scenes);
+    std::swap(m_channelFX, other.m_channelFX);
+    std::swap(m_color, other.m_color);
+    std::swap(m_skip, other.m_skip);
+}
+
 QJsonObject Cue::toJson() const {
     QJsonObject json;
     json["id"] = m_id;
@@ -190,6 +293,10 @@ QJsonObject Cue::toJson() const {
     json["autoFollow"] = m_autoFollow;
     json["autoFollowDelay"] = m_autoFollowDelay;
     json["autoFollowCondition"] = autoFollowConditionToString(m_autoFollowCondition);
+    if (m_fadeTime > 0.0) {
+        json["fadeTime"] = m_fadeTime;
+        json["fadeCurve"] = fadeCurveToString(m_fadeCurve);
+    }
     json["parameters"] = m_parameters;
 
     // DCA targeting
@@ -258,6 +365,9 @@ QJsonObject Cue::toJson() const {
     if (!m_group.isEmpty()) {
         json["group"] = m_group;
     }
+    if (!m_qLabCue.isEmpty()) {
+        json["qLabCue"] = m_qLabCue;
+    }
     if (!m_tags.isEmpty()) {
         QJsonArray tagsArray;
         for (const QString& tag : m_tags) {
@@ -265,6 +375,70 @@ QJsonObject Cue::toJson() const {
         }
         json["tags"] = tagsArray;
     }
+
+    // per-channel actor-profile slots: { "<channel>": "<slot>" }
+    if (!m_channelProfiles.isEmpty()) {
+        QJsonObject profilesObj;
+        for (auto it = m_channelProfiles.constBegin(); it != m_channelProfiles.constEnd(); ++it) {
+            profilesObj[QString::number(it.key())] = it.value();
+        }
+        json["channelProfiles"] = profilesObj;
+    }
+
+    // per-channel level overrides: { "<channel>": level }
+    if (!m_channelLevels.isEmpty()) {
+        QJsonObject levelsObj;
+        for (auto it = m_channelLevels.constBegin(); it != m_channelLevels.constEnd(); ++it) {
+            levelsObj[QString::number(it.key())] = it.value();
+        }
+        json["channelLevels"] = levelsObj;
+    }
+
+    // named-position assignments
+    if (!m_channelPositions.isEmpty()) {
+        QJsonObject positionsObj;
+        for (auto it = m_channelPositions.constBegin(); it != m_channelPositions.constEnd(); ++it) {
+            positionsObj[QString::number(it.key())] = it.value();
+        }
+        json["channelPositions"] = positionsObj;
+    }
+
+    // per-FX-unit mute states: { "<unit>": muted }
+    if (!m_fxMutes.isEmpty()) {
+        QJsonObject fxObj;
+        for (auto it = m_fxMutes.constBegin(); it != m_fxMutes.constEnd(); ++it) {
+            fxObj[QString::number(it.key())] = it.value();
+        }
+        json["fxMutes"] = fxObj;
+    }
+
+    // console snippets recalled on fire
+    if (!m_snippets.isEmpty()) {
+        QJsonArray snippetArray;
+        for (int snippet : m_snippets) {
+            snippetArray.append(snippet);
+        }
+        json["snippets"] = snippetArray;
+    }
+
+    if (!m_scenes.isEmpty()) {
+        QJsonArray sceneArray;
+        for (int scene : m_scenes)
+            sceneArray.append(scene);
+        json["scenes"] = sceneArray;
+    }
+
+    if (!m_channelFX.isEmpty()) {
+        QJsonObject fxChanObj;
+        for (auto it = m_channelFX.constBegin(); it != m_channelFX.constEnd(); ++it)
+            fxChanObj[QString::number(it.key())] = it.value();
+        json["channelFX"] = fxChanObj;
+    }
+
+    if (!m_color.isEmpty()) {
+        json["color"] = m_color;
+    }
+    json["skip"] = m_skip;
 
     return json;
 }
@@ -282,6 +456,8 @@ Cue Cue::fromJson(const QJsonObject& json) {
     cue.m_autoFollow = json["autoFollow"].toBool();
     cue.m_autoFollowDelay = json["autoFollowDelay"].toDouble();
     cue.m_autoFollowCondition = stringToAutoFollowCondition(json["autoFollowCondition"].toString());
+    cue.m_fadeTime = json["fadeTime"].toDouble(0.0);
+    cue.m_fadeCurve = stringToFadeCurve(json["fadeCurve"].toString());
     cue.m_parameters = json["parameters"].toObject();
 
     // DCA targeting
@@ -347,12 +523,68 @@ Cue Cue::fromJson(const QJsonObject& json) {
     cue.m_stopBehavior = stringToStopBehavior(json["stopBehavior"].toString());
 
     cue.m_group = json["group"].toString();
+    cue.m_qLabCue = json["qLabCue"].toString();
     if (json.contains("tags")) {
         QJsonArray tagsArray = json["tags"].toArray();
         for (const QJsonValue& val : tagsArray) {
             cue.m_tags.append(val.toString());
         }
     }
+
+    // per-channel actor-profile slots
+    if (json.contains("channelProfiles")) {
+        const QJsonObject profilesObj = json["channelProfiles"].toObject();
+        for (auto it = profilesObj.constBegin(); it != profilesObj.constEnd(); ++it) {
+            cue.m_channelProfiles[it.key().toInt()] = it.value().toString();
+        }
+    }
+
+    // per-channel level overrides
+    if (json.contains("channelLevels")) {
+        const QJsonObject levelsObj = json["channelLevels"].toObject();
+        for (auto it = levelsObj.constBegin(); it != levelsObj.constEnd(); ++it) {
+            cue.m_channelLevels[it.key().toInt()] = it.value().toDouble();
+        }
+    }
+
+    // named-position assignments
+    if (json.contains("channelPositions")) {
+        QJsonObject positionsObj = json["channelPositions"].toObject();
+        for (auto it = positionsObj.constBegin(); it != positionsObj.constEnd(); ++it) {
+            cue.m_channelPositions[it.key().toInt()] = it.value().toString();
+        }
+    }
+
+    // per-FX-unit mute states
+    if (json.contains("fxMutes")) {
+        const QJsonObject fxObj = json["fxMutes"].toObject();
+        for (auto it = fxObj.constBegin(); it != fxObj.constEnd(); ++it) {
+            cue.m_fxMutes[it.key().toInt()] = it.value().toBool();
+        }
+    }
+
+    // console snippets
+    if (json.contains("snippets")) {
+        const QJsonArray snippetArray = json["snippets"].toArray();
+        for (const QJsonValue& val : snippetArray) {
+            cue.m_snippets.append(val.toInt());
+        }
+    }
+
+    if (json.contains("scenes")) {
+        const QJsonArray sceneArray = json["scenes"].toArray();
+        for (const QJsonValue& val : sceneArray)
+            cue.m_scenes.append(val.toInt());
+    }
+
+    if (json.contains("channelFX")) {
+        const QJsonObject fxChanObj = json["channelFX"].toObject();
+        for (auto it = fxChanObj.constBegin(); it != fxChanObj.constEnd(); ++it)
+            cue.m_channelFX[it.key().toInt()] = it.value().toBool();
+    }
+
+    cue.m_color = json["color"].toString();
+    cue.m_skip = json["skip"].toBool(false);
 
     return cue;
 }

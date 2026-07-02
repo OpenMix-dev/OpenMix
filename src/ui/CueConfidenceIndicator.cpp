@@ -1,4 +1,5 @@
 #include "CueConfidenceIndicator.h"
+#include "theme/Theme.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
 #include "core/CueValidator.h"
@@ -56,24 +57,32 @@ void CueConfidenceIndicator::validate() {
     emit validationCompleted(m_level);
 }
 
+void CueConfidenceIndicator::setConfidence(ConfidenceLevel level, const QString& tooltip) {
+    m_level = level;
+    m_tooltipText = tooltip;
+    setToolTip(tooltip);
+    update();
+    emit validationCompleted(m_level);
+}
+
 QString CueConfidenceIndicator::tooltipText() const { return m_tooltipText; }
 
-QSize CueConfidenceIndicator::sizeHint() const { return QSize(16, 16); }
+QSize CueConfidenceIndicator::sizeHint() const { return QSize(20, 20); }
 
-QSize CueConfidenceIndicator::minimumSizeHint() const { return QSize(12, 12); }
+QSize CueConfidenceIndicator::minimumSizeHint() const { return QSize(18, 18); }
 
 QColor CueConfidenceIndicator::colorForLevel(ConfidenceLevel level) {
     switch (level) {
     case ConfidenceLevel::Good:
-        return QColor(76, 175, 80); // green
+        return Theme::color(Theme::Colors::AccentGreen);
     case ConfidenceLevel::Warning:
-        return QColor(255, 193, 7); // amber
+        return Theme::color(Theme::Colors::AccentAmber);
     case ConfidenceLevel::Error:
-        return QColor(244, 67, 54); // red
+        return Theme::color(Theme::Colors::AccentRed);
     case ConfidenceLevel::Unknown:
-        return QColor(158, 158, 158); // gray
+        return Theme::color(Theme::Colors::TextTertiary);
     }
-    return QColor(158, 158, 158);
+    return Theme::color(Theme::Colors::TextTertiary);
 }
 
 QString CueConfidenceIndicator::iconForLevel(ConfidenceLevel level) {

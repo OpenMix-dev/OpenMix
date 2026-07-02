@@ -1,7 +1,11 @@
 #include "X32Protocol.h"
 #include "../../core/Cue.h"
 #include <QDateTime>
+#include <QtEndian>
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstring>
 
 namespace OpenMix {
 
@@ -9,6 +13,40 @@ namespace {
 constexpr int MAX_X32_INPUT_CHANNELS = 32;
 constexpr int MAX_X32_EFFECT_SENDS = 16;
 constexpr int MAX_X32_MIX_BUSES = 16;
+
+// X32 OSC encodes most continuous params as a normalized float 0..1 mapped onto
+// the parameter's real range. These helpers convert real-world units to that
+// 0..1 value. The curves are close approximations of the console's mapping; the
+// exact lookup tables can refine the constants without changing call sites.
+QString x32Channel(int channel) { return QString("/ch/%1").arg(channel, 2, 10, QChar('0')); }
+
+float clampUnit(double v) { return static_cast<float>(std::clamp(v, 0.0, 1.0)); }
+
+float linNorm(double v, double lo, double hi) { return clampUnit((v - lo) / (hi - lo)); }
+
+float logNorm(double v, double lo, double hi) {
+    if (v <= lo)
+        return 0.0f;
+    if (v >= hi)
+        return 1.0f;
+    return static_cast<float>(std::log(v / lo) / std::log(hi / lo));
+}
+
+// X32 compressor ratio is an enum index into a fixed table
+int x32RatioIndex(double ratio) {
+    static constexpr std::array<double, 12> ratios = {1.1, 1.3, 1.5, 2.0, 2.5, 3.0,
+                                                      4.0, 5.0, 7.0, 10.0, 20.0, 100.0};
+    int best = 0;
+    double bestDiff = 1e9;
+    for (int i = 0; i < static_cast<int>(ratios.size()); ++i) {
+        double diff = std::abs(ratios[i] - ratio);
+        if (diff < bestDiff) {
+            bestDiff = diff;
+            best = i;
+        }
+    }
+    return best;
+}
 } // namespace
 
 X32Protocol::X32Protocol(const MixerCapabilities& caps, QObject* parent)
@@ -225,12 +263,93 @@ void X32Protocol::recallScene(int sceneNumber) {
     m_transport.send("/-action/goscene", sceneNumber);
 }
 
+void X32Protocol::recallSnippet(int snippetNumber) {
+    if (m_connectionState != ConnectionState::Connected)
+        return;
+
+    // X32 snippet recall: /-action/gosnippet followed by snippet number
+    m_transport.send("/-action/gosnippet", snippetNumber);
+}
+
+void X32Protocol::setChannelFader(int channel, double level) {
+    sendParameter(x32Channel(channel) + "/mix/fader", clampUnit(level));
+}
+
+std::optional<double> X32Protocol::readChannelFader(int channel) {
+    const QVariant value = getParameter(x32Channel(channel) + "/mix/fader");
+    if (!value.isValid())
+        return std::nullopt;
+    return value.toDouble();
+}
+
+void X32Protocol::setChannelMute(int channel, bool muted) {
+    // /mix/on: 1 = on (unmuted), 0 = muted
+    sendParameter(x32Channel(channel) + "/mix/on", muted ? 0 : 1);
+}
+
+void X32Protocol::setChannelPreamp(int channel, double gainDb) {
+    // per-channel digital trim, +/-18 dB (head-amp analog gain is patch-dependent)
+    sendParameter(x32Channel(channel) + "/preamp/trim", linNorm(gainDb, -18.0, 18.0));
+}
+
+void X32Protocol::setChannelHpf(int channel, bool on, double freqHz) {
+    const QString ch = x32Channel(channel);
+    sendParameter(ch + "/preamp/hpon", on ? 1 : 0);
+    sendParameter(ch + "/preamp/hpf", logNorm(freqHz, 20.0, 400.0));
+}
+
+void X32Protocol::setChannelEqOn(int channel, bool on) {
+    sendParameter(x32Channel(channel) + "/eq/on", on ? 1 : 0);
+}
+
+void X32Protocol::setChannelEqBand(int channel, int band, bool /*on*/, int type, double freqHz,
+                                   double gainDb, double q) {
+    // X32 EQ has no per-band enable; the band's type selects its shape.
+    const QString prefix = QString("%1/eq/%2").arg(x32Channel(channel)).arg(band);
+    sendParameter(prefix + "/type", type);
+    sendParameter(prefix + "/f", logNorm(freqHz, 20.0, 20000.0));
+    sendParameter(prefix + "/g", linNorm(gainDb, -15.0, 15.0));
+    // X32 Q is descending: norm 0.0 = Q10.0, norm 1.0 = Q0.3
+    sendParameter(prefix + "/q", 1.0f - logNorm(q, 0.3, 10.0));
+}
+
+void X32Protocol::setChannelDynamics(int channel, bool on, double thresholdDb, double ratio,
+                                     double attackMs, double releaseMs, double makeupDb) {
+    const QString ch = x32Channel(channel);
+    sendParameter(ch + "/dyn/on", on ? 1 : 0);
+    sendParameter(ch + "/dyn/thr", linNorm(thresholdDb, -60.0, 0.0));
+    sendParameter(ch + "/dyn/ratio", x32RatioIndex(ratio));
+    sendParameter(ch + "/dyn/attack", linNorm(attackMs, 0.0, 120.0));
+    sendParameter(ch + "/dyn/release", logNorm(releaseMs, 5.0, 4000.0));
+    sendParameter(ch + "/dyn/mgain", linNorm(makeupDb, 0.0, 24.0));
+}
+
+void X32Protocol::setChannelName(int channel, const QString& name) {
+    // scribble-strip label; the console truncates to its display width
+    sendParameter(x32Channel(channel) + "/config/name", name);
+}
+
+void X32Protocol::setChannelColor(int channel, int color) {
+    // /config/color is a palette index (0..15)
+    sendParameter(x32Channel(channel) + "/config/color", color);
+}
+
 void X32Protocol::refresh() {
     if (m_connectionState != ConnectionState::Connected)
         return;
 
     for (const QString& param : m_snapshotParams) {
         requestParameter(param);
+    }
+}
+
+void X32Protocol::requestConsoleNames(int count) {
+    if (m_connectionState != ConnectionState::Connected)
+        return;
+    for (int i = 1; i <= count; ++i) {
+        const QString idx = QStringLiteral("%1").arg(i, 3, 10, QChar('0'));
+        requestParameter(QStringLiteral("/-show/showfile/snippet/%1/name").arg(idx));
+        requestParameter(QStringLiteral("/-show/showfile/scene/%1/name").arg(idx));
     }
 }
 
@@ -278,6 +397,7 @@ void X32Protocol::onKeepAliveTimeout() {
         }
 
         m_transport.send("/xremote");
+        m_transport.send(QString("/meters"), QString("/meters/1"));
     }
 }
 
@@ -357,6 +477,27 @@ void X32Protocol::processResponse(const QString& path, const QVariant& value) {
         return;
     }
 
+    if (path == "/meters/1") {
+        parseMeters(value.toByteArray());
+        return;
+    }
+
+    // console snippet/scene name responses -> name cache
+    static const QRegularExpression nameRe(
+        QStringLiteral("^/-show/showfile/(scene|snippet)/(\\d+)/name$"));
+    const QRegularExpressionMatch nameMatch = nameRe.match(path);
+    if (nameMatch.hasMatch()) {
+        emit consoleNameReceived(nameMatch.captured(1) == QLatin1String("scene"),
+                                 nameMatch.captured(2).toInt(), value.toString());
+    }
+
+    // input-channel fader move -> semantic signal (used by record-faders)
+    static const QRegularExpression faderRe(QStringLiteral("^/ch/(\\d+)/mix/fader$"));
+    const QRegularExpressionMatch faderMatch = faderRe.match(path);
+    if (faderMatch.hasMatch() && value.isValid()) {
+        emit channelFaderChanged(faderMatch.captured(1).toInt(), value.toDouble());
+    }
+
     if (m_pendingRequests.contains(path)) {
         X32PendingRequest req = m_pendingRequests.take(path);
         qint64 roundTrip = now - req.sentTime;
@@ -370,6 +511,25 @@ void X32Protocol::processResponse(const QString& path, const QVariant& value) {
     if (value.isValid()) {
         m_parameterCache[path] = value;
         emit parameterChanged(path, value);
+    }
+}
+
+void X32Protocol::parseMeters(const QByteArray& blob) {
+    // /meters/1 blob content: [uint32 LE count][count * float32 LE], each a
+    // linear input-channel level 0..1. Map the first N to channels 1..N.
+    if (blob.size() < 4)
+        return;
+    const auto* bytes = reinterpret_cast<const uchar*>(blob.constData());
+    const int count = static_cast<int>(qFromLittleEndian<quint32>(bytes));
+    const int maxCh = std::min(count, m_capabilities.inputChannels);
+    for (int i = 0; i < maxCh; ++i) {
+        const int off = 4 + i * 4;
+        if (off + 4 > blob.size())
+            break;
+        const quint32 raw = qFromLittleEndian<quint32>(bytes + off);
+        float level = 0.0f;
+        std::memcpy(&level, &raw, sizeof(float));
+        emit channelMeter(i + 1, level);
     }
 }
 
@@ -387,6 +547,8 @@ void X32Protocol::handleXinfoResponse([[maybe_unused]] const QVariant& value) {
         m_reconnectAttempts = 0;
 
         m_transport.send("/xremote");
+        // subscribe to input-channel meters (bank 1); renewed on keep-alive
+        m_transport.send(QString("/meters"), QString("/meters/1"));
         emit connected();
     }
 }

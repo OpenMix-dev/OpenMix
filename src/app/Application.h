@@ -16,12 +16,19 @@ class PlaybackGuard;
 class PlaybackLogger;
 class DryRunEngine;
 class ShortcutManager;
-class OperationModeManager;
 class CrashRecovery;
 class MidiInputManager;
 class ConsoleDiscoveryService;
 class AppLogger;
 class ConnectionLogBridge;
+class OscRemoteServer;
+class QLabClient;
+class ReaperClient;
+class CuePlayerClient;
+class ScsClient;
+class TimecodeTriggerList;
+class ChannelMonitor;
+class ScribbleController;
 struct DiscoveredConsole;
 
 class Application : public QObject {
@@ -49,7 +56,6 @@ class Application : public QObject {
 
     // operator experience
     [[nodiscard]] ShortcutManager* shortcutManager() { return m_shortcutManager; }
-    [[nodiscard]] OperationModeManager* operationModeManager() { return m_operationModeManager; }
 
     // recovery
     [[nodiscard]] CrashRecovery* crashRecovery() { return m_crashRecovery; }
@@ -63,6 +69,22 @@ class Application : public QObject {
     // application logging
     [[nodiscard]] AppLogger* appLogger() { return m_appLogger; }
 
+    // inbound OSC remote control (QLab / stage-manager)
+    [[nodiscard]] OscRemoteServer* oscRemoteServer() { return m_oscRemoteServer; }
+
+    // outbound QLab / DAW remote
+    [[nodiscard]] QLabClient* qLabClient() { return m_qLabClient; }
+    [[nodiscard]] ReaperClient* reaperClient() { return m_reaperClient; }
+    [[nodiscard]] CuePlayerClient* cuePlayerClient() { return m_cuePlayerClient; }
+    [[nodiscard]] ScsClient* scsClient() { return m_scsClient; }
+
+    // timecode triggers + channel monitor
+    [[nodiscard]] TimecodeTriggerList* timecodeTriggers() { return m_timecodeTriggers; }
+    [[nodiscard]] ChannelMonitor* channelMonitor() { return m_channelMonitor; }
+
+    // scribble-strip driver (actor names, cue number, silence/clip colors)
+    [[nodiscard]] ScribbleController* scribbleController() { return m_scribbleController; }
+
     // mixer connection
     void connectToMixer(const QString& type, const QString& host, int port);
     void connectToDiscoveredConsole(const DiscoveredConsole& console);
@@ -71,6 +93,11 @@ class Application : public QObject {
     // main window
     void setMainWindow(MainWindow* window);
     [[nodiscard]] MainWindow* mainWindow();
+
+    // record-faders: while active, console fader moves are written live into the
+    // current cue's channel levels.
+    void setRecordFadersActive(bool active);
+    [[nodiscard]] bool recordFadersActive() const { return m_recordFadersActive; }
 
     // initialization
     void initialize();
@@ -81,6 +108,7 @@ class Application : public QObject {
   signals:
     void mixerConnected();
     void mixerDisconnected();
+    void recordFadersActiveChanged(bool active);
 
   private:
     void setupMixerConnection(const QString& type, const QString& host, int port);
@@ -104,7 +132,6 @@ class Application : public QObject {
 
     // operator experience
     ShortcutManager* m_shortcutManager;
-    OperationModeManager* m_operationModeManager;
 
     // recovery
     CrashRecovery* m_crashRecovery;
@@ -118,6 +145,24 @@ class Application : public QObject {
     // application logging
     AppLogger* m_appLogger;
     ConnectionLogBridge* m_connectionLogBridge;
+
+    // inbound OSC remote control
+    OscRemoteServer* m_oscRemoteServer;
+
+    // outbound QLab / DAW remote
+    QLabClient* m_qLabClient;
+    ReaperClient* m_reaperClient;
+    CuePlayerClient* m_cuePlayerClient;
+    ScsClient* m_scsClient;
+
+    bool m_recordFadersActive = false;
+
+    // timecode-triggered cues + channel silence/clip monitoring
+    TimecodeTriggerList* m_timecodeTriggers;
+    ChannelMonitor* m_channelMonitor;
+
+    // scribble-strip driver
+    ScribbleController* m_scribbleController;
 };
 
 } // namespace OpenMix

@@ -225,6 +225,97 @@ void WingProtocol::recallScene(int sceneNumber) {
     m_transport.send("/action/scenes/recall", sceneNumber);
 }
 
+void WingProtocol::recallSnippet(int snippetNumber) {
+    if (m_connectionState != ConnectionState::Connected)
+        return;
+
+    // WING snippet recall
+    m_transport.send("/-action/gosnippet", snippetNumber);
+}
+
+namespace {
+QString wingChannel(int channel) { return QString("/ch/%1").arg(channel); }
+
+// WING faders carry real-world dB; map a normalized 0..1 level onto the exact
+// X32/WING fader law (piecewise-linear in dB, per the Maillot/WING references):
+//   0.0000-0.0625 -> -inf..-60, 0.0625-0.25 -> -60..-30,
+//   0.25-0.5      -> -30..-10,  0.5-1.0      -> -10..+10  (0.75 = 0 dB).
+float wingFaderDb(double level) {
+    level = std::clamp(level, 0.0, 1.0);
+    if (level <= 0.0)
+        return -144.0f; // -inf floor
+    if (level < 0.0625)
+        return static_cast<float>(-60.0 - (0.0625 - level) / 0.0625 * 84.0);
+    if (level < 0.25)
+        return static_cast<float>(level * 160.0 - 70.0);
+    if (level < 0.5)
+        return static_cast<float>(level * 80.0 - 50.0);
+    return static_cast<float>(level * 40.0 - 30.0);
+}
+
+// WING STD EQ exposes named bands l,1,2,3,4,h (not numbered 1..N)
+QString wingEqBand(int band) {
+    static const char* tokens[] = {"l", "1", "2", "3", "4", "h"};
+    int idx = std::clamp(band - 1, 0, 5);
+    return tokens[idx];
+}
+} // namespace
+
+void WingProtocol::setChannelFader(int channel, double level) {
+    sendParameter(wingChannel(channel) + "/fdr", wingFaderDb(level));
+}
+
+void WingProtocol::setChannelMute(int channel, bool muted) {
+    // WING /mute polarity is the opposite of X32: 1 = muted, 0 = unmuted
+    sendParameter(wingChannel(channel) + "/mute", muted ? 1 : 0);
+}
+
+void WingProtocol::setChannelPreamp(int channel, double gainDb) {
+    // per-channel head-amp gain (real dB), follows the patched source
+    sendParameter(wingChannel(channel) + "/in/set/$g", static_cast<float>(gainDb));
+}
+
+void WingProtocol::setChannelHpf(int channel, bool on, double freqHz) {
+    // WING's HPF is the channel low-cut filter
+    const QString ch = wingChannel(channel);
+    sendParameter(ch + "/flt/lc", on ? 1 : 0);
+    sendParameter(ch + "/flt/lcf", static_cast<float>(freqHz));
+}
+
+void WingProtocol::setChannelEqOn(int channel, bool on) {
+    sendParameter(wingChannel(channel) + "/eq/on", on ? 1 : 0);
+}
+
+void WingProtocol::setChannelEqBand(int channel, int band, bool /*on*/, int /*type*/, double freqHz,
+                                    double gainDb, double q) {
+    // WING named bands carry real-world values: /ch/N/eq/<tok>{g,f,q}
+    const QString prefix = wingChannel(channel) + "/eq/" + wingEqBand(band);
+    sendParameter(prefix + "g", static_cast<float>(gainDb));
+    sendParameter(prefix + "f", static_cast<float>(freqHz));
+    sendParameter(prefix + "q", static_cast<float>(q));
+}
+
+void WingProtocol::setChannelDynamics(int channel, bool on, double thresholdDb, double ratio,
+                                      double attackMs, double releaseMs, double makeupDb) {
+    const QString ch = wingChannel(channel);
+    sendParameter(ch + "/dyn/on", on ? 1 : 0);
+    sendParameter(ch + "/dyn/thr", static_cast<float>(thresholdDb));
+    sendParameter(ch + "/dyn/ratio", static_cast<float>(ratio));
+    sendParameter(ch + "/dyn/att", static_cast<float>(attackMs));
+    sendParameter(ch + "/dyn/rel", static_cast<float>(releaseMs));
+    sendParameter(ch + "/dyn/gain", static_cast<float>(makeupDb));
+}
+
+void WingProtocol::setChannelName(int channel, const QString& name) {
+    // WING channel name node (best-effort; console truncates to display width)
+    sendParameter(wingChannel(channel) + "/$name", name);
+}
+
+void WingProtocol::setChannelColor(int channel, int color) {
+    // WING channel color index (best-effort; palette differs from X32)
+    sendParameter(wingChannel(channel) + "/col", color);
+}
+
 void WingProtocol::refresh() {
     if (m_connectionState != ConnectionState::Connected)
         return;

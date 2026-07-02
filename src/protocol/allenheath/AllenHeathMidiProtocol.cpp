@@ -66,26 +66,48 @@ void AllenHeathMidiProtocol::sendParameter(const QString& path, const QVariant& 
             QString param = parts[3];
 
             if (param == "fader") {
-                // DCA fader: NRPN message
-                // value is 0.0-1.0, convert to 14-bit MIDI value (0-16383)
+                // DCA level: 14-bit NRPN (SQ Issue 5, Master Sends/Control p24)
                 int midiValue = qBound(0, static_cast<int>(value.toFloat() * 16383.0f), 16383);
-                int msb = (midiValue >> 7) & 0x7F;
-                int lsb = midiValue & 0x7F;
-
-                // Allen & Heath NRPN for DCA fader
-                // NRPN MSB = 0x63, NRPN LSB varies by DCA
-                QByteArray msg = buildNRPNMessage(0, 0x63, dca - 1, msb, lsb);
+                QByteArray msg = buildNRPNMessage(0, DCA_LEVEL_MSB, DCA_LEVEL_LSB_BASE + dca - 1,
+                                                  (midiValue >> 7) & 0x7F, midiValue & 0x7F);
                 m_transport.send(msg);
             } else if (param == "mute") {
-                // DCA mute: Control Change
-                int muteValue = value.toBool() ? 127 : 0;
-                QByteArray msg = buildControlChange(0, 0x50 + dca - 1, muteValue);
+                // SQ mute is an NRPN; value-fine 1 = muted, 0 = unmuted (p11/p21)
+                QByteArray msg =
+                    buildNRPNMessage(0, DCA_MUTE_MSB, dca - 1, 0x00, value.toBool() ? 0x01 : 0x00);
+                m_transport.send(msg);
+            }
+        }
+    } else if (path.startsWith("/ch/")) {
+        QStringList parts = path.split('/');
+        if (parts.size() >= 4) {
+            int ch = parts[2].toInt();
+            QString param = parts[3];
+
+            if (param == "fader") {
+                // input-channel level to LR: 14-bit NRPN (SQ Issue 5 p22)
+                int midiValue = qBound(0, static_cast<int>(value.toFloat() * 16383.0f), 16383);
+                QByteArray msg = buildNRPNMessage(0, CH_LEVEL_TO_LR_MSB, ch - 1,
+                                                  (midiValue >> 7) & 0x7F, midiValue & 0x7F);
+                m_transport.send(msg);
+            } else if (param == "mute") {
+                QByteArray msg =
+                    buildNRPNMessage(0, CH_MUTE_MSB, ch - 1, 0x00, value.toBool() ? 0x01 : 0x00);
                 m_transport.send(msg);
             }
         }
     }
 
     m_parameterCache[path] = value;
+}
+
+void AllenHeathMidiProtocol::setChannelFader(int channel, double level) {
+    // route through the path-based encoder above (keeps one wire-format code path)
+    sendParameter(QString("/ch/%1/fader").arg(channel), static_cast<float>(level));
+}
+
+void AllenHeathMidiProtocol::setChannelMute(int channel, bool muted) {
+    sendParameter(QString("/ch/%1/mute").arg(channel), muted);
 }
 
 QVariant AllenHeathMidiProtocol::getParameter(const QString& path) {

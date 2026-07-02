@@ -53,6 +53,9 @@ inline QIcon mediaNext() { return fromPath(":/qlementine/icons/16/navigation/che
 inline QIcon warning() { return fromPath(":/qlementine/icons/16/misc/warning.svg"); }
 
 inline QIcon sliders() { return fromPath(":/qlementine/icons/16/navigation/sliders-vertical.svg"); }
+inline QIcon clock() { return fromPath(":/qlementine/icons/16/misc/clock.svg"); }
+inline QIcon location() { return fromPath(":/qlementine/icons/16/misc/location.svg"); }
+inline QIcon info() { return fromPath(":/qlementine/icons/16/misc/info.svg"); }
 inline QIcon audioVolume() { return fromPath(":/qlementine/icons/16/audio/speaker-2.svg"); }
 inline QIcon network() { return fromPath(":/qlementine/icons/16/hardware/network.svg"); }
 inline QIcon refresh() { return fromPath(":/qlementine/icons/16/action/refresh.svg"); }
@@ -60,5 +63,13 @@ inline QIcon disconnect() { return fromPath(":/qlementine/icons/16/action/link-b
 inline QIcon download() { return fromPath(":/qlementine/icons/16/action/download.svg"); }
 inline QIcon upload() { return fromPath(":/qlementine/icons/16/document/open.svg"); }
 inline QIcon helpAbout() { return fromPath(":/qlementine/icons/16/misc/help.svg"); }
+
+inline QIcon actorSetup() { return fromPath(":/qlementine/icons/16/misc/users.svg"); }
+inline QIcon actor() { return fromPath(":/qlementine/icons/16/misc/user.svg"); }
+inline QIcon remoteControl() { return fromPath(":/qlementine/icons/16/hardware/radio.svg"); }
+inline QIcon copy() { return fromPath(":/qlementine/icons/16/action/copy.svg"); }
+inline QIcon paste() { return fromPath(":/qlementine/icons/16/action/paste.svg"); }
+inline QIcon moveUp() { return fromPath(":/qlementine/icons/16/navigation/chevron-up.svg"); }
+inline QIcon moveDown() { return fromPath(":/qlementine/icons/16/navigation/chevron-down.svg"); }
 
 } // namespace OpenMix::Icons

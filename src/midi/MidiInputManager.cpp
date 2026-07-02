@@ -1,4 +1,5 @@
 #include "MidiInputManager.h"
+#include "MscParser.h"
 #include "core/PlaybackEngine.h"
 #include "core/PlaybackGuard.h"
 
@@ -61,7 +62,10 @@ bool MidiInputManager::openDevice(int deviceIndex) {
     try {
         m_midiIn->openPort(deviceIndex);
         m_midiIn->setCallback(&MidiInputManager::midiCallback, this);
-        m_midiIn->ignoreTypes(true, true, true); // ignore sysex, timing, active sensing
+        // receive sysex (MIDI Show Control) and timing (MTC quarter-frame, 0xF1);
+        // still ignore active sensing. Single-byte clock (0xF8) is dropped by the
+        // size check in processMidiMessage.
+        m_midiIn->ignoreTypes(false, false, true);
 
         m_currentDeviceName = QString::fromStdString(m_midiIn->getPortName(deviceIndex));
         m_savedDeviceName = m_currentDeviceName;
@@ -124,6 +128,21 @@ void MidiInputManager::clearMappings() {
     emit mappingsChanged();
 }
 
+void MidiInputManager::setMuteAssignments(const QVector<MidiMuteAssignment>& assignments) {
+    m_muteAssignments = assignments;
+    emit mappingsChanged();
+}
+
+void MidiInputManager::addMuteAssignment(const MidiMuteAssignment& assignment) {
+    m_muteAssignments.append(assignment);
+    emit mappingsChanged();
+}
+
+void MidiInputManager::clearMuteAssignments() {
+    m_muteAssignments.clear();
+    emit mappingsChanged();
+}
+
 bool MidiInputManager::hasConflict(const MidiTrigger& trigger, int excludeIndex) const {
     for (int i = 0; i < m_mappings.size(); ++i) {
         if (i == excludeIndex)
@@ -153,6 +172,12 @@ void MidiInputManager::saveToSettings() {
     QJsonDocument doc(mappingsArray);
     settings.setValue("mappings", doc.toJson(QJsonDocument::Compact));
 
+    QJsonArray muteArray;
+    for (const MidiMuteAssignment& mute : m_muteAssignments) {
+        muteArray.append(mute.toJson());
+    }
+    settings.setValue("muteAssignments", QJsonDocument(muteArray).toJson(QJsonDocument::Compact));
+
     settings.endGroup();
 }
 
@@ -171,6 +196,15 @@ void MidiInputManager::loadFromSettings() {
         m_mappings.clear();
         for (const QJsonValue& val : mappingsArray) {
             m_mappings.append(MidiMapping::fromJson(val.toObject()));
+        }
+    }
+
+    QString muteJson = settings.value("muteAssignments").toString();
+    if (!muteJson.isEmpty()) {
+        QJsonArray muteArray = QJsonDocument::fromJson(muteJson.toUtf8()).array();
+        m_muteAssignments.clear();
+        for (const QJsonValue& val : muteArray) {
+            m_muteAssignments.append(MidiMuteAssignment::fromJson(val.toObject()));
         }
     }
 
@@ -240,6 +274,22 @@ void MidiInputManager::processMidiMessage(const std::vector<unsigned char>& mess
     if (message.size() < 2)
         return;
 
+    // System Exclusive — MIDI Show Control frames drive the playback engine
+    if (message[0] == 0xF0) {
+        handleSysex(message);
+        return;
+    }
+
+    // MIDI Time Code quarter-frame (0xF1 + data nibble): assemble the running
+    // timecode; emit once a full hh:mm:ss:ff frame completes (every 8th message)
+    if (message[0] == 0xF1) {
+        if (m_mtcParser.parseQuarterFrame(message[1])) {
+            const MtcTime tc = m_mtcParser.time();
+            emit timecodeChanged(tc.hours, tc.minutes, tc.seconds, tc.frames);
+        }
+        return;
+    }
+
     unsigned char status = message[0];
     int channel = status & 0x0F;
     int statusType = status & 0xF0;
@@ -294,6 +344,49 @@ void MidiInputManager::processMidiMessage(const std::vector<unsigned char>& mess
             break; // only execute first matching mapping
         }
     }
+
+    // channel mute buttons: toggle the assigned channel's mute on the console
+    for (const MidiMuteAssignment& mute : m_muteAssignments) {
+        if (mute.channel > 0 && mute.trigger.matches(type, channel, noteOrCC, value)) {
+            if (m_engine)
+                m_engine->toggleChannelMute(mute.channel);
+            emit channelMuteToggled(mute.channel);
+            break;
+        }
+    }
+}
+
+void MidiInputManager::handleSysex(const std::vector<unsigned char>& message) {
+    if (!m_enabled || !m_mscEnabled || !m_engine)
+        return;
+
+    const MscMessage msc = parseMsc(message);
+    if (!msc.valid)
+        return;
+
+    // device-id filter: 0x7F = "all devices"
+    if (m_mscDeviceId != 0x7F && msc.deviceId != 0x7F && msc.deviceId != m_mscDeviceId)
+        return;
+
+    switch (msc.command) {
+    case Msc::GO:
+    case Msc::TIMED_GO: // timed-go is fired immediately (no fade-from-MSC support yet)
+        if (msc.cueNumber.has_value())
+            m_engine->goToNumber(*msc.cueNumber);
+        m_engine->go();
+        break;
+    case Msc::STOP:
+    case Msc::ALL_OFF:
+        m_engine->stop();
+        break;
+    case Msc::RESUME:
+        m_engine->go();
+        break;
+    default:
+        break;
+    }
+
+    emit mscReceived(msc.command);
 }
 
 void MidiInputManager::executeAction(MidiAction action) {

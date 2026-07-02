@@ -115,6 +115,11 @@ bool CueFilterProxyModel::filterAcceptsRow(int sourceRow, [[maybe_unused]] const
     if (!model)
         return true;
 
+    // The running and standby cues stay visible regardless of filters, so an
+    // operator never loses sight of what is playing or queued next.
+    if (sourceRow == model->currentCueIndex() || sourceRow == model->standbyCueIndex())
+        return true;
+
     const Cue* cue = model->cueAt(sourceRow);
     if (!cue)
         return true;

@@ -1,6 +1,7 @@
 #include "CueTableModel.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
+#include "core/DCAMapping.h"
 #include "theme/Theme.h"
 #include <QBrush>
 #include <QDataStream>
@@ -14,9 +15,15 @@ const QString CueTableModel::s_mimeType = QStringLiteral("application/x-openmix-
 CueTableModel::CueTableModel(CueList* cueList, QObject* parent)
     : QAbstractTableModel(parent), m_cueList(cueList) {
     if (m_cueList) {
+        connect(m_cueList, &CueList::cueAboutToBeAdded, this,
+                &CueTableModel::onCueAboutToBeAdded);
         connect(m_cueList, &CueList::cueAdded, this, &CueTableModel::onCueAdded);
+        connect(m_cueList, &CueList::cueAboutToBeRemoved, this,
+                &CueTableModel::onCueAboutToBeRemoved);
         connect(m_cueList, &CueList::cueRemoved, this, &CueTableModel::onCueRemoved);
         connect(m_cueList, &CueList::cueUpdated, this, &CueTableModel::onCueUpdated);
+        connect(m_cueList, &CueList::cueAboutToBeMoved, this,
+                &CueTableModel::onCueAboutToBeMoved);
         connect(m_cueList, &CueList::cueMoved, this, &CueTableModel::onCueMoved);
         connect(m_cueList, &CueList::listCleared, this, &CueTableModel::onListCleared);
         connect(m_cueList, &CueList::listLoaded, this, &CueTableModel::onListLoaded);
@@ -32,7 +39,28 @@ int CueTableModel::rowCount(const QModelIndex& parent) const {
 int CueTableModel::columnCount(const QModelIndex& parent) const {
     if (parent.isValid())
         return 0;
-    return ColCount;
+    return ColCount + m_dcaCount * DcaSubCols;
+}
+
+void CueTableModel::setDcaCount(int count) {
+    count = qBound(0, count, 64);
+    if (count == m_dcaCount)
+        return;
+    beginResetModel();
+    m_dcaCount = count;
+    endResetModel();
+}
+
+int CueTableModel::dcaSubColumn(int col) const {
+    if (col < ColCount || col >= ColCount + m_dcaCount * DcaSubCols)
+        return -1;
+    return (col - ColCount) % DcaSubCols;
+}
+
+int CueTableModel::dcaOfColumn(int col) const {
+    if (col < ColCount || col >= ColCount + m_dcaCount * DcaSubCols)
+        return -1;
+    return (col - ColCount) / DcaSubCols + 1; // 1-based
 }
 
 QVariant CueTableModel::data(const QModelIndex& index, int role) const {
@@ -48,9 +76,54 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
     const Cue& cue = m_cueList->at(row);
 
     if (role == Qt::DisplayRole || role == Qt::EditRole) {
+        // per-DCA triplet columns: [assignment | fx | pos]
+        const int sub = dcaSubColumn(col);
+        if (sub >= 0) {
+            const int dca = dcaOfColumn(col);
+            const DCAOverride ov = cue.dcaOverride(dca);
+            if (sub == 0) { // assignment: the cue's DCA label / mute override
+                if (ov.label.has_value())
+                    return *ov.label;
+                if (ov.mute.has_value())
+                    return *ov.mute ? tr("mute") : tr("on");
+                return QString();
+            }
+            // fx / pos: summarise the cue's per-channel FX / position over the
+            // channels assigned to this DCA (via the show's DCA mapping)
+            if (m_dcaMapping) {
+                const QList<int> channels = m_dcaMapping->channelsForDCA(dca);
+                if (sub == 1) { // fx
+                    const QMap<int, bool> fx = cue.channelFX();
+                    int n = 0;
+                    for (int ch : channels)
+                        if (fx.value(ch, false))
+                            ++n;
+                    return n > 0 ? QString::number(n) : QString();
+                }
+                if (sub == 2) { // pos
+                    const QMap<int, QString> pos = cue.channelPositions();
+                    int n = 0;
+                    for (int ch : channels)
+                        if (!pos.value(ch).isEmpty())
+                            ++n;
+                    return n > 0 ? QString::number(n) : QString();
+                }
+            }
+            return QString();
+        }
+
         switch (col) {
-        case ColNumber:
-            return QString::number(cue.number(), 'f', 1);
+        case ColNumber: {
+            const QString num = QString::number(cue.number(), 'f', 1);
+            // Marker only on the display text, never the edit text.
+            if (role == Qt::DisplayRole) {
+                if (row == m_currentIndex)
+                    return QString("▶ ") + num;
+                if (row == m_standbyIndex)
+                    return QString("→ ") + num;
+            }
+            return num;
+        }
         case ColName:
             return cue.name();
         case ColType:
@@ -61,23 +134,67 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
             return cue.tags().join(", ");
         case ColNotes:
             return cue.notes();
+        case ColColor:
+            return QVariant(); // shown as a ● dot via the decoration role
+        case ColScene: {
+            QStringList parts;
+            for (int s : cue.scenes())
+                parts << QString::number(s);
+            return parts.join(", ");
+        }
+        case ColSnip: {
+            QStringList parts;
+            for (int s : cue.snippets())
+                parts << QString::number(s);
+            return parts.join(", ");
+        }
+        case ColExternal:
+            return cue.qLabCue();
+        case ColFx: {
+            QStringList parts;
+            const QMap<int, bool> mutes = cue.fxMutes();
+            for (auto it = mutes.begin(); it != mutes.end(); ++it) {
+                if (it.value())
+                    parts << QString::number(it.key());
+            }
+            return parts.isEmpty() ? QString() : tr("mute %1").arg(parts.join(", "));
+        }
+        case ColFade:
+            return cue.fadeTime() > 0.0 ? tr("%1s").arg(cue.fadeTime(), 0, 'f', 1)
+                                        : tr("instant");
         }
     }
 
+    // color swatch shown in the color column
+    if (role == Qt::DecorationRole && col == ColColor) {
+        const QString hex = cue.color();
+        if (!hex.isEmpty()) {
+            QColor c(hex);
+            if (c.isValid())
+                return c;
+        }
+        return QVariant();
+    }
+
     if (role == Qt::BackgroundRole) {
+        // green = running now, amber = standing by next. Distinct so an
+        // operator reads the list at a glance under stage lighting.
         if (row == m_currentIndex) {
-            return QBrush(QColor(34, 197, 94, 220));
+            return QBrush(Theme::withAlpha(Theme::Colors::AccentGreen, 220));
+        }
+        if (row == m_standbyIndex) {
+            return QBrush(Theme::withAlpha(Theme::Colors::AccentAmber, 150));
         }
     }
 
     if (role == Qt::ForegroundRole) {
-        if (row == m_currentIndex) {
+        if (row == m_currentIndex || row == m_standbyIndex) {
             return QBrush(Theme::color(Theme::Colors::TextPrimary));
         }
     }
 
     if (role == Qt::FontRole) {
-        if (row == m_currentIndex) {
+        if (row == m_currentIndex || row == m_standbyIndex) {
             QFont font;
             font.setBold(true);
             return font;
@@ -108,11 +225,24 @@ QVariant CueTableModel::headerData(int section, Qt::Orientation orientation, int
         return QVariant();
     }
 
+    // per-DCA triplet headers
+    const int sub = dcaSubColumn(section);
+    if (sub >= 0) {
+        switch (sub) {
+        case 0:
+            return tr("DCA %1").arg(dcaOfColumn(section));
+        case 1:
+            return tr("fx");
+        case 2:
+            return tr("pos");
+        }
+    }
+
     switch (section) {
     case ColNumber:
-        return tr("Q#");
+        return tr("Cue");
     case ColName:
-        return tr("Name");
+        return tr("Text");
     case ColType:
         return tr("Type");
     case ColGroup:
@@ -121,6 +251,18 @@ QVariant CueTableModel::headerData(int section, Qt::Orientation orientation, int
         return tr("Tags");
     case ColNotes:
         return tr("Notes");
+    case ColColor:
+        return QString::fromUtf8("\xE2\x97\x8F"); // ●
+    case ColScene:
+        return tr("Scene");
+    case ColSnip:
+        return tr("Snip");
+    case ColExternal:
+        return tr("QLab");
+    case ColFx:
+        return tr("FX");
+    case ColFade:
+        return tr("Fade");
     }
     return QVariant();
 }
@@ -320,13 +462,26 @@ const Cue* CueTableModel::cueAt(int row) const {
     return &m_cueList->at(row);
 }
 
-void CueTableModel::onCueAdded(int index) {
+void CueTableModel::onCueAboutToBeAdded(int index) {
     beginInsertRows(QModelIndex(), index, index);
+}
+
+void CueTableModel::onCueAdded(int index) {
     endInsertRows();
+
+    // shift highlights for rows that moved down by the insertion
+    if (m_currentIndex >= index)
+        ++m_currentIndex;
+    if (m_standbyIndex >= index)
+        ++m_standbyIndex;
+}
+
+void CueTableModel::onCueAboutToBeRemoved(int index) {
+    // must bracket the removal before the row is erased from the list
+    beginRemoveRows(QModelIndex(), index, index);
 }
 
 void CueTableModel::onCueRemoved(int index) {
-    beginRemoveRows(QModelIndex(), index, index);
     endRemoveRows();
 
     // adjust highlight indices
@@ -347,16 +502,15 @@ void CueTableModel::onCueUpdated(int index) {
     emit dataChanged(this->index(index, 0), this->index(index, ColCount - 1));
 }
 
-void CueTableModel::onCueMoved(int from, int to) {
-    // use moveRows from Qt to update the view
-    // CueList already moved the item, this just notifies the view
-    // so selections/scroll position/other visual states stay in sync
-    //
-    // destinationChild is the row before the moved rows, so
-    // moving down → to + 1, moving up → to
-    int destRow = (from < to) ? to + 1 : to;
-
+void CueTableModel::onCueAboutToBeMoved(int from, int to) {
+    // beginMoveRows must bracket the move before the list is reordered.
+    // destinationChild is the row before the moved rows: moving down → to + 1,
+    // moving up → to
+    const int destRow = (from < to) ? to + 1 : to;
     beginMoveRows(QModelIndex(), from, from, QModelIndex(), destRow);
+}
+
+void CueTableModel::onCueMoved(int from, int to) {
     endMoveRows();
 
     // adjust highlight indices

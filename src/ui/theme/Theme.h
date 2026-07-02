@@ -85,6 +85,7 @@ constexpr int XL = 24;
 constexpr int XXL = 32;
 } // namespace Spacing
 
+constexpr int SpacingXXS = Spacing::XXS;
 constexpr int SpacingXS = Spacing::XS;
 constexpr int SpacingS = Spacing::S;
 constexpr int SpacingM = Spacing::M;
@@ -150,7 +151,8 @@ constexpr int IconL = 20;
 constexpr int IconXL = 24;
 } // namespace Size
 
-QString globalStylesheet();
+// base dark theme; pass highContrast=true for a brighter booth-friendly variant
+QString globalStylesheet(bool highContrast = false);
 
 QColor color(const char* themeColor);
 

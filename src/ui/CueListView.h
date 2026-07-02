@@ -1,14 +1,17 @@
 #pragma once
 
+#include "core/Cue.h"
 #include <QAbstractItemDelegate>
 #include <QAction>
 #include <QTableView>
 #include <QWidget>
+#include <optional>
+
+class QLabel;
 
 namespace OpenMix {
 
 class Application;
-class Cue;
 class CueTableModel;
 class CueFilterProxyModel;
 class CueFilterBar;
@@ -37,7 +40,22 @@ class CueListView : public QWidget {
   public slots:
     void addNewCue();
     void deleteSelectedCue();
-    void duplicateSelectedCue();
+    void duplicateSelectedCue(); // clone the selected cue to the end of the list
+    void cloneCueAfter();        // clone the selected cue in place, just after it
+    void copySelectedCue();
+    void pasteCue();      // insert the clipboard cue as a new cue after selection
+    void pasteCueMerge(); // merge clipboard content into the selected cue
+    void pasteCueSwap();  // exchange content between clipboard and selected cue
+    void fillDown();      // copy the selected cue's content into the next cue
+    void cloneOffsets();      // copy just the selected cue's level offsets to the next cue
+    int recordOffsets();      // capture live console faders into the selected cue; returns count
+    void jumpToSelectedCue(); // set the selected cue as standby without firing
+    void setEditingLocked(bool locked); // make the cue table read-only
+    void setRowHeight(int pixels);      // cue-table row height
+    void setColumnVisible(int column, bool visible);
+    void setDcaSubColumnsVisible(int sub, bool visible); // sub 1=fx, 2=pos
+
+    [[nodiscard]] bool hasClipboardCue() const { return m_clipboard.has_value(); }
 
   signals:
     void cueSelected(int index);
@@ -51,16 +69,29 @@ class CueListView : public QWidget {
     void onCueReordered(int fromIndex, int toIndex);
     void onFiltersChanged();
     void onTabNavigationRequested(const QModelIndex& fromIndex, bool forward);
+    void showContextMenu(const QPoint& pos);
+    void onCellDoubleClicked(const QModelIndex& proxyIndex);
+
+  public slots:
+    void beginRenameSelected(); // enter inline edit on the selected cue's name
 
   private:
     void setupUi();
     void setupDelegates();
+    void saveColumnWidths();
+    void restoreColumnWidths();
+    void updateEmptyHint();
     void createActions();
     void editNextCell(bool forward);
     QModelIndex nextEditableIndex(const QModelIndex& current, bool forward) const;
+    void insertCueAt(int index, const Cue& cue); // undoable insert + select
+    void selectSourceRow(int sourceRow);
+
+    std::optional<Cue> m_clipboard; // copied cue for paste operations
 
     Application* m_app;
     QTableView* m_tableView;
+    QLabel* m_emptyHint = nullptr; // centered hint shown when the table is empty
     CueTableModel* m_model;
     CueFilterProxyModel* m_proxyModel;
     CueFilterBar* m_filterBar;

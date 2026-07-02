@@ -27,7 +27,7 @@ void DCAWidget::setupUi() {
     m_nameLabel = new QLabel(QString("DCA %1").arg(m_dcaNumber), this);
     m_nameLabel->setAlignment(Qt::AlignCenter);
     QFont nameFont;
-    nameFont.setPointSize(8);
+    nameFont.setPointSize(9);
     nameFont.setBold(true);
     m_nameLabel->setFont(nameFont);
     m_nameLabel->installEventFilter(this);
@@ -44,7 +44,7 @@ void DCAWidget::setupUi() {
     m_levelLabel = new QLabel("-inf", this);
     m_levelLabel->setAlignment(Qt::AlignCenter);
     QFont levelFont;
-    levelFont.setPointSize(7);
+    levelFont.setPointSize(9);
     m_levelLabel->setFont(levelFont);
 
     // fader slider (vertical)
@@ -197,7 +197,7 @@ void DCAWidget::setOriginalLevel(float level) {
     update();
 }
 
-QSize DCAWidget::sizeHint() const { return QSize(50, 180); }
+QSize DCAWidget::sizeHint() const { return QSize(56, 184); }
 
 QSize DCAWidget::minimumSizeHint() const { return QSize(40, 120); }
 

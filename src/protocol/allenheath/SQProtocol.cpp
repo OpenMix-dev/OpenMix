@@ -14,6 +14,11 @@ void SQProtocol::initializeSnapshotParams() {
         m_snapshotParams.append(dcaFaderPath(i));
         m_snapshotParams.append(dcaMutePath(i));
     }
+
+    // input-channel faders, so a cue restores channel levels (not just DCAs)
+    for (int i = 1; i <= m_capabilities.inputChannels; ++i) {
+        m_snapshotParams.append(QString("/ch/%1/fader").arg(i));
+    }
 }
 
 QString SQProtocol::dcaFaderPath(int dca) const { return QString("/dca/%1/fader").arg(dca); }

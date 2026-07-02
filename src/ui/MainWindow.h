@@ -7,6 +7,7 @@ class QAction;
 class QMenu;
 class QToolBar;
 class QLabel;
+class QLineEdit;
 class QSplitter;
 
 namespace OpenMix {
@@ -14,11 +15,18 @@ namespace OpenMix {
 class Application;
 class CueListView;
 class CueEditor;
+class ChannelStripPanel;
 class ConnectionPanel;
 class MixerFeedbackPanel;
 class DCAMappingPanel;
+class ActorSetupPanel;
+class EnsemblePanel;
+class PositionPanel;
+class TimecodePanel;
+class ActiveCueInfoPanel;
 class PopOutWindow;
 class BubbleBar;
+class AutoUpdater;
 class PlaybackGuard;
 struct ValidationResult;
 
@@ -30,6 +38,7 @@ class MainWindow : public QMainWindow {
     ~MainWindow() override;
 
     void openConnectionPanel();
+    void showWelcomeDialog();
 
   protected:
     void closeEvent(QCloseEvent* event) override;
@@ -40,22 +49,37 @@ class MainWindow : public QMainWindow {
     // file menu actions
     void newShow();
     void openShow();
+    void importTmixShow();
     void saveShow();
     void saveShowAs();
+    void exportNotes();
+    void discardNotes();
 
     // edit menu actions
     void addCue();
     void deleteCue();
     void renumberCues();
+    void onJumpEntered();
+    void toggleLockEditing();
+    void recordOffsets();
 
     // playback actions
     void go();
     void stopPlayback();
+    void showAllocateSpareDialog();
 
     // view actions - pop-out windows
     void toggleConnectionPanel();
     void toggleMixerFeedbackPanel();
+    void toggleCueEditorPanel();
+    void toggleChannelStrip();
     void toggleDCAMappingPanel();
+    void toggleActorSetupPanel();
+    void toggleEnsemblePanel();
+    void togglePositionPanel();
+    void toggleTimecodePanel();
+    void toggleActiveCueInfoPanel();
+    void showCueZeroDialog();
 
     // update UI state
     void updateTitle();
@@ -75,13 +99,25 @@ class MainWindow : public QMainWindow {
 
     // settings dialogs
     void showMidiConfigDialog();
+    void showRemoteControlDialog();
     void showKeyboardShortcutsDialog();
+    void showSettingsDialog();
+    void showFxSetupDialog();
     void showLogViewerDialog();
+    void showQuickStart();
+    void showFeatureGuide();
+    void checkForUpdates();
+    void runGithubUpdateCheck(); // notify-and-link fallback (no silent updater)
+    void showEditHistoryDialog();
+    void exportCuesToCsv();
+    void showChannelUtilizationDialog();
+    void showMarkerNotesDialog();
 
     // bubble bar interaction
     void onBubbleButtonClicked(const QString& id, bool checked);
 
   private:
+    [[nodiscard]] bool isTextEntryFocused() const;
     void setupUi();
     void createActions();
     void registerShortcuts();
@@ -106,15 +142,30 @@ class MainWindow : public QMainWindow {
     // pop-out window contents (owned by pop-out windows)
     ConnectionPanel* m_connectionPanel;
     MixerFeedbackPanel* m_mixerFeedbackPanel;
+    ChannelStripPanel* m_channelStrip;
     DCAMappingPanel* m_dcaMappingPanel;
+    ActorSetupPanel* m_actorSetupPanel;
+    EnsemblePanel* m_ensemblePanel;
+    PositionPanel* m_positionPanel;
+    TimecodePanel* m_timecodePanel;
+    ActiveCueInfoPanel* m_activeCueInfoPanel;
 
     // pop-out windows
     PopOutWindow* m_connectionPopOut;
+    PopOutWindow* m_cueEditorPopOut;
     PopOutWindow* m_mixerFeedbackPopOut;
     PopOutWindow* m_dcaMappingPopOut;
+    PopOutWindow* m_actorSetupPopOut;
+    PopOutWindow* m_ensemblePopOut;
+    PopOutWindow* m_positionPopOut;
+    PopOutWindow* m_timecodePopOut;
+    PopOutWindow* m_activeCueInfoPopOut;
 
     // bubble bar
     BubbleBar* m_bubbleBar;
+
+    // silent auto-updates (WinSparkle/Sparkle), or notify-and-link on Linux
+    AutoUpdater* m_autoUpdater;
 
     // menus
     QMenu* m_fileMenu;
@@ -132,8 +183,11 @@ class MainWindow : public QMainWindow {
     // file actions
     QAction* m_newAction;
     QAction* m_openAction;
+    QAction* m_importTmixAction;
     QAction* m_saveAction;
     QAction* m_saveAsAction;
+    QAction* m_exportNotesAction;
+    QAction* m_discardNotesAction;
     QAction* m_exitAction;
 
     // edit actions
@@ -142,6 +196,19 @@ class MainWindow : public QMainWindow {
     QAction* m_renumberAction;
     QAction* m_undoAction;
     QAction* m_redoAction;
+    QAction* m_cloneCueAction;
+    QAction* m_cloneToEndAction;
+    QAction* m_copyCueAction;
+    QAction* m_pasteCueAction;
+    QAction* m_pasteMergeAction;
+    QAction* m_pasteSwapAction;
+    QAction* m_fillDownAction;
+    QAction* m_cloneOffsetsAction;
+    QAction* m_recordOffsetsAction;
+    QAction* m_jumpToSelectedAction;
+    QAction* m_jumpAction;
+    QAction* m_lockEditingAction;
+    bool m_editingLocked = false;
 
     // playback actions
     QAction* m_goAction;
@@ -152,18 +219,37 @@ class MainWindow : public QMainWindow {
     // safety actions
     QAction* m_panicAction;
     QAction* m_panicRestoreAction;
+    QAction* m_spareBackupAction;
+    QAction* m_recordFadersAction;
 
     // view actions (for menu checkable items)
     QAction* m_showConnectionAction;
     QAction* m_showMixerFeedbackAction;
+    QAction* m_showCueEditorAction;
     QAction* m_showDCAMappingAction;
+    QAction* m_showActorSetupAction;
+    QAction* m_showEnsembleAction;
+    QAction* m_showPositionAction;
+    QAction* m_showTimecodeAction;
+    QAction* m_showActiveCueInfoAction;
+    QAction* m_cueZeroAction;
+    QAction* m_editHistoryAction;
+    QAction* m_exportCsvAction;
+    QAction* m_channelUtilizationAction;
+    QAction* m_markerNotesAction;
     QAction* m_showLogViewerAction;
 
     // settings actions
     QAction* m_keyboardShortcutsAction;
     QAction* m_midiControllerAction;
+    QAction* m_remoteControlAction;
+    QAction* m_appSettingsAction;
+    QAction* m_fxSetupAction;
 
     // help actions
+    QAction* m_quickStartAction;
+    QAction* m_featureGuideAction;
+    QAction* m_checkUpdatesAction;
     QAction* m_aboutAction;
 
     // status bar
@@ -171,6 +257,7 @@ class MainWindow : public QMainWindow {
     QLabel* m_cueStatusLabel;
     QLabel* m_currentCueLabel;
     QLabel* m_nextCueLabel;
+    QLineEdit* m_jumpEdit = nullptr;
 };
 
 } // namespace OpenMix

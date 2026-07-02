@@ -9,6 +9,7 @@
 #include "allenheath/SQProtocol.h"
 #include "behringer/WingProtocol.h"
 #include "behringer/X32Protocol.h"
+#include "digico/DiGiCoProtocol.h"
 #include "yamaha/YamahaCLProtocol.h"
 #include "yamaha/YamahaDM7Protocol.h"
 #include "yamaha/YamahaQLProtocol.h"
@@ -67,6 +68,12 @@ MixerProtocol* ProtocolFactory::create(const MixerCapabilities& caps, QObject* p
     case ConsoleType::DM7:
         return new YamahaDM7Protocol(caps, parent);
 
+    case ConsoleType::SD7:
+    case ConsoleType::SD9:
+    case ConsoleType::SD11:
+    case ConsoleType::SD12:
+        return new DiGiCoProtocol(caps, parent);
+
     case ConsoleType::Loopback:
         return new LoopbackProtocol(caps, parent);
 
@@ -101,6 +108,10 @@ bool ProtocolFactory::isImplemented(ConsoleType type) {
     case ConsoleType::CL3:
     case ConsoleType::CL5:
     case ConsoleType::DM7:
+    case ConsoleType::SD7:
+    case ConsoleType::SD9:
+    case ConsoleType::SD11:
+    case ConsoleType::SD12:
     case ConsoleType::Loopback:
         return true;
     default:

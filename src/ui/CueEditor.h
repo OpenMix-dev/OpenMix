@@ -14,11 +14,14 @@ class QListWidget;
 class QGroupBox;
 class QScrollArea;
 class QVBoxLayout;
+class QTableWidget;
 
 namespace OpenMix {
 
 class Application;
+class ActorProfileLibrary;
 class Cue;
+class CollapsibleSection;
 
 class CueEditor : public QWidget {
     Q_OBJECT
@@ -46,11 +49,36 @@ class CueEditor : public QWidget {
     void onTargetedDCAsChanged();
     void onDCAOverrideChanged(int dca);
 
+    void onFadeTimeChanged(double value);
+    void onFadeCurveChanged(int index);
+    void onQLabCueChanged(const QString& text);
+    void onChannelProfileChanged(int channel);
+    void onChannelPositionChanged(int channel);
+    void onChannelLevelToggled(int channel, bool on);
+    void onChannelLevelChanged(int channel);
+    void onActorLibraryChanged();
+
+    void onColorChanged(const QString& text);
+    void onColorPick();
+    void onSkipChanged(bool checked);
+    void onSnippetsChanged(const QString& text);
+    void onFxMuteChanged();
+    void onGangsChanged();
+    void onCheckModeToggled(bool checked);
+    void onEngineCheckModeChanged(bool enabled);
+
   private:
     void setupUi();
     void createDCATargetingSection();
+    void createFadeSection();
+    void createChannelProfilesSection();
+    void createFxMutesSection();
+    void rebuildChannelTable();
+    void populateChannelTable();
     void updateFromCue();
     void updateDCAOverridesUI();
+    void updateFxMutesUI();
+    void updateGangsUI();
     void setEnabled(bool enabled);
     Cue* currentCue();
 
@@ -68,14 +96,45 @@ class CueEditor : public QWidget {
     QDoubleSpinBox* m_autoFollowDelaySpin;
     QTextEdit* m_notesEdit;
 
+    // fade transition
+    QDoubleSpinBox* m_fadeTimeSpin = nullptr;
+    QComboBox* m_fadeCurveCombo = nullptr;
+
+    // linked QLab (DAW remote) cue id
+    QLineEdit* m_qLabCueEdit = nullptr;
+
+    // per-cue color + skip flag
+    QLineEdit* m_colorEdit = nullptr;
+    QPushButton* m_colorPickButton = nullptr;
+    QCheckBox* m_skipCheck = nullptr;
+
+    // console snippets recalled on fire (comma-separated indices)
+    QLineEdit* m_snippetsEdit = nullptr;
+
+    // per-FX-unit mute overrides
+    struct FxMuteWidgets {
+        QCheckBox* enable;
+        QCheckBox* muted;
+    };
+    CollapsibleSection* m_fxMutesGroup = nullptr;
+    QVector<FxMuteWidgets> m_fxMuteWidgets;
+
+    // L/R gangs (show-level) + soundcheck (check) mode toggle
+    QLineEdit* m_gangEdit = nullptr;
+    QCheckBox* m_checkModeCheck = nullptr;
+
+    // per-channel actor profile slot + level
+    ActorProfileLibrary* m_actorLibrary = nullptr;
+    CollapsibleSection* m_channelProfilesGroup = nullptr;
+    QTableWidget* m_channelTable = nullptr;
+
     // DCA targeting widgets
-    QGroupBox* m_dcaTargetingGroup;
+    CollapsibleSection* m_dcaTargetingGroup = nullptr;
     QCheckBox* m_targetAllDCAsCheck;
     QVector<QCheckBox*> m_dcaTargetChecks;
 
     // DCA overrides (mute/label per DCA)
-    QGroupBox* m_dcaOverridesGroup;
-    QScrollArea* m_dcaOverridesScroll;
+    CollapsibleSection* m_dcaOverridesGroup = nullptr;
     struct DCAOverrideWidgets {
         QCheckBox* enableMute;
         QCheckBox* muteValue;

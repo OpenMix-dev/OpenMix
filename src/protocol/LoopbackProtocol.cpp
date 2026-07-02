@@ -177,4 +177,49 @@ void LoopbackProtocol::refresh() {
     // do nothing
 }
 
+void LoopbackProtocol::setChannelFader(int channel, double level) {
+    m_recordedCalls.append(QString("fader:ch=%1:level=%2").arg(channel).arg(level));
+}
+
+void LoopbackProtocol::setChannelMute(int channel, bool muted) {
+    m_recordedCalls.append(QString("mute:ch=%1:muted=%2").arg(channel).arg(muted ? 1 : 0));
+}
+
+void LoopbackProtocol::setChannelPreamp(int channel, double gainDb) {
+    m_recordedCalls.append(QString("preamp:ch=%1:gain=%2").arg(channel).arg(gainDb));
+}
+
+void LoopbackProtocol::setChannelHpf(int channel, bool on, double freqHz) {
+    m_recordedCalls.append(
+        QString("hpf:ch=%1:on=%2:freq=%3").arg(channel).arg(on ? 1 : 0).arg(freqHz));
+}
+
+void LoopbackProtocol::setChannelEqOn(int channel, bool on) {
+    m_recordedCalls.append(QString("eqon:ch=%1:on=%2").arg(channel).arg(on ? 1 : 0));
+}
+
+void LoopbackProtocol::setChannelEqBand(int channel, int band, bool on, int type, double freqHz,
+                                        double gainDb, double q) {
+    m_recordedCalls.append(QString("eqband:ch=%1:band=%2:on=%3:type=%4:f=%5:g=%6:q=%7")
+                               .arg(channel)
+                               .arg(band)
+                               .arg(on ? 1 : 0)
+                               .arg(type)
+                               .arg(freqHz)
+                               .arg(gainDb)
+                               .arg(q));
+}
+
+void LoopbackProtocol::setChannelDynamics(int channel, bool on, double thresholdDb, double ratio,
+                                          double attackMs, double releaseMs, double makeupDb) {
+    m_recordedCalls.append(QString("dyn:ch=%1:on=%2:thr=%3:ratio=%4:atk=%5:rel=%6:gain=%7")
+                               .arg(channel)
+                               .arg(on ? 1 : 0)
+                               .arg(thresholdDb)
+                               .arg(ratio)
+                               .arg(attackMs)
+                               .arg(releaseMs)
+                               .arg(makeupDb));
+}
+
 } // namespace OpenMix

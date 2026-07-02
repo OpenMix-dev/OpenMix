@@ -50,14 +50,35 @@ class X32Protocol : public MixerProtocol {
     // scene/snapshot recall
     void recallScene(int sceneNumber) override;
 
+    // snippet (partial scene) recall
+    void recallSnippet(int snippetNumber) override;
+
+    // semantic channel setters (used by actor-voice recall and fades)
+    void setChannelFader(int channel, double level) override;
+    [[nodiscard]] std::optional<double> readChannelFader(int channel) override;
+    void setChannelMute(int channel, bool muted) override;
+    void setChannelPreamp(int channel, double gainDb) override;
+    void setChannelHpf(int channel, bool on, double freqHz) override;
+    void setChannelEqOn(int channel, bool on) override;
+    void setChannelEqBand(int channel, int band, bool on, int type, double freqHz, double gainDb,
+                          double q) override;
+    void setChannelDynamics(int channel, bool on, double thresholdDb, double ratio, double attackMs,
+                            double releaseMs, double makeupDb) override;
+
+    // scribble strips
+    void setChannelName(int channel, const QString& name) override;
+    void setChannelColor(int channel, int color) override;
+
     // keep-alive
     void refresh() override;
+    void requestConsoleNames(int count) override;
 
     // latency monitoring
     [[nodiscard]] int latencyMs() const override { return m_latencyMs; }
 
     // capabilities
     [[nodiscard]] const MixerCapabilities& capabilities() const override { return m_capabilities; }
+    [[nodiscard]] bool supportsParameterFeedback() const override { return true; }
 
     // X32-specific: list of parameters to recall
     [[nodiscard]] QStringList snapshotParameters() const { return m_snapshotParams; }
@@ -87,6 +108,7 @@ class X32Protocol : public MixerProtocol {
     void startReconnection();
     void updateLatency(qint64 roundTripMs);
     void processResponse(const QString& path, const QVariant& value);
+    void parseMeters(const QByteArray& blob);
 
     MixerCapabilities m_capabilities;
     OscTransport m_transport;

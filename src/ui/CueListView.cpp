@@ -10,11 +10,19 @@
 #include "core/ShortcutManager.h"
 #include "core/Show.h"
 #include "core/UndoCommands.h"
+#include "protocol/MixerProtocol.h"
 
 #include <QApplication>
 #include <QFocusEvent>
+#include "theme/Theme.h"
+
 #include <QHeaderView>
+#include <QInputDialog>
+#include <QLabel>
 #include <QKeyEvent>
+#include <QMenu>
+#include <QRegularExpression>
+#include <QSettings>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <algorithm>
@@ -50,6 +58,7 @@ void CueListView::setupUi() {
 
     // create model & proxy
     m_model = new CueTableModel(m_app->show()->cueList(), this);
+    m_model->setDcaMapping(m_app->show()->dcaMapping());
     m_proxyModel = new CueFilterProxyModel(this);
     m_proxyModel->setSourceModel(m_model);
 
@@ -83,12 +92,40 @@ void CueListView::setupUi() {
     m_tableView->horizontalHeader()->setStretchLastSection(true);
     m_tableView->setShowGrid(false);
 
-    // column widths
-    m_tableView->setColumnWidth(CueTableModel::ColNumber, 60);
-    m_tableView->setColumnWidth(CueTableModel::ColName, 150);
-    m_tableView->setColumnWidth(CueTableModel::ColType, 100);
+    // column widths (Cue wider to fit the ▶/→ standby markers)
+    m_tableView->setColumnWidth(CueTableModel::ColColor, 28);
+    m_tableView->setColumnWidth(CueTableModel::ColNumber, 78);
+    m_tableView->setColumnWidth(CueTableModel::ColName, 220);
+    m_tableView->setColumnWidth(CueTableModel::ColFx, 70);
+    m_tableView->setColumnWidth(CueTableModel::ColScene, 70);
+    m_tableView->setColumnWidth(CueTableModel::ColSnip, 70);
+    m_tableView->setColumnWidth(CueTableModel::ColExternal, 90);
+    m_tableView->setColumnWidth(CueTableModel::ColType, 90);
     m_tableView->setColumnWidth(CueTableModel::ColGroup, 100);
     m_tableView->setColumnWidth(CueTableModel::ColTags, 120);
+    m_tableView->setColumnWidth(CueTableModel::ColFade, 72);
+
+    // per-DCA triplet columns: narrow, and hide the fx/pos sub-columns by default
+    for (int c = CueTableModel::ColCount; c < m_model->columnCount(); ++c) {
+        const int sub = m_model->dcaSubColumn(c);
+        m_tableView->setColumnWidth(c, sub == 0 ? 60 : 40);
+        if (sub == 1 || sub == 2)
+            m_tableView->setColumnHidden(c, true);
+    }
+
+    // columns are user-resizable; remember widths across sessions
+    m_tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
+    restoreColumnWidths();
+    connect(m_tableView->horizontalHeader(), &QHeaderView::sectionResized, this,
+            [this](int, int, int) { saveColumnWidths(); });
+
+    // right-click context menu for quick edits
+    m_tableView->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_tableView, &QTableView::customContextMenuRequested, this,
+            &CueListView::showContextMenu);
+
+    // double-click a recall cell opens a focused assign prompt
+    connect(m_tableView, &QTableView::doubleClicked, this, &CueListView::onCellDoubleClicked);
 
     // connections
     connect(m_tableView->selectionModel(), &QItemSelectionModel::selectionChanged, this,
@@ -106,6 +143,37 @@ void CueListView::setupUi() {
 
     layout->addWidget(m_filterBar);
     layout->addWidget(m_tableView);
+
+    // centered hint shown over the empty table so a fresh show isn't a blank void
+    m_emptyHint = new QLabel(m_tableView->viewport());
+    m_emptyHint->setAlignment(Qt::AlignCenter);
+    m_emptyHint->setWordWrap(true);
+    m_emptyHint->setAttribute(Qt::WA_TransparentForMouseEvents);
+    m_emptyHint->setStyleSheet(
+        QString("color: %1; font-size: 13px;").arg(Theme::Colors::TextTertiary));
+    m_emptyHint->hide();
+
+    auto refreshHint = [this]() { updateEmptyHint(); };
+    connect(m_proxyModel, &QAbstractItemModel::rowsInserted, this, refreshHint);
+    connect(m_proxyModel, &QAbstractItemModel::rowsRemoved, this, refreshHint);
+    connect(m_proxyModel, &QAbstractItemModel::modelReset, this, refreshHint);
+    connect(m_proxyModel, &QAbstractItemModel::layoutChanged, this, refreshHint);
+    updateEmptyHint();
+}
+
+void CueListView::updateEmptyHint() {
+    if (!m_emptyHint)
+        return;
+    const bool empty = m_proxyModel->rowCount() == 0;
+    if (empty) {
+        const bool noCuesAtAll = !m_model->cueList() || m_model->cueList()->count() == 0;
+        m_emptyHint->setText(noCuesAtAll
+                                 ? tr("No cues yet.\nPress the + button (Ctrl+Shift+N) to add one.")
+                                 : tr("No cues match the current filter."));
+        m_emptyHint->resize(m_tableView->viewport()->size());
+        m_emptyHint->move(0, 0);
+    }
+    m_emptyHint->setVisible(empty);
 }
 
 void CueListView::setupDelegates() {
@@ -116,6 +184,10 @@ void CueListView::setupDelegates() {
     m_typeDelegate = new CueTypeDelegate(this);
     m_textDelegate = new CueTextDelegate(this);
 
+    // default delegate covers the dynamic per-DCA columns (strips the selection
+    // block so the row's standby/current colour shows through)
+    m_tableView->setItemDelegate(m_textDelegate);
+
     // assign delegates to columns
     m_tableView->setItemDelegateForColumn(CueTableModel::ColNumber, m_numberDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColName, m_textDelegate);
@@ -123,6 +195,14 @@ void CueListView::setupDelegates() {
     m_tableView->setItemDelegateForColumn(CueTableModel::ColGroup, m_textDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColTags, m_textDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColNotes, m_textDelegate);
+    // remaining columns: honor the row's standby/current background instead of
+    // painting a selection block over it
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColColor, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColFx, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColScene, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColSnip, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColExternal, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColFade, m_textDelegate);
 
     // connect tab navigation
     connect(m_numberDelegate, &CueNumberDelegate::tabNavigationRequested, this,
@@ -158,9 +238,12 @@ int CueListView::selectedCueIndex() const {
     if (!current.isValid())
         return -1;
 
-    // map from proxy to source
+    // map from proxy to source, and never hand back an out-of-range row
     QModelIndex sourceIndex = m_proxyModel->mapToSource(current);
-    return sourceIndex.row();
+    const int row = sourceIndex.row();
+    if (row < 0 || !m_model->cueList() || row >= m_model->cueList()->count())
+        return -1;
+    return row;
 }
 
 void CueListView::setCurrentCueHighlight(int index) {
@@ -274,6 +357,348 @@ void CueListView::duplicateSelectedCue() {
     m_filterBar->updateFilterOptions();
 }
 
+void CueListView::selectSourceRow(int sourceRow) {
+    if (sourceRow < 0)
+        return;
+    QModelIndex sourceIndex = m_model->index(sourceRow, 0);
+    QModelIndex proxyIndex = m_proxyModel->mapFromSource(sourceIndex);
+    if (proxyIndex.isValid())
+        m_tableView->selectRow(proxyIndex.row());
+}
+
+void CueListView::insertCueAt(int index, const Cue& cue) {
+    CueList* cueList = m_app->show()->cueList();
+    const int clamped = std::clamp(index, 0, cueList->count());
+    m_app->undoStack()->push(new AddCueCommand(cueList, cue, clamped));
+    cueList->insertCue(clamped, cue);
+    selectSourceRow(clamped);
+    m_filterBar->updateFilterOptions();
+}
+
+// midpoint number that keeps the clone in order between a cue and its successor
+static double interpolatedNumber(const CueList* cueList, int idx) {
+    const double a = cueList->at(idx).number();
+    const double b = (idx + 1 < cueList->count()) ? cueList->at(idx + 1).number() : a + 1.0;
+    return b > a ? (a + b) / 2.0 : a + 0.1;
+}
+
+void CueListView::cloneCueAfter() {
+    int idx = selectedCueIndex();
+    if (idx < 0)
+        return;
+    CueList* cueList = m_app->show()->cueList();
+    Cue clone = cueList->at(idx);
+    clone.regenerateId();
+    clone.setNumber(interpolatedNumber(cueList, idx));
+    insertCueAt(idx + 1, clone);
+}
+
+void CueListView::copySelectedCue() {
+    int idx = selectedCueIndex();
+    if (idx < 0)
+        return;
+    m_clipboard = m_app->show()->cueList()->at(idx);
+}
+
+void CueListView::pasteCue() {
+    if (!m_clipboard)
+        return;
+    CueList* cueList = m_app->show()->cueList();
+    Cue pasted = *m_clipboard;
+    pasted.regenerateId();
+
+    int idx = selectedCueIndex();
+    if (idx < 0) {
+        pasted.setNumber(cueList->nextCueNumber());
+        m_app->undoStack()->push(new AddCueCommand(cueList, pasted));
+        cueList->addCue(pasted);
+        selectSourceRow(cueList->count() - 1);
+        m_filterBar->updateFilterOptions();
+        return;
+    }
+    pasted.setNumber(interpolatedNumber(cueList, idx));
+    insertCueAt(idx + 1, pasted);
+}
+
+void CueListView::pasteCueMerge() {
+    int idx = selectedCueIndex();
+    if (!m_clipboard || idx < 0)
+        return;
+    CueList* cueList = m_app->show()->cueList();
+    Cue oldCue = cueList->at(idx);
+    Cue newCue = oldCue;
+    newCue.mergeContentFrom(*m_clipboard);
+    m_app->undoStack()->push(new EditCueCommand(cueList, idx, oldCue, newCue));
+    cueList->updateCue(idx, newCue);
+}
+
+void CueListView::pasteCueSwap() {
+    int idx = selectedCueIndex();
+    if (!m_clipboard || idx < 0)
+        return;
+    CueList* cueList = m_app->show()->cueList();
+    Cue oldCue = cueList->at(idx);
+    Cue newCue = oldCue;
+    Cue stored = *m_clipboard;
+    newCue.swapContentWith(stored);
+    m_app->undoStack()->push(new EditCueCommand(cueList, idx, oldCue, newCue));
+    cueList->updateCue(idx, newCue);
+    m_clipboard = stored; // clipboard keeps the content swapped out of the cue
+}
+
+void CueListView::fillDown() {
+    int idx = selectedCueIndex();
+    CueList* cueList = m_app->show()->cueList();
+    if (idx < 0 || idx + 1 >= cueList->count())
+        return;
+    Cue source = cueList->at(idx);
+    Cue oldCue = cueList->at(idx + 1);
+    Cue newCue = oldCue;
+    newCue.mergeContentFrom(source);
+    m_app->undoStack()->push(new EditCueCommand(cueList, idx + 1, oldCue, newCue));
+    cueList->updateCue(idx + 1, newCue);
+    selectSourceRow(idx + 1);
+}
+
+void CueListView::cloneOffsets() {
+    int idx = selectedCueIndex();
+    CueList* cueList = m_app->show()->cueList();
+    if (idx < 0 || idx + 1 >= cueList->count())
+        return;
+    const QMap<int, double> levels = cueList->at(idx).channelLevels();
+    if (levels.isEmpty())
+        return;
+
+    Cue oldCue = cueList->at(idx + 1);
+    Cue newCue = oldCue;
+    for (auto it = levels.begin(); it != levels.end(); ++it)
+        newCue.setChannelLevel(it.key(), it.value());
+    m_app->undoStack()->push(new EditCueCommand(cueList, idx + 1, oldCue, newCue));
+    cueList->updateCue(idx + 1, newCue);
+    selectSourceRow(idx + 1);
+}
+
+int CueListView::recordOffsets() {
+    MixerProtocol* mixer = m_app->mixer();
+    const int idx = selectedCueIndex();
+    CueList* cueList = m_app->show()->cueList();
+    if (!mixer || !mixer->isConnected() || idx < 0)
+        return 0;
+
+    Cue oldCue = cueList->at(idx);
+    Cue newCue = oldCue;
+    int count = 0;
+    const int channels = mixer->capabilities().inputChannels;
+    for (int ch = 1; ch <= channels; ++ch) {
+        if (const std::optional<double> level = mixer->readChannelFader(ch)) {
+            newCue.setChannelLevel(ch, *level);
+            ++count;
+        }
+    }
+    if (count == 0)
+        return 0;
+
+    m_app->undoStack()->push(new EditCueCommand(cueList, idx, oldCue, newCue));
+    cueList->updateCue(idx, newCue);
+    selectSourceRow(idx);
+    return count;
+}
+
+void CueListView::jumpToSelectedCue() {
+    int idx = selectedCueIndex();
+    if (idx < 0)
+        return;
+    m_app->playbackEngine()->setStandbyIndex(idx);
+}
+
+void CueListView::setRowHeight(int pixels) {
+    m_tableView->verticalHeader()->setDefaultSectionSize(pixels);
+}
+
+void CueListView::setColumnVisible(int column, bool visible) {
+    m_tableView->setColumnHidden(column, !visible);
+}
+
+void CueListView::setDcaSubColumnsVisible(int sub, bool visible) {
+    for (int c = CueTableModel::ColCount; c < m_model->columnCount(); ++c)
+        if (m_model->dcaSubColumn(c) == sub)
+            m_tableView->setColumnHidden(c, !visible);
+}
+
+void CueListView::setEditingLocked(bool locked) {
+    m_tableView->setEditTriggers(locked ? QAbstractItemView::NoEditTriggers
+                                        : QAbstractItemView::DoubleClicked |
+                                              QAbstractItemView::EditKeyPressed |
+                                              QAbstractItemView::AnyKeyPressed);
+}
+
+void CueListView::showContextMenu(const QPoint& pos) {
+    QModelIndex at = m_tableView->indexAt(pos);
+    if (at.isValid())
+        m_tableView->selectRow(at.row());
+
+    const int row = selectedCueIndex();
+    QMenu menu(this);
+
+    if (row >= 0) {
+        QAction* rename = menu.addAction(tr("Rename"));
+        rename->setShortcut(QKeySequence(Qt::Key_F2));
+        connect(rename, &QAction::triggered, this, &CueListView::beginRenameSelected);
+
+        QMenu* typeMenu = menu.addMenu(tr("Change Type"));
+        const CueType types[] = {CueType::Snapshot, CueType::Stop, CueType::GoTo,
+                                 CueType::Wait, CueType::Macro};
+        for (CueType t : types) {
+            QAction* a = typeMenu->addAction(cueTypeToString(t));
+            connect(a, &QAction::triggered, this, [this, row, t]() {
+                m_model->setData(m_model->index(row, CueTableModel::ColType),
+                                 cueTypeToString(t), Qt::EditRole);
+            });
+        }
+
+        menu.addSeparator();
+        menu.addAction(tr("Duplicate"), this, &CueListView::duplicateSelectedCue);
+        menu.addAction(tr("Copy"), this, &CueListView::copySelectedCue);
+    }
+
+    QAction* paste = menu.addAction(tr("Paste"));
+    paste->setEnabled(hasClipboardCue());
+    connect(paste, &QAction::triggered, this, &CueListView::pasteCue);
+
+    if (row >= 0) {
+        menu.addSeparator();
+        menu.addAction(tr("Jump to Standby"), this, &CueListView::jumpToSelectedCue);
+        menu.addAction(tr("Delete"), this, &CueListView::deleteSelectedCue);
+    }
+
+    menu.exec(m_tableView->viewport()->mapToGlobal(pos));
+}
+
+void CueListView::saveColumnWidths() {
+    QSettings s;
+    s.beginGroup("CueListColumnsV2");
+    for (int c = 0; c < CueTableModel::ColCount; ++c)
+        s.setValue(QString::number(c), m_tableView->columnWidth(c));
+    s.endGroup();
+}
+
+void CueListView::restoreColumnWidths() {
+    QSettings s;
+    s.beginGroup("CueListColumnsV2");
+    for (int c = 0; c < CueTableModel::ColCount; ++c) {
+        const int w = s.value(QString::number(c), 0).toInt();
+        if (w > 0)
+            m_tableView->setColumnWidth(c, w);
+    }
+    s.endGroup();
+}
+
+void CueListView::beginRenameSelected() {
+    const int row = selectedCueIndex();
+    if (row < 0)
+        return;
+    QModelIndex src = m_model->index(row, CueTableModel::ColName);
+    QModelIndex proxy = m_proxyModel->mapFromSource(src);
+    if (proxy.isValid()) {
+        m_tableView->setCurrentIndex(proxy);
+        m_tableView->edit(proxy);
+    }
+}
+
+void CueListView::onCellDoubleClicked(const QModelIndex& proxyIndex) {
+    if (!proxyIndex.isValid())
+        return;
+    const QModelIndex src = m_proxyModel->mapToSource(proxyIndex);
+    const int row = src.row();
+    const int col = src.column();
+    CueList* list = m_app->show()->cueList();
+    if (row < 0 || row >= list->count())
+        return;
+    Cue cue = list->at(row);
+
+    auto commit = [&]() {
+        list->updateCue(row, cue);
+        emit cueSelected(row);
+    };
+    auto parseInts = [](const QString& text) {
+        QList<int> out;
+        for (const QString& part : text.split(QRegularExpression("[,\\s]+"), Qt::SkipEmptyParts)) {
+            bool ok = false;
+            const int v = part.toInt(&ok);
+            if (ok)
+                out.append(v);
+        }
+        return out;
+    };
+
+    // per-DCA assignment cell: set the DCA's label/mute override
+    const int dca = m_model->dcaOfColumn(col);
+    if (dca > 0 && m_model->dcaSubColumn(col) == 0) {
+        const DCAOverride cur = cue.dcaOverride(dca);
+        bool ok = false;
+        const QString label = QInputDialog::getText(
+            this, tr("Assign DCA %1").arg(dca), tr("Label (blank to clear):"), QLineEdit::Normal,
+            cur.label.value_or(QString()), &ok);
+        if (!ok)
+            return;
+        DCAOverride ov;
+        if (!label.isEmpty())
+            ov.label = label;
+        cue.setDCAOverride(dca, ov);
+        commit();
+        return;
+    }
+
+    switch (col) {
+    case CueTableModel::ColScene: {
+        bool ok = false;
+        QStringList cur;
+        for (int s : cue.scenes())
+            cur << QString::number(s);
+        const QString text = QInputDialog::getText(this, tr("Assign Scenes"),
+                                                   tr("Scene numbers (comma separated):"),
+                                                   QLineEdit::Normal, cur.join(", "), &ok);
+        if (ok) {
+            cue.setScenes(parseInts(text));
+            commit();
+        }
+        return;
+    }
+    case CueTableModel::ColSnip: {
+        bool ok = false;
+        QStringList cur;
+        for (int s : cue.snippets())
+            cur << QString::number(s);
+        const QString text = QInputDialog::getText(this, tr("Assign Snippets"),
+                                                   tr("Snippet indices (comma separated):"),
+                                                   QLineEdit::Normal, cur.join(", "), &ok);
+        if (ok) {
+            cue.setSnippets(parseInts(text));
+            commit();
+        }
+        return;
+    }
+    case CueTableModel::ColExternal: {
+        bool ok = false;
+        const QString text =
+            QInputDialog::getText(this, tr("Assign External Cue"), tr("Playback cue id:"),
+                                  QLineEdit::Normal, cue.qLabCue(), &ok);
+        if (ok) {
+            cue.setQLabCue(text.trimmed());
+            commit();
+        }
+        return;
+    }
+    default:
+        // editable text columns edit in place; other cells open the full editor
+        if (col != CueTableModel::ColNumber && col != CueTableModel::ColName &&
+            col != CueTableModel::ColType && col != CueTableModel::ColGroup &&
+            col != CueTableModel::ColTags && col != CueTableModel::ColNotes)
+            emit cueDoubleClicked(row);
+        return;
+    }
+}
+
 void CueListView::onSelectionChanged() { emit cueSelected(selectedCueIndex()); }
 
 void CueListView::onCueReordered(int fromIndex, int toIndex) {
@@ -287,7 +712,7 @@ void CueListView::onCueReordered(int fromIndex, int toIndex) {
 }
 
 void CueListView::onFiltersChanged() {
-    // could emit a signal or update status
+    updateEmptyHint();
 }
 
 void CueListView::onTabNavigationRequested(const QModelIndex& fromIndex, bool forward) {
@@ -314,6 +739,10 @@ void CueListView::onTabNavigationRequested(const QModelIndex& fromIndex, bool fo
 }
 
 bool CueListView::eventFilter(QObject* watched, QEvent* event) {
+    // keep the empty-state hint sized to the viewport
+    if (watched == m_tableView->viewport() && event->type() == QEvent::Resize)
+        updateEmptyHint();
+
     if (watched == m_tableView && event->type() == QEvent::FocusOut) {
         QFocusEvent* focusEvent = static_cast<QFocusEvent*>(event);
         if (focusEvent->reason() != Qt::PopupFocusReason &&
@@ -331,6 +760,12 @@ bool CueListView::eventFilter(QObject* watched, QEvent* event) {
 
         // check if there's an active editor by looking for index widget
         bool isEditing = current.isValid() && m_tableView->indexWidget(current) != nullptr;
+
+        // F2 renames the selected cue inline
+        if (keyEvent->key() == Qt::Key_F2 && !isEditing) {
+            beginRenameSelected();
+            return true;
+        }
 
         // handle enter to edit current cell
         if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {

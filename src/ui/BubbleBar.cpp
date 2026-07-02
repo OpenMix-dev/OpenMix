@@ -2,8 +2,12 @@
 #include "BubbleButton.h"
 #include "theme/Theme.h"
 
-#include <QHBoxLayout>
+#include <QGridLayout>
 #include <QResizeEvent>
+
+namespace {
+constexpr int kBubbleColumns = 64; // keep the icons on a single row
+}
 
 namespace OpenMix {
 
@@ -13,10 +17,10 @@ BubbleBar::BubbleBar(QWidget* parent) : QWidget(parent) {
 }
 
 void BubbleBar::setupUi() {
-    m_layout = new QHBoxLayout(this);
-    m_layout->setContentsMargins(Theme::SpacingS, Theme::SpacingS, Theme::SpacingS,
-                                 Theme::SpacingS);
-    m_layout->setSpacing(Theme::SpacingXS);
+    m_layout = new QGridLayout(this);
+    m_layout->setContentsMargins(Theme::SpacingXS, Theme::SpacingXS, Theme::SpacingXS,
+                                 Theme::SpacingXS);
+    m_layout->setSpacing(Theme::SpacingXXS);
 
     setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 }
@@ -26,9 +30,10 @@ BubbleButton* BubbleBar::addButton(const QString& id, const QString& icon, const
         return m_buttons[id];
     }
 
+    const int idx = m_buttons.size();
     BubbleButton* button = new BubbleButton(icon, tooltip, this);
     m_buttons[id] = button;
-    m_layout->addWidget(button);
+    m_layout->addWidget(button, idx / kBubbleColumns, idx % kBubbleColumns);
 
     connect(button, &QPushButton::clicked,
             [this, id](bool checked) { emit buttonClicked(id, checked); });
@@ -42,9 +47,10 @@ BubbleButton* BubbleBar::addButton(const QString& id, const QIcon& icon, const Q
         return m_buttons[id];
     }
 
+    const int idx = m_buttons.size();
     BubbleButton* button = new BubbleButton(icon, tooltip, this);
     m_buttons[id] = button;
-    m_layout->addWidget(button);
+    m_layout->addWidget(button, idx / kBubbleColumns, idx % kBubbleColumns);
 
     connect(button, &QPushButton::clicked,
             [this, id](bool checked) { emit buttonClicked(id, checked); });

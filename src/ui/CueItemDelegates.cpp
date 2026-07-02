@@ -9,6 +9,8 @@
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QPainter>
+#include <QPolygon>
 #include <QTimer>
 
 namespace OpenMix {
@@ -82,10 +84,15 @@ void CueNumberDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
     if (m_cueList) {
         const auto existingIndex = m_cueList->indexOfNumber(newNumber);
         if (existingIndex && *existingIndex != index.row()) {
-            QMessageBox::warning(
-                qobject_cast<QWidget*>(editor->parent()), QObject::tr("Cue Number Conflict"),
-                QObject::tr("Cue %1 already exists. Please choose a different number.")
-                    .arg(newNumber, 0, 'f', 1));
+            // defer the modal: showing it here would pump the event loop during
+            // Qt's editor-commit and can destroy the editor underneath us
+            const double dup = newNumber;
+            QTimer::singleShot(0, [dup]() {
+                QMessageBox::warning(
+                    nullptr, QObject::tr("Cue Number Conflict"),
+                    QObject::tr("Cue %1 already exists. Please choose a different number.")
+                        .arg(dup, 0, 'f', 1));
+            });
             return;
         }
     }
@@ -126,6 +133,54 @@ void CueTypeDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
         opt.backgroundBrush = bgData.value<QBrush>();
     }
 
+    // distinct shape+color per cue type reads faster than the word alone
+    const CueType type = stringToCueType(index.data(Qt::DisplayRole).toString());
+    const int sz = 10;
+    QRect box(opt.rect.left() + 8, opt.rect.center().y() - sz / 2, sz, sz);
+
+    QColor c;
+    switch (type) {
+    case CueType::Snapshot: c = Theme::color(Theme::Colors::AccentGreen); break;
+    case CueType::Stop:     c = Theme::color(Theme::Colors::AccentRed); break;
+    case CueType::GoTo:     c = Theme::color(Theme::Colors::AccentBlue); break;
+    case CueType::Wait:     c = Theme::color(Theme::Colors::AccentAmber); break;
+    case CueType::Macro:    c = Theme::color(Theme::Colors::AccentBlueHover); break;
+    }
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing);
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(c);
+    switch (type) {
+    case CueType::Snapshot:
+        painter->drawEllipse(box);
+        break;
+    case CueType::Stop:
+        painter->drawRect(box);
+        break;
+    case CueType::GoTo: {
+        QPolygon tri;
+        tri << QPoint(box.left(), box.top()) << QPoint(box.right(), box.center().y())
+            << QPoint(box.left(), box.bottom());
+        painter->drawPolygon(tri);
+        break;
+    }
+    case CueType::Wait: {
+        QPolygon dia;
+        dia << QPoint(box.center().x(), box.top()) << QPoint(box.right(), box.center().y())
+            << QPoint(box.center().x(), box.bottom()) << QPoint(box.left(), box.center().y());
+        painter->drawPolygon(dia);
+        break;
+    }
+    case CueType::Macro:
+        for (int i = 0; i < 3; ++i)
+            painter->drawRect(box.left(), box.top() + i * 4, sz, 2);
+        break;
+    }
+    painter->restore();
+
+    // indent the text past the marker
+    opt.rect.setLeft(box.right() + 6);
     QStyledItemDelegate::paint(painter, opt, index);
 }
 

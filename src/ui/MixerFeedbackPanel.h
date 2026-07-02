@@ -4,11 +4,14 @@
 #include <QWidget>
 
 class QKeyEvent;
+class QHBoxLayout;
+class QLabel;
 
 namespace OpenMix {
 
 class Application;
 class DCAWidget;
+class CueConfidenceIndicator;
 
 class MixerFeedbackPanel : public QWidget {
     Q_OBJECT
@@ -30,6 +33,10 @@ class MixerFeedbackPanel : public QWidget {
 
     void onActiveCueChanged(int cueIndex);
 
+    // post-fire confidence from PlaybackEngine cue verification
+    void onCueLanded(int cueIndex);
+    void onCueDrifted(int cueIndex, const QStringList& paths);
+
   protected:
     void keyPressEvent(QKeyEvent* event) override;
 
@@ -48,9 +55,16 @@ class MixerFeedbackPanel : public QWidget {
     void loadCueSettings(const QString& cueId);
     void clearCueSettings();
 
+    QString cueDescription(int cueIndex) const;
+
     Application* m_app;
+    QHBoxLayout* m_dcaLayout = nullptr;
     QVector<DCAWidget*> m_dcaWidgets;
     QString m_activeCueId;
+
+    // post-fire ("did the cue land?") status row
+    CueConfidenceIndicator* m_fireIndicator = nullptr;
+    QLabel* m_fireStatusLabel = nullptr;
 };
 
 } // namespace OpenMix
