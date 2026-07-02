@@ -171,3 +171,78 @@ jobs:
             OpenMix-linux/*
             OpenMix-windows/*
             OpenMix-macos/*
+
+  # generate the Sparkle/WinSparkle appcasts that the app polls, and publish
+  # them to GitHub Pages. Requires a Sparkle EdDSA private key in the
+  # OPENMIX_SPARKLE_ED_PRIVATE_KEY secret (see docs/AUTOUPDATE.md).
+  appcast:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [release]
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Sparkle tools
+        run: brew install --cask sparkle || brew install sparkle
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Build appcasts
+        env:
+          SPARKLE_KEY: ${{ secrets.OPENMIX_SPARKLE_ED_PRIVATE_KEY }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG#v}"
+          BASE="https://github.com/johnqherman/OpenMix/releases/download/${TAG}"
+          mkdir -p site
+
+          # macOS: sign the DMG with Sparkle's EdDSA key and emit a full appcast
+          SIGN=$(find /opt/homebrew /usr/local -name sign_update -type f 2>/dev/null | head -1)
+          DMG=$(ls OpenMix-macos/*.dmg | head -1)
+          if [ -n "$SPARKLE_KEY" ] && [ -n "$SIGN" ] && [ -n "$DMG" ]; then
+            echo "$SPARKLE_KEY" > /tmp/ed_key
+            SIG=$("$SIGN" -f /tmp/ed_key "$DMG")   # prints sparkle:edSignature=... length=...
+            LEN=$(stat -f%z "$DMG")
+            cat > site/appcast-macos.xml <<EOF
+          <?xml version="1.0"?>
+          <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+            <channel>
+              <item>
+                <title>OpenMix ${VERSION}</title>
+                <sparkle:version>${VERSION}</sparkle:version>
+                <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+                <enclosure url="${BASE}/$(basename "$DMG")" ${SIG} sparkle:version="${VERSION}" length="${LEN}" type="application/octet-stream"/>
+              </item>
+            </channel>
+          </rss>
+          EOF
+          else
+            echo "::warning::No Sparkle key/tool/DMG; skipping macOS appcast (updates will not verify)"
+          fi
+
+          # Windows: WinSparkle RSS appcast
+          EXE=$(ls OpenMix-windows/*.exe | head -1)
+          if [ -n "$EXE" ]; then
+            cat > site/appcast-windows.xml <<EOF
+          <?xml version="1.0"?>
+          <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+            <channel>
+              <item>
+                <title>OpenMix ${VERSION}</title>
+                <sparkle:version>${VERSION}</sparkle:version>
+                <enclosure url="${BASE}/$(basename "$EXE")" sparkle:version="${VERSION}" type="application/octet-stream"/>
+              </item>
+            </channel>
+          </rss>
+          EOF
+          fi
+
+      - name: Publish to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          keep_files: true

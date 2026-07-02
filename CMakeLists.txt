@@ -381,7 +381,11 @@ elseif(APPLE)
     target_sources(${PROJECT_NAME} PRIVATE src/app/AutoUpdaterSparkle.mm)
     target_compile_options(${PROJECT_NAME} PRIVATE -F${sparkle_SOURCE_DIR})
     target_link_libraries(${PROJECT_NAME} PRIVATE "-F${sparkle_SOURCE_DIR}" "-framework Sparkle")
+    configure_file(${CMAKE_SOURCE_DIR}/packaging/Info.plist.in
+        ${CMAKE_BINARY_DIR}/Info.plist @ONLY)
     set_target_properties(${PROJECT_NAME} PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_BINARY_DIR}/Info.plist
         BUILD_RPATH "@executable_path/../Frameworks"
         INSTALL_RPATH "@executable_path/../Frameworks")
     install(DIRECTORY ${sparkle_SOURCE_DIR}/Sparkle.framework

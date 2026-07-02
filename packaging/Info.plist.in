@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>OpenMix</string>
+    <key>CFBundleDisplayName</key>
+    <string>OpenMix</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.openmix.OpenMix</string>
+    <key>CFBundleExecutable</key>
+    <string>OpenMix</string>
+    <key>CFBundleShortVersionString</key>
+    <string>@PROJECT_VERSION@</string>
+    <key>CFBundleVersion</key>
+    <string>@PROJECT_VERSION@</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+
+    <!-- Sparkle auto-update -->
+    <key>SUFeedURL</key>
+    <string>https://johnqherman.github.io/OpenMix/appcast-macos.xml</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUAutomaticallyUpdate</key>
+    <true/>
+    <!-- EdDSA public key; must match the OPENMIX_SPARKLE_ED_PRIVATE_KEY signing
+         secret used by CI (see docs/AUTOUPDATE.md). -->
+    <key>SUPublicEDKey</key>
+    <string>REPLACE_WITH_SPARKLE_ED_PUBLIC_KEY</string>
+</dict>
+</plist>
