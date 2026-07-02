@@ -367,11 +367,13 @@ if(WIN32)
     FetchContent_Declare(winsparkle
         URL https://github.com/vslavik/winsparkle/releases/download/v0.8.1/WinSparkle-0.8.1.zip)
     FetchContent_MakeAvailable(winsparkle)
-    set(WINSPARKLE_ROOT ${winsparkle_SOURCE_DIR}/WinSparkle-0.8.1)
-    # the 0.8.1 zip nests the x64 binaries under x64/Release/; glob so the exact
-    # layout can't break the build, then pick the x64 variant
+    # the 0.8.1 zip layout (nesting, x64/Release/ subdir) is fragile; glob for the
+    # header, x64 lib, and x64 dll so the exact structure can't break the build
+    file(GLOB_RECURSE _ws_hdrs "${winsparkle_SOURCE_DIR}/*winsparkle.h")
     file(GLOB_RECURSE _ws_libs "${winsparkle_SOURCE_DIR}/*WinSparkle.lib")
     file(GLOB_RECURSE _ws_dlls "${winsparkle_SOURCE_DIR}/*WinSparkle.dll")
+    list(GET _ws_hdrs 0 _ws_hdr)
+    get_filename_component(WINSPARKLE_INCLUDE ${_ws_hdr} DIRECTORY)
     foreach(f ${_ws_libs})
         if(f MATCHES "x64")
             set(WINSPARKLE_LIB ${f})
@@ -382,10 +384,10 @@ if(WIN32)
             set(WINSPARKLE_DLL ${f})
         endif()
     endforeach()
-    if(NOT WINSPARKLE_LIB OR NOT WINSPARKLE_DLL)
-        message(FATAL_ERROR "WinSparkle x64 lib/dll not found under ${winsparkle_SOURCE_DIR}")
+    if(NOT WINSPARKLE_INCLUDE OR NOT WINSPARKLE_LIB OR NOT WINSPARKLE_DLL)
+        message(FATAL_ERROR "WinSparkle header/x64 lib/dll not found under ${winsparkle_SOURCE_DIR}")
     endif()
-    target_include_directories(${PROJECT_NAME} PRIVATE ${WINSPARKLE_ROOT}/include)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${WINSPARKLE_INCLUDE})
     target_link_libraries(${PROJECT_NAME} PRIVATE ${WINSPARKLE_LIB})
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different

@@ -35,7 +35,8 @@ jobs:
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build --config Release --parallel
+        # cap parallelism: full -j OOM-kills cc1plus (heavy Qt PCH) on the runner
+        run: cmake --build build --config Release --parallel 2
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
@@ -94,8 +95,7 @@ jobs:
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DCMAKE_PREFIX_PATH="C:\Qt\6.11.0\msvc2022_64"
 
       - name: Build
-        # cap parallelism: full -j OOM-kills cc1plus (heavy Qt PCH) on the runner
-        run: cmake --build build --parallel 2
+        run: cmake --build build --parallel
 
       - name: Test
         run: |
