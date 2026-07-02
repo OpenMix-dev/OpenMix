@@ -142,7 +142,7 @@ void AllocateSpareDialog::updateStatus() {
             stateText = tr("backup live");
             break;
         }
-        text = tr("Spare channel %1 covers channel %2 — %3.")
+        text = tr("Spare channel %1 covers channel %2 (%3).")
                    .arg(m_spare->spareChannel())
                    .arg(m_spare->allocatedChannel())
                    .arg(stateText);

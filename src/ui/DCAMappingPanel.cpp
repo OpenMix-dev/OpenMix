@@ -470,7 +470,7 @@ void DCAMappingPanel::updateComboItemStates() {
         if (dca > 0) {
             label->setText(tr("%1 [%2]").arg(busDisplayName(bus)).arg(dca));
             label->setStyleSheet(assignedStyle);
-            label->setToolTip(tr("Assigned to DCA %1 — double-click to rename").arg(dca));
+            label->setToolTip(tr("Assigned to DCA %1; double-click to rename").arg(dca));
         } else {
             label->setText(busDisplayName(bus));
             label->setStyleSheet("");

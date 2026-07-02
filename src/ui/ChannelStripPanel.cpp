@@ -22,7 +22,7 @@ ChannelStripPanel::ChannelStripPanel(Application* app, QWidget* parent)
     m_grid->setContentsMargins(Theme::SpacingS, Theme::SpacingS, Theme::SpacingS, Theme::SpacingS);
     m_grid->setSpacing(Theme::SpacingXS);
 
-    m_emptyHint = new QLabel(tr("No actor channels assigned — set them up in Actor Setup."), this);
+    m_emptyHint = new QLabel(tr("No actor channels assigned. Set them up in Actor Setup."), this);
     m_emptyHint->setStyleSheet(QString("color: %1;").arg(Theme::Colors::TextTertiary));
     m_grid->addWidget(m_emptyHint, 0, 0);
 
