@@ -1274,7 +1274,11 @@ void MainWindow::showCueZeroDialog() {
 }
 
 void MainWindow::updateTitle() {
-    QString title = m_app->show()->name();
+    // saved shows are titled by their filename; the internal show name only
+    // covers unsaved shows (it defaults to "Untitled Show")
+    const QString path = m_app->show()->filePath();
+    QString title =
+        path.isEmpty() ? m_app->show()->name() : QFileInfo(path).completeBaseName();
     if (m_app->show()->isModified()) {
         title += " *";
     }
