@@ -7,6 +7,8 @@
 #include <QWidget>
 #include <optional>
 
+class QLabel;
+
 namespace OpenMix {
 
 class Application;
@@ -76,6 +78,7 @@ class CueListView : public QWidget {
     void setupDelegates();
     void saveColumnWidths();
     void restoreColumnWidths();
+    void updateEmptyHint();
     void createActions();
     void editNextCell(bool forward);
     QModelIndex nextEditableIndex(const QModelIndex& current, bool forward) const;
@@ -86,6 +89,7 @@ class CueListView : public QWidget {
 
     Application* m_app;
     QTableView* m_tableView;
+    QLabel* m_emptyHint = nullptr; // centered hint shown when the table is empty
     CueTableModel* m_model;
     CueFilterProxyModel* m_proxyModel;
     CueFilterBar* m_filterBar;

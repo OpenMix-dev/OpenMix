@@ -14,7 +14,10 @@
 
 #include <QApplication>
 #include <QFocusEvent>
+#include "theme/Theme.h"
+
 #include <QHeaderView>
+#include <QLabel>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QSettings>
@@ -121,6 +124,37 @@ void CueListView::setupUi() {
 
     layout->addWidget(m_filterBar);
     layout->addWidget(m_tableView);
+
+    // centered hint shown over the empty table so a fresh show isn't a blank void
+    m_emptyHint = new QLabel(m_tableView->viewport());
+    m_emptyHint->setAlignment(Qt::AlignCenter);
+    m_emptyHint->setWordWrap(true);
+    m_emptyHint->setAttribute(Qt::WA_TransparentForMouseEvents);
+    m_emptyHint->setStyleSheet(
+        QString("color: %1; font-size: 13px;").arg(Theme::Colors::TextTertiary));
+    m_emptyHint->hide();
+
+    auto refreshHint = [this]() { updateEmptyHint(); };
+    connect(m_proxyModel, &QAbstractItemModel::rowsInserted, this, refreshHint);
+    connect(m_proxyModel, &QAbstractItemModel::rowsRemoved, this, refreshHint);
+    connect(m_proxyModel, &QAbstractItemModel::modelReset, this, refreshHint);
+    connect(m_proxyModel, &QAbstractItemModel::layoutChanged, this, refreshHint);
+    updateEmptyHint();
+}
+
+void CueListView::updateEmptyHint() {
+    if (!m_emptyHint)
+        return;
+    const bool empty = m_proxyModel->rowCount() == 0;
+    if (empty) {
+        const bool noCuesAtAll = !m_model->cueList() || m_model->cueList()->count() == 0;
+        m_emptyHint->setText(noCuesAtAll
+                                 ? tr("No cues yet.\nPress the + button (Ctrl+Shift+N) to add one.")
+                                 : tr("No cues match the current filter."));
+        m_emptyHint->resize(m_tableView->viewport()->size());
+        m_emptyHint->move(0, 0);
+    }
+    m_emptyHint->setVisible(empty);
 }
 
 void CueListView::setupDelegates() {
@@ -554,7 +588,7 @@ void CueListView::onCueReordered(int fromIndex, int toIndex) {
 }
 
 void CueListView::onFiltersChanged() {
-    // could emit a signal or update status
+    updateEmptyHint();
 }
 
 void CueListView::onTabNavigationRequested(const QModelIndex& fromIndex, bool forward) {
@@ -581,6 +615,10 @@ void CueListView::onTabNavigationRequested(const QModelIndex& fromIndex, bool fo
 }
 
 bool CueListView::eventFilter(QObject* watched, QEvent* event) {
+    // keep the empty-state hint sized to the viewport
+    if (watched == m_tableView->viewport() && event->type() == QEvent::Resize)
+        updateEmptyHint();
+
     if (watched == m_tableView && event->type() == QEvent::FocusOut) {
         QFocusEvent* focusEvent = static_cast<QFocusEvent*>(event);
         if (focusEvent->reason() != Qt::PopupFocusReason &&
