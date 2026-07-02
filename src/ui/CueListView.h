@@ -8,6 +8,7 @@
 #include <optional>
 
 class QLabel;
+class QTimer;
 
 namespace OpenMix {
 
@@ -78,8 +79,8 @@ class CueListView : public QWidget {
   private:
     void setupUi();
     void setupDelegates();
-    void saveColumnWidths();
-    void restoreColumnWidths();
+    void scheduleColumnRelayout();
+    void relayoutColumns();
     void updateEmptyHint();
     void createActions();
     void editNextCell(bool forward);
@@ -95,6 +96,7 @@ class CueListView : public QWidget {
     CueTableModel* m_model;
     CueFilterProxyModel* m_proxyModel;
     CueFilterBar* m_filterBar;
+    QTimer* m_relayoutTimer = nullptr; // coalesces column relayout requests
     int m_currentCueIndex = -1;
     int m_standbyCueIndex = -1;
 

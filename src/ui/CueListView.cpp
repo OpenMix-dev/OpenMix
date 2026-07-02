@@ -22,12 +22,16 @@
 #include <QKeyEvent>
 #include <QMenu>
 #include <QRegularExpression>
-#include <QSettings>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <algorithm>
 
 namespace OpenMix {
+
+namespace {
+// narrowest a column may get when the viewport can't fit all natural widths
+constexpr int MinChokedColumnWidth = 40;
+} // namespace
 
 CueListView::CueListView(Application* app, QWidget* parent) : QWidget(parent), m_app(app) {
     setupUi();
@@ -89,35 +93,33 @@ void CueListView::setupUi() {
 
     // headers
     m_tableView->verticalHeader()->setVisible(false);
-    m_tableView->horizontalHeader()->setStretchLastSection(true);
     m_tableView->setShowGrid(false);
 
-    // column widths (Cue wider to fit the ▶/→ standby markers)
-    m_tableView->setColumnWidth(CueTableModel::ColColor, 28);
-    m_tableView->setColumnWidth(CueTableModel::ColNumber, 78);
-    m_tableView->setColumnWidth(CueTableModel::ColName, 220);
-    m_tableView->setColumnWidth(CueTableModel::ColFx, 70);
-    m_tableView->setColumnWidth(CueTableModel::ColScene, 70);
-    m_tableView->setColumnWidth(CueTableModel::ColSnip, 70);
-    m_tableView->setColumnWidth(CueTableModel::ColExternal, 90);
-    m_tableView->setColumnWidth(CueTableModel::ColType, 90);
-    m_tableView->setColumnWidth(CueTableModel::ColGroup, 100);
-    m_tableView->setColumnWidth(CueTableModel::ColTags, 120);
-    m_tableView->setColumnWidth(CueTableModel::ColFade, 72);
-
-    // per-DCA triplet columns: narrow, and hide the fx/pos sub-columns by default
+    // hide the per-DCA fx/pos sub-columns by default
     for (int c = CueTableModel::ColCount; c < m_model->columnCount(); ++c) {
         const int sub = m_model->dcaSubColumn(c);
-        m_tableView->setColumnWidth(c, sub == 0 ? 60 : 40);
         if (sub == 1 || sub == 2)
             m_tableView->setColumnHidden(c, true);
     }
 
-    // columns are user-resizable; remember widths across sessions
-    m_tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
-    restoreColumnWidths();
-    connect(m_tableView->horizontalHeader(), &QHeaderView::sectionResized, this,
-            [this](int, int, int) { saveColumnWidths(); });
+    // columns auto-fit their contents; leftover space is shared, and columns only
+    // shrink below their natural width when the viewport can't fit them all
+    m_tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);
+    m_relayoutTimer = new QTimer(this);
+    m_relayoutTimer->setSingleShot(true);
+    m_relayoutTimer->setInterval(0);
+    connect(m_relayoutTimer, &QTimer::timeout, this, &CueListView::relayoutColumns);
+    connect(m_proxyModel, &QAbstractItemModel::modelReset, this,
+            &CueListView::scheduleColumnRelayout);
+    connect(m_proxyModel, &QAbstractItemModel::rowsInserted, this,
+            &CueListView::scheduleColumnRelayout);
+    connect(m_proxyModel, &QAbstractItemModel::rowsRemoved, this,
+            &CueListView::scheduleColumnRelayout);
+    connect(m_proxyModel, &QAbstractItemModel::layoutChanged, this,
+            &CueListView::scheduleColumnRelayout);
+    connect(m_proxyModel, &QAbstractItemModel::dataChanged, this,
+            &CueListView::scheduleColumnRelayout);
+    scheduleColumnRelayout();
 
     // right-click context menu for quick edits
     m_tableView->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -517,12 +519,14 @@ void CueListView::setRowHeight(int pixels) {
 
 void CueListView::setColumnVisible(int column, bool visible) {
     m_tableView->setColumnHidden(column, !visible);
+    scheduleColumnRelayout();
 }
 
 void CueListView::setDcaSubColumnsVisible(int sub, bool visible) {
     for (int c = CueTableModel::ColCount; c < m_model->columnCount(); ++c)
         if (m_model->dcaSubColumn(c) == sub)
             m_tableView->setColumnHidden(c, !visible);
+    scheduleColumnRelayout();
 }
 
 void CueListView::setEditingLocked(bool locked) {
@@ -574,23 +578,50 @@ void CueListView::showContextMenu(const QPoint& pos) {
     menu.exec(m_tableView->viewport()->mapToGlobal(pos));
 }
 
-void CueListView::saveColumnWidths() {
-    QSettings s;
-    s.beginGroup("CueListColumnsV2");
-    for (int c = 0; c < CueTableModel::ColCount; ++c)
-        s.setValue(QString::number(c), m_tableView->columnWidth(c));
-    s.endGroup();
+void CueListView::scheduleColumnRelayout() {
+    if (m_relayoutTimer)
+        m_relayoutTimer->start();
 }
 
-void CueListView::restoreColumnWidths() {
-    QSettings s;
-    s.beginGroup("CueListColumnsV2");
-    for (int c = 0; c < CueTableModel::ColCount; ++c) {
-        const int w = s.value(QString::number(c), 0).toInt();
-        if (w > 0)
-            m_tableView->setColumnWidth(c, w);
+void CueListView::relayoutColumns() {
+    QHeaderView* header = m_tableView->horizontalHeader();
+    const int columnCount = m_proxyModel->columnCount();
+    const int available = m_tableView->viewport()->width();
+    if (columnCount <= 0 || available <= 0)
+        return;
+
+    // natural width per visible column: whatever its contents and header need
+    // (QTableView re-declares sizeHintForColumn protected; the base keeps it public)
+    const QAbstractItemView* view = m_tableView;
+    QList<int> columns;
+    QList<int> natural;
+    int naturalTotal = 0;
+    for (int c = 0; c < columnCount; ++c) {
+        if (m_tableView->isColumnHidden(c))
+            continue;
+        const int w = qMax(view->sizeHintForColumn(c), header->sectionSizeHint(c));
+        columns.append(c);
+        natural.append(w);
+        naturalTotal += w;
     }
-    s.endGroup();
+    if (columns.isEmpty() || naturalTotal <= 0)
+        return;
+
+    // scale everything to the viewport: leftover space is shared proportionally,
+    // and columns only shrink below natural width when there isn't enough room
+    const bool choked = naturalTotal > available;
+    int used = 0;
+    for (int i = 0; i < columns.size(); ++i) {
+        int w = static_cast<int>(qint64(natural[i]) * available / naturalTotal);
+        if (choked) {
+            // keep a usable floor; past that the horizontal scrollbar takes over
+            w = qMax(w, qMin(natural[i], MinChokedColumnWidth));
+        } else if (i == columns.size() - 1) {
+            w = available - used; // hand rounding leftovers to the last column
+        }
+        m_tableView->setColumnWidth(columns[i], w);
+        used += w;
+    }
 }
 
 void CueListView::beginRenameSelected() {
@@ -739,9 +770,11 @@ void CueListView::onTabNavigationRequested(const QModelIndex& fromIndex, bool fo
 }
 
 bool CueListView::eventFilter(QObject* watched, QEvent* event) {
-    // keep the empty-state hint sized to the viewport
-    if (watched == m_tableView->viewport() && event->type() == QEvent::Resize)
+    // keep the empty-state hint sized to the viewport and refit columns to it
+    if (watched == m_tableView->viewport() && event->type() == QEvent::Resize) {
         updateEmptyHint();
+        scheduleColumnRelayout();
+    }
 
     if (watched == m_tableView && event->type() == QEvent::FocusOut) {
         QFocusEvent* focusEvent = static_cast<QFocusEvent*>(event);
