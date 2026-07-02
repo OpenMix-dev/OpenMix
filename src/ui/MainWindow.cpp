@@ -25,6 +25,7 @@
 #include "RemoteControlDialog.h"
 #include "SettingsDialog.h"
 #include "app/Application.h"
+#include "app/AutoUpdater.h"
 #include "app/UpdateChecker.h"
 #include "app/QLabClient.h"
 #include "core/AppLogger.h"
@@ -95,6 +96,12 @@ MainWindow::MainWindow(Application* app, QWidget* parent) : QMainWindow(parent),
     loadSettings();
     updateActions();
     updateTitle();
+
+    // silent auto-updates; on Linux this falls back to the notify-and-link check
+    m_autoUpdater = new AutoUpdater(this);
+    m_autoUpdater->initialize();
+    connect(m_autoUpdater, &AutoUpdater::manualCheckRequested, this,
+            &MainWindow::runGithubUpdateCheck);
 }
 
 MainWindow::~MainWindow() { saveSettings(); }
@@ -1489,6 +1496,12 @@ void MainWindow::showQuickStart() {
 }
 
 void MainWindow::checkForUpdates() {
+    // hand off to the silent updater (WinSparkle/Sparkle); on Linux it signals
+    // back via manualCheckRequested to run the notify-and-link check below
+    m_autoUpdater->checkForUpdatesNow();
+}
+
+void MainWindow::runGithubUpdateCheck() {
     statusBar()->showMessage(tr("Checking for updates..."), 3000);
     auto* checker = new UpdateChecker(this);
     connect(checker, &UpdateChecker::updateAvailable, this,

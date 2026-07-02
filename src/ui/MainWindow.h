@@ -26,6 +26,7 @@ class TimecodePanel;
 class ActiveCueInfoPanel;
 class PopOutWindow;
 class BubbleBar;
+class AutoUpdater;
 class PlaybackGuard;
 struct ValidationResult;
 
@@ -106,6 +107,7 @@ class MainWindow : public QMainWindow {
     void showQuickStart();
     void showFeatureGuide();
     void checkForUpdates();
+    void runGithubUpdateCheck(); // notify-and-link fallback (no silent updater)
     void showEditHistoryDialog();
     void exportCuesToCsv();
     void showChannelUtilizationDialog();
@@ -161,6 +163,9 @@ class MainWindow : public QMainWindow {
 
     // bubble bar
     BubbleBar* m_bubbleBar;
+
+    // silent auto-updates (WinSparkle/Sparkle), or notify-and-link on Linux
+    AutoUpdater* m_autoUpdater;
 
     // menus
     QMenu* m_fileMenu;

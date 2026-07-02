@@ -87,6 +87,7 @@ set(SOURCES
     src/app/CuePlayerClient.cpp
     src/app/ScsClient.cpp
     src/app/UpdateChecker.cpp
+    src/app/AutoUpdater.cpp
     src/core/Cue.cpp
     src/core/CueList.cpp
     src/core/Show.cpp
@@ -205,6 +206,7 @@ set(HEADERS
     src/app/CuePlayerClient.h
     src/app/ScsClient.h
     src/app/UpdateChecker.h
+    src/app/AutoUpdater.h
     src/core/Cue.h
     src/core/CueList.h
     src/core/Show.h
@@ -357,6 +359,34 @@ else()
 endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE RtMidi)
+
+# --- auto-update frameworks (Windows = WinSparkle, macOS = Sparkle) ----------
+# Linux has no silent-update framework; AutoUpdater falls back to the notify-and
+# -link checker there, so nothing extra is linked.
+if(WIN32)
+    FetchContent_Declare(winsparkle
+        URL https://github.com/vslavik/winsparkle/releases/download/v0.8.1/WinSparkle-0.8.1.zip)
+    FetchContent_MakeAvailable(winsparkle)
+    set(WINSPARKLE_ROOT ${winsparkle_SOURCE_DIR}/WinSparkle-0.8.1)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${WINSPARKLE_ROOT}/include)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${WINSPARKLE_ROOT}/x64/WinSparkle.lib)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${WINSPARKLE_ROOT}/x64/WinSparkle.dll $<TARGET_FILE_DIR:${PROJECT_NAME}>)
+    install(FILES ${WINSPARKLE_ROOT}/x64/WinSparkle.dll DESTINATION ${CMAKE_INSTALL_BINDIR})
+elseif(APPLE)
+    FetchContent_Declare(sparkle
+        URL https://github.com/sparkle-project/Sparkle/releases/download/2.6.4/Sparkle-2.6.4.tar.xz)
+    FetchContent_MakeAvailable(sparkle)
+    target_sources(${PROJECT_NAME} PRIVATE src/app/AutoUpdaterSparkle.mm)
+    target_compile_options(${PROJECT_NAME} PRIVATE -F${sparkle_SOURCE_DIR})
+    target_link_libraries(${PROJECT_NAME} PRIVATE "-F${sparkle_SOURCE_DIR}" "-framework Sparkle")
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        BUILD_RPATH "@executable_path/../Frameworks"
+        INSTALL_RPATH "@executable_path/../Frameworks")
+    install(DIRECTORY ${sparkle_SOURCE_DIR}/Sparkle.framework
+        DESTINATION ${PROJECT_NAME}.app/Contents/Frameworks)
+endif()
 
 target_precompile_headers(${PROJECT_NAME} PRIVATE
     <QObject>
