@@ -560,14 +560,16 @@ void MainWindow::createMenus() {
         int column;
         bool visible; // default visibility
     };
-    const ColumnToggle columnToggles[] = {{"&Group", CueTableModel::ColGroup, true},
-                                          {"&Tags", CueTableModel::ColTags, true},
-                                          {"&Notes", CueTableModel::ColNotes, true},
-                                          {"F&ade", CueTableModel::ColFade, true},
-                                          {"Colo&r", CueTableModel::ColColor, true},
-                                          {"&DCAs", CueTableModel::ColDca, false},
-                                          {"&Positions", CueTableModel::ColPosition, false},
-                                          {"&FX", CueTableModel::ColFx, false}};
+    const ColumnToggle columnToggles[] = {{"&FX", CueTableModel::ColFx, true},
+                                          {"&Snip", CueTableModel::ColSnip, true},
+                                          {"&QLab", CueTableModel::ColExternal, true},
+                                          {"&DCAs", CueTableModel::ColDca, true},
+                                          {"&Positions", CueTableModel::ColPosition, true},
+                                          {"T&ype", CueTableModel::ColType, false},
+                                          {"&Group", CueTableModel::ColGroup, false},
+                                          {"&Tags", CueTableModel::ColTags, false},
+                                          {"&Notes", CueTableModel::ColNotes, false},
+                                          {"Fa&de", CueTableModel::ColFade, false}};
     for (const ColumnToggle& ct : columnToggles) {
         QAction* action = columnsMenu->addAction(tr(ct.label));
         action->setCheckable(true);

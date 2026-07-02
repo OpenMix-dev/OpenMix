@@ -89,10 +89,16 @@ void CueListView::setupUi() {
     m_tableView->horizontalHeader()->setStretchLastSection(true);
     m_tableView->setShowGrid(false);
 
-    // column widths (ColNumber wider to fit the ▶/→ standby markers)
+    // column widths (Cue wider to fit the ▶/→ standby markers)
+    m_tableView->setColumnWidth(CueTableModel::ColColor, 28);
     m_tableView->setColumnWidth(CueTableModel::ColNumber, 78);
-    m_tableView->setColumnWidth(CueTableModel::ColName, 150);
-    m_tableView->setColumnWidth(CueTableModel::ColType, 100);
+    m_tableView->setColumnWidth(CueTableModel::ColName, 220);
+    m_tableView->setColumnWidth(CueTableModel::ColFx, 70);
+    m_tableView->setColumnWidth(CueTableModel::ColSnip, 70);
+    m_tableView->setColumnWidth(CueTableModel::ColExternal, 90);
+    m_tableView->setColumnWidth(CueTableModel::ColDca, 120);
+    m_tableView->setColumnWidth(CueTableModel::ColPosition, 80);
+    m_tableView->setColumnWidth(CueTableModel::ColType, 90);
     m_tableView->setColumnWidth(CueTableModel::ColGroup, 100);
     m_tableView->setColumnWidth(CueTableModel::ColTags, 120);
     m_tableView->setColumnWidth(CueTableModel::ColFade, 72);
@@ -178,6 +184,8 @@ void CueListView::setupDelegates() {
     m_tableView->setItemDelegateForColumn(CueTableModel::ColDca, m_textDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColPosition, m_textDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColFx, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColSnip, m_textDelegate);
+    m_tableView->setItemDelegateForColumn(CueTableModel::ColExternal, m_textDelegate);
     m_tableView->setItemDelegateForColumn(CueTableModel::ColFade, m_textDelegate);
 
     // connect tab navigation
@@ -546,7 +554,7 @@ void CueListView::showContextMenu(const QPoint& pos) {
 
 void CueListView::saveColumnWidths() {
     QSettings s;
-    s.beginGroup("CueListColumns");
+    s.beginGroup("CueListColumnsV2");
     for (int c = 0; c < CueTableModel::ColCount; ++c)
         s.setValue(QString::number(c), m_tableView->columnWidth(c));
     s.endGroup();
@@ -554,7 +562,7 @@ void CueListView::saveColumnWidths() {
 
 void CueListView::restoreColumnWidths() {
     QSettings s;
-    s.beginGroup("CueListColumns");
+    s.beginGroup("CueListColumnsV2");
     for (int c = 0; c < CueTableModel::ColCount; ++c) {
         const int w = s.value(QString::number(c), 0).toInt();
         if (w > 0)

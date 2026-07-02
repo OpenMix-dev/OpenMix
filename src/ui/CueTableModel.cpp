@@ -77,7 +77,15 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
         case ColNotes:
             return cue.notes();
         case ColColor:
-            return cue.color();
+            return QVariant(); // shown as a ● dot via the decoration role
+        case ColSnip: {
+            QStringList parts;
+            for (int s : cue.snippets())
+                parts << QString::number(s);
+            return parts.join(", ");
+        }
+        case ColExternal:
+            return cue.qLabCue();
         case ColDca: {
             QStringList parts;
             const QMap<int, DCAOverride> overrides = cue.dcaOverrides();
@@ -180,7 +188,11 @@ QVariant CueTableModel::headerData(int section, Qt::Orientation orientation, int
     case ColNotes:
         return tr("Notes");
     case ColColor:
-        return tr("Color");
+        return QString::fromUtf8("\xE2\x97\x8F"); // ●
+    case ColSnip:
+        return tr("Snip");
+    case ColExternal:
+        return tr("QLab");
     case ColDca:
         return tr("DCAs");
     case ColPosition:

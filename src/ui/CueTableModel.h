@@ -14,18 +14,23 @@ class CueTableModel : public QAbstractTableModel {
   public:
     // ColColor is appended last so existing column indices stay stable for views
     // that assign per-column delegates/widths by name.
+    // Order mirrors the reference console layout: colour dot, cue number, text,
+    // then recall summaries; editing columns (Type/Group/Tags/Notes/Fade) trail
+    // and are hidden by default.
     enum Column {
-        ColNumber = 0,
-        ColName,
+        ColColor = 0, // ● cue colour dot
+        ColNumber,    // Cue number
+        ColName,      // Text (cue name)
+        ColFx,        // read-only muted FX units
+        ColSnip,      // read-only console snippet indices
+        ColExternal,  // linked external-playback cue (QLab/SCS/Cue Player)
+        ColDca,       // read-only summary of DCA overrides (channel labels)
+        ColPosition,  // read-only count of positioned channels
         ColType,
         ColGroup,
         ColTags,
         ColNotes,
-        ColColor,
-        ColDca,      // read-only summary of DCA overrides (channel labels)
-        ColPosition, // read-only count of positioned channels
-        ColFx,       // read-only muted FX units
-        ColFade,     // fade duration (instant / seconds)
+        ColFade, // fade duration (instant / seconds)
         ColCount
     };
 
