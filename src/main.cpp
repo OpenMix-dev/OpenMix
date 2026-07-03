@@ -29,6 +29,11 @@ class FastTooltipStyle : public QProxyStyle {
 };
 } // namespace OpenMix
 
+#if defined(Q_OS_MACOS)
+// implemented in MoveToApplications.mm; may relaunch the app and not return
+extern "C" void openmix_offer_move_to_applications();
+#endif
+
 int main(int argc, char* argv[]) {
     QApplication qtApp(argc, argv);
 
@@ -37,6 +42,12 @@ int main(int argc, char* argv[]) {
     QApplication::setApplicationVersion(OPENMIX_VERSION);
     QApplication::setOrganizationName("OpenMix");
     QApplication::setWindowIcon(QIcon(":/icons/openmix.png"));
+
+#if defined(Q_OS_MACOS)
+    // before any real startup work: Sparkle cannot update an app that runs
+    // from Downloads, a DMG, or a translocation path
+    openmix_offer_move_to_applications();
+#endif
 
     oclero::qlementine::icons::initializeIconTheme();
 
