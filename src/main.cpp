@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
 
     // metadata
     QApplication::setApplicationName("OpenMix");
-    QApplication::setApplicationVersion("0.1.0");
+    QApplication::setApplicationVersion(OPENMIX_VERSION);
     QApplication::setOrganizationName("OpenMix");
     QApplication::setWindowIcon(QIcon(":/icons/openmix.png"));
 

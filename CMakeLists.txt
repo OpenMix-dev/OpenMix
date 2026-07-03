@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(OpenMix
-    VERSION 0.1.0
+    VERSION 1.0.0
     DESCRIPTION "Stage mixing software for live theatre that lets engineers program, automate, and run cues seamlessly across 30+ digital mixing consoles"
     LANGUAGES CXX
 )
@@ -442,6 +442,9 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE
     <functional>
     <optional>
 )
+
+# the one version source: project(VERSION) above; the app reads it from here
+target_compile_definitions(${PROJECT_NAME} PRIVATE OPENMIX_VERSION="${PROJECT_VERSION}")
 
 # platform-specific settings
 if(WIN32)
