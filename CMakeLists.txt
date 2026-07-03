@@ -396,8 +396,12 @@ if(APPLE)
         MACOSX_BUNDLE_INFO_PLIST ${CMAKE_BINARY_DIR}/Info.plist
         BUILD_RPATH "@executable_path/../Frameworks"
         INSTALL_RPATH "@executable_path/../Frameworks")
+    # USE_SOURCE_PERMISSIONS: without it every file installs as 644 and
+    # Sparkle's Autoupdate/Updater/XPC helpers lose their execute bits, so
+    # launchd refuses to run them and every update fails
     install(DIRECTORY ${sparkle_SOURCE_DIR}/Sparkle.framework
-        DESTINATION ${PROJECT_NAME}.app/Contents/Frameworks)
+        DESTINATION ${PROJECT_NAME}.app/Contents/Frameworks
+        USE_SOURCE_PERMISSIONS)
 endif()
 
 target_precompile_headers(${PROJECT_NAME} PRIVATE
