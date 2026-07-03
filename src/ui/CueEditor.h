@@ -13,6 +13,7 @@ class QLabel;
 class QListWidget;
 class QGroupBox;
 class QScrollArea;
+class QStringListModel;
 class QVBoxLayout;
 class QTableWidget;
 
@@ -48,6 +49,7 @@ class CueEditor : public QWidget {
     void onNotesChanged();
     void onTargetedDCAsChanged();
     void onDCAOverrideChanged(int dca);
+    void onDCALabelCommitted(int dca);
 
     void onFadeTimeChanged(double value);
     void onFadeCurveChanged(int index);
@@ -77,6 +79,7 @@ class CueEditor : public QWidget {
     void populateChannelTable();
     void updateFromCue();
     void updateDCAOverridesUI();
+    void updateDCAAssignInfo();
     void updateFxMutesUI();
     void updateGangsUI();
     void setEnabled(bool enabled);
@@ -140,8 +143,12 @@ class CueEditor : public QWidget {
         QCheckBox* muteValue;
         QCheckBox* enableLabel;
         QLineEdit* labelValue;
+        QLabel* assignInfo;
     };
     QVector<DCAOverrideWidgets> m_dcaOverrideWidgets;
+
+    // role/actor names offered while typing a DCA label; shared by all 8 fields
+    QStringListModel* m_actorCompletionModel = nullptr;
 };
 
 } // namespace OpenMix

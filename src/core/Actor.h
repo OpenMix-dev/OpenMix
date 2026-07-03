@@ -8,9 +8,10 @@
 
 namespace OpenMix {
 
-// A cast member assigned to a console input channel. Holds one ActorProfile per
-// profile slot (e.g. "Main", "Solo"); the active slot is chosen per-cue. Profiles
-// follow the actor, so swapping in an understudy swaps the whole voice set.
+// A cast member assigned to a console input channel, optionally tagged with the
+// role (character) they play. Holds one ActorProfile per profile slot (e.g.
+// "Main", "Solo"); the active slot is chosen per-cue. Profiles follow the actor,
+// so swapping in an understudy swaps the whole voice set.
 class Actor {
   public:
     Actor();
@@ -22,6 +23,9 @@ class Actor {
 
     [[nodiscard]] QString name() const { return m_name; }
     void setName(const QString& name) { m_name = name; }
+
+    [[nodiscard]] QString role() const { return m_role; }
+    void setRole(const QString& role) { m_role = role; }
 
     [[nodiscard]] int channel() const noexcept { return m_channel; }
     void setChannel(int channel) { m_channel = channel; }
@@ -45,6 +49,7 @@ class Actor {
   private:
     QString m_id;
     QString m_name;
+    QString m_role; // character/part; empty when unused
     int m_channel = 0;
     int m_order = 0;
     bool m_active = true;

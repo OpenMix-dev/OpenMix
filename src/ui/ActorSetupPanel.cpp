@@ -403,14 +403,15 @@ void ActorSetupPanel::setupUi() {
     leftLayout->setContentsMargins(0, 0, 0, 0);
 
     m_actorTree = new QTreeWidget(left);
-    m_actorTree->setColumnCount(3);
-    m_actorTree->setHeaderLabels({tr("Actor"), tr("Ch"), tr("Active")});
+    m_actorTree->setColumnCount(4);
+    m_actorTree->setHeaderLabels({tr("Actor"), tr("Role"), tr("Ch"), tr("Active")});
     m_actorTree->setRootIsDecorated(false);
     m_actorTree->setSelectionMode(QAbstractItemView::SingleSelection);
     m_actorTree->header()->setStretchLastSection(false);
     m_actorTree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
-    m_actorTree->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    m_actorTree->header()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_actorTree->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    m_actorTree->header()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
     connect(m_actorTree, &QTreeWidget::itemSelectionChanged, this,
             &ActorSetupPanel::onActorSelectionChanged);
     leftLayout->addWidget(m_actorTree, 1);
@@ -468,6 +469,10 @@ void ActorSetupPanel::setupUi() {
     auto* identityForm = new QFormLayout(identityBox);
     m_nameEdit = new QLineEdit(identityBox);
     m_nameEdit->setPlaceholderText(tr("Actor name"));
+    m_roleEdit = new QLineEdit(identityBox);
+    m_roleEdit->setPlaceholderText(tr("Character / part (e.g. Cosette)"));
+    m_roleEdit->setToolTip(
+        tr("Typing this role into a cue's DCA slot assigns this actor's channel"));
     m_channelSpin = new QSpinBox(identityBox);
     m_channelSpin->setRange(1, 96);
     m_activeCheck = new QCheckBox(tr("Active"), identityBox);
@@ -475,27 +480,39 @@ void ActorSetupPanel::setupUi() {
     m_backupCheck = new QCheckBox(tr("Channel on backup / spare mic"), identityBox);
     m_backupCheck->setToolTip(tr("Resolve this channel to the backup voice instead of the main"));
     identityForm->addRow(tr("Name:"), m_nameEdit);
+    identityForm->addRow(tr("Role:"), m_roleEdit);
     identityForm->addRow(tr("Channel:"), m_channelSpin);
     identityForm->addRow(QString(), m_activeCheck);
     identityForm->addRow(QString(), m_backupCheck);
     editorLayout->addWidget(identityBox);
 
     connect(m_nameEdit, &QLineEdit::textChanged, this, &ActorSetupPanel::onNameChanged);
+    connect(m_roleEdit, &QLineEdit::textChanged, this, &ActorSetupPanel::onRoleChanged);
     connect(m_channelSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
             &ActorSetupPanel::onChannelChanged);
     connect(m_activeCheck, &QCheckBox::toggled, this, &ActorSetupPanel::onActiveToggled);
     connect(m_backupCheck, &QCheckBox::toggled, this, &ActorSetupPanel::onBackupToggled);
 
-    auto* slotBox = new QGroupBox(tr("Profile Slot"), m_editor);
-    auto* slotLayout = new QHBoxLayout(slotBox);
+    auto* slotBox = new QGroupBox(tr("Voice Profile Slots (shared by all actors)"), m_editor);
+    auto* slotBoxLayout = new QVBoxLayout(slotBox);
+    auto* slotHint = new QLabel(
+        tr("Slots are show-wide voice categories (e.g. \"Main\", \"Cold Day\") — not per-actor "
+           "mic names. Adding a slot adds it for every actor; the EQ/dynamics below are this "
+           "actor's own settings for the selected slot."),
+        slotBox);
+    slotHint->setWordWrap(true);
+    slotHint->setStyleSheet(QString("color: %1;").arg(Theme::Colors::TextSecondary));
+    slotBoxLayout->addWidget(slotHint);
+    auto* slotLayout = new QHBoxLayout();
     m_slotCombo = new QComboBox(slotBox);
     m_addSlotBtn = new QPushButton(Icons::listAdd(), QString(), slotBox);
-    m_addSlotBtn->setToolTip(tr("Add a profile slot"));
+    m_addSlotBtn->setToolTip(tr("Add a voice profile slot (added for every actor)"));
     m_removeSlotBtn = new QPushButton(Icons::listRemove(), QString(), slotBox);
-    m_removeSlotBtn->setToolTip(tr("Remove the current profile slot"));
+    m_removeSlotBtn->setToolTip(tr("Remove the current voice profile slot (removed for every actor)"));
     slotLayout->addWidget(m_slotCombo, 1);
     slotLayout->addWidget(m_addSlotBtn);
     slotLayout->addWidget(m_removeSlotBtn);
+    slotBoxLayout->addLayout(slotLayout);
     editorLayout->addWidget(slotBox);
 
     connect(m_slotCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
@@ -565,8 +582,9 @@ void ActorSetupPanel::rebuildActorTree(const QString& selectId) {
     for (const Actor& a : actors) {
         auto* item = new QTreeWidgetItem(m_actorTree);
         item->setText(0, a.name().isEmpty() ? tr("(unnamed)") : a.name());
-        item->setText(1, QString::number(a.channel()));
-        item->setText(2, a.active() ? tr("Yes") : tr("No"));
+        item->setText(1, a.role());
+        item->setText(2, QString::number(a.channel()));
+        item->setText(3, a.active() ? tr("Yes") : tr("No"));
         item->setData(0, Qt::UserRole, a.id());
         if (a.id() == selectId)
             toSelect = item;
@@ -613,6 +631,7 @@ void ActorSetupPanel::loadActorIntoEditor() {
         setEditorEnabled(false);
         m_updatingUi = true;
         m_nameEdit->clear();
+        m_roleEdit->clear();
         m_channelSpin->setValue(1);
         m_activeCheck->setChecked(false);
         m_backupCheck->setChecked(false);
@@ -627,6 +646,7 @@ void ActorSetupPanel::loadActorIntoEditor() {
 
     m_updatingUi = true;
     m_nameEdit->setText(a->name());
+    m_roleEdit->setText(a->role());
     m_channelSpin->setValue(a->channel());
     m_activeCheck->setChecked(a->active());
     m_backupCheck->setChecked(m_library->isBackup(a->channel()));
@@ -762,6 +782,22 @@ void ActorSetupPanel::onNameChanged(const QString& text) {
         item->setText(0, text.isEmpty() ? tr("(unnamed)") : text);
 }
 
+void ActorSetupPanel::onRoleChanged(const QString& text) {
+    if (m_updatingUi)
+        return;
+    const QString id = selectedActorId();
+    const Actor* a = m_library ? m_library->actorById(id) : nullptr;
+    if (!a)
+        return;
+    Actor copy = *a;
+    copy.setRole(text);
+    m_updatingUi = true;
+    m_library->updateActor(id, copy);
+    m_updatingUi = false;
+    if (auto* item = m_actorTree->currentItem())
+        item->setText(1, text);
+}
+
 void ActorSetupPanel::onChannelChanged(int channel) {
     if (m_updatingUi)
         return;
@@ -776,7 +812,7 @@ void ActorSetupPanel::onChannelChanged(int channel) {
     m_backupCheck->setChecked(m_library->isBackup(channel)); // backup is per-channel
     m_updatingUi = false;
     if (auto* item = m_actorTree->currentItem())
-        item->setText(1, QString::number(channel));
+        item->setText(2, QString::number(channel));
 }
 
 void ActorSetupPanel::onActiveToggled(bool on) {
@@ -792,7 +828,7 @@ void ActorSetupPanel::onActiveToggled(bool on) {
     m_library->updateActor(id, copy);
     m_updatingUi = false;
     if (auto* item = m_actorTree->currentItem())
-        item->setText(2, on ? tr("Yes") : tr("No"));
+        item->setText(3, on ? tr("Yes") : tr("No"));
 }
 
 void ActorSetupPanel::onBackupToggled(bool on) {
@@ -827,14 +863,14 @@ void ActorSetupPanel::addSlot() {
     if (!m_library)
         return;
     bool ok = false;
-    const QString name =
-        QInputDialog::getText(this, tr("Add Profile Slot"), tr("Slot name:"), QLineEdit::Normal,
-                              QString(), &ok)
-            .trimmed();
+    const QString name = QInputDialog::getText(this, tr("Add Voice Profile Slot"),
+                                               tr("Slot name (added for every actor):"),
+                                               QLineEdit::Normal, QString(), &ok)
+                             .trimmed();
     if (!ok || name.isEmpty())
         return;
     if (m_library->profileSlots().contains(name)) {
-        QMessageBox::information(this, tr("Add Profile Slot"),
+        QMessageBox::information(this, tr("Add Voice Profile Slot"),
                                  tr("A slot named \"%1\" already exists.").arg(name));
         return;
     }

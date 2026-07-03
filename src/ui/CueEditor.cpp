@@ -14,6 +14,7 @@
 #include <QCheckBox>
 #include <QColorDialog>
 #include <QComboBox>
+#include <QCompleter>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QGridLayout>
@@ -25,6 +26,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSpinBox>
+#include <QStringListModel>
 #include <QTableWidget>
 #include <QTextEdit>
 #include <QVBoxLayout>
@@ -36,6 +38,10 @@ namespace OpenMix {
 CueEditor::CueEditor(Application* app, QWidget* parent) : QWidget(parent), m_app(app) {
     if (m_app && m_app->show())
         m_actorLibrary = m_app->show()->actorProfileLibrary();
+
+    m_actorCompletionModel = new QStringListModel(this);
+    if (m_actorLibrary)
+        m_actorCompletionModel->setStringList(m_actorLibrary->completionCandidates());
 
     setupUi();
     setEnabled(false);
@@ -176,11 +182,24 @@ void CueEditor::setupUi() {
 
         widgets.enableLabel = new QCheckBox(tr("Set Label"), dcaBox);
         widgets.labelValue = new QLineEdit(dcaBox);
-        widgets.labelValue->setPlaceholderText(tr("DCA label"));
+        widgets.labelValue->setPlaceholderText(tr("Role, actor, or label"));
+        widgets.labelValue->setToolTip(
+            tr("Typing a role or actor name assigns their channel to this DCA for this cue; "
+               "the console truncates long scribble labels"));
         widgets.labelValue->setEnabled(false);
-        widgets.labelValue->setMaxLength(12);
+        widgets.labelValue->setMaxLength(32);
         dcaLayout->addWidget(widgets.enableLabel, 1, 0);
         dcaLayout->addWidget(widgets.labelValue, 1, 1);
+
+        auto* completer = new QCompleter(m_actorCompletionModel, dcaBox);
+        completer->setCaseSensitivity(Qt::CaseInsensitive);
+        completer->setCompletionMode(QCompleter::PopupCompletion);
+        widgets.labelValue->setCompleter(completer);
+
+        widgets.assignInfo = new QLabel(dcaBox);
+        widgets.assignInfo->setWordWrap(true);
+        widgets.assignInfo->setStyleSheet(QString("color: %1;").arg(Theme::Colors::TextSecondary));
+        dcaLayout->addWidget(widgets.assignInfo, 2, 0, 1, 2);
 
         // connect enable checkboxes to enable/disable value widgets
         connect(widgets.enableMute, &QCheckBox::toggled, widgets.muteValue, &QCheckBox::setEnabled);
@@ -197,6 +216,12 @@ void CueEditor::setupUi() {
                 [this, dca]() { onDCAOverrideChanged(dca); });
         connect(widgets.labelValue, &QLineEdit::textChanged,
                 [this, dca]() { onDCAOverrideChanged(dca); });
+        // name resolution runs at commit time, not per keystroke, so a prefix
+        // of one name never assigns while typing another ("Anna" vs "Annabelle")
+        connect(widgets.labelValue, &QLineEdit::editingFinished,
+                [this, dca]() { onDCALabelCommitted(dca); });
+        connect(completer, QOverload<const QString&>::of(&QCompleter::activated),
+                [this, dca](const QString&) { onDCALabelCommitted(dca); });
 
         m_dcaOverrideWidgets.append(widgets);
         overridesContentLayout->addWidget(dcaBox);
@@ -546,6 +571,8 @@ void CueEditor::updateDCAOverridesUI() {
         widgets.labelValue->setText(override.label.value_or(""));
         widgets.labelValue->setEnabled(override.label.has_value());
     }
+
+    updateDCAAssignInfo();
 }
 
 void CueEditor::updateFxMutesUI() {
@@ -712,6 +739,69 @@ void CueEditor::onDCAOverrideChanged(int dca) {
     emit cueModified();
 }
 
+void CueEditor::onDCALabelCommitted(int dca) {
+    if (m_updatingUi)
+        return;
+
+    Cue* cue = currentCue();
+    if (!cue || dca < 1 || dca > m_dcaOverrideWidgets.size() || !m_actorLibrary)
+        return;
+
+    const DCAOverrideWidgets& widgets = m_dcaOverrideWidgets[dca - 1];
+    if (!widgets.enableLabel->isChecked())
+        return;
+
+    // a matching role/actor name assigns their channel to this DCA for this
+    // cue; any other text stays a plain scribble label
+    const Actor* actor = m_actorLibrary->resolveActor(widgets.labelValue->text());
+    if (!actor)
+        return;
+
+    cue->assignChannelToDCAMapping(actor->channel(), dca, m_app->show()->dcaMapping());
+    m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
+    updateDCAAssignInfo();
+    emit cueModified();
+}
+
+void CueEditor::updateDCAAssignInfo() {
+    Cue* cue = currentCue();
+    const DCAMapping* showMapping =
+        (m_app && m_app->show()) ? m_app->show()->dcaMapping() : nullptr;
+
+    for (int i = 0; i < m_dcaOverrideWidgets.size(); ++i) {
+        QLabel* info = m_dcaOverrideWidgets[i].assignInfo;
+        if (!cue) {
+            info->clear();
+            continue;
+        }
+
+        // same precedence as playback: cue custom mapping, else show mapping
+        const int dca = i + 1;
+        QList<int> channels;
+        if (cue->hasCustomDCAMapping())
+            channels = cue->dcaChannelMapping().value(dca);
+        else if (showMapping)
+            channels = showMapping->channelsForDCA(dca);
+
+        if (channels.isEmpty()) {
+            info->setText(tr("No channels assigned"));
+            continue;
+        }
+
+        QStringList parts;
+        for (int ch : channels) {
+            const Actor* actor = m_actorLibrary ? m_actorLibrary->actorForChannel(ch) : nullptr;
+            if (actor && !actor->role().isEmpty())
+                parts << tr("Ch %1 %2 (%3)").arg(ch).arg(actor->name(), actor->role());
+            else if (actor)
+                parts << tr("Ch %1 %2").arg(ch).arg(actor->name());
+            else
+                parts << tr("Ch %1").arg(ch);
+        }
+        info->setText(tr("Members: %1").arg(parts.join(", ")));
+    }
+}
+
 void CueEditor::rebuildChannelTable() {
     if (!m_channelTable)
         return;
@@ -740,7 +830,10 @@ void CueEditor::rebuildChannelTable() {
         chItem->setFlags(Qt::ItemIsEnabled);
         m_channelTable->setItem(row, 0, chItem);
 
-        auto* nameItem = new QTableWidgetItem(a.name().isEmpty() ? tr("(unnamed)") : a.name());
+        QString display = a.name().isEmpty() ? tr("(unnamed)") : a.name();
+        if (!a.role().isEmpty())
+            display = tr("%1 (%2)").arg(display, a.role());
+        auto* nameItem = new QTableWidgetItem(display);
         nameItem->setFlags(Qt::ItemIsEnabled);
         m_channelTable->setItem(row, 1, nameItem);
 
@@ -955,12 +1048,16 @@ void CueEditor::onChannelLevelChanged(int channel) {
 
 void CueEditor::onActorLibraryChanged() {
     // actors/slots changed (e.g. project loaded, or edited in Actor Setup):
-    // refresh the per-channel table for the cue currently shown.
+    // refresh the autocomplete names and the per-channel table for the cue
+    // currently shown.
+    if (m_actorLibrary)
+        m_actorCompletionModel->setStringList(m_actorLibrary->completionCandidates());
     if (m_currentIndex < 0)
         return;
     m_updatingUi = true;
     rebuildChannelTable();
     populateChannelTable();
+    updateDCAAssignInfo();
     m_updatingUi = false;
 }
 

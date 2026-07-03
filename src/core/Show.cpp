@@ -153,7 +153,7 @@ void Show::newShow() {
 
 QJsonObject Show::toJson() const {
     QJsonObject json;
-    json["version"] = "1.7";
+    json["version"] = "1.8"; // 1.8: actor roles
     json["name"] = m_name;
     json["author"] = m_author;
     json["designer"] = m_designer;

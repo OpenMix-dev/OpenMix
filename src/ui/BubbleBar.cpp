@@ -35,8 +35,7 @@ BubbleButton* BubbleBar::addButton(const QString& id, const QString& icon, const
     m_buttons[id] = button;
     m_layout->addWidget(button, idx / kBubbleColumns, idx % kBubbleColumns);
 
-    connect(button, &QPushButton::clicked,
-            [this, id](bool checked) { emit buttonClicked(id, checked); });
+    connect(button, &QPushButton::clicked, [this, id]() { emit buttonClicked(id); });
 
     adjustSize();
     return button;
@@ -52,8 +51,7 @@ BubbleButton* BubbleBar::addButton(const QString& id, const QIcon& icon, const Q
     m_buttons[id] = button;
     m_layout->addWidget(button, idx / kBubbleColumns, idx % kBubbleColumns);
 
-    connect(button, &QPushButton::clicked,
-            [this, id](bool checked) { emit buttonClicked(id, checked); });
+    connect(button, &QPushButton::clicked, [this, id]() { emit buttonClicked(id); });
 
     adjustSize();
     return button;
@@ -72,7 +70,6 @@ void BubbleBar::removeButton(const QString& id) {
 void BubbleBar::setButtonActive(const QString& id, bool active) {
     if (BubbleButton* btn = m_buttons.value(id)) {
         btn->setActive(active);
-        btn->setChecked(active);
     }
 }
 

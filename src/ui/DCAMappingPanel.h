@@ -47,6 +47,8 @@ class DCAMappingPanel : public QWidget {
     void copyShowMappingToCue();
     void clearCueMapping();
 
+    void onActorsChanged();
+
     // bus name editing
     void startBusNameEdit(int bus);
     void finishBusNameEdit(int bus);
@@ -59,11 +61,14 @@ class DCAMappingPanel : public QWidget {
     void setupUi();
     void createChannelSection();
     void createBusSection();
+    void createDcaOverviewSection();
     void updateDCAOptions();
     void populateFromMapping();
     void updateComboItemStates();
     void updateContextHeader();
+    void updateDcaOverview();
     QString busDisplayName(int bus) const;
+    QString channelDisplayName(int channel) const;
 
     Application* m_app;
     DCAMapping* m_mapping;
@@ -75,12 +80,19 @@ class DCAMappingPanel : public QWidget {
     // UI elements
     QWidget* m_contextHeader;
     QLabel* m_contextLabel;
+    QLabel* m_mappingStateLabel;
     QCheckBox* m_useCueMappingCheck;
     QPushButton* m_copyFromShowButton;
     QPushButton* m_clearCueMappingButton;
 
     QScrollArea* m_scrollArea;
     QWidget* m_scrollContent;
+
+    // per-DCA summary of what fires for the current cue
+    QGroupBox* m_dcaOverviewGroup = nullptr;
+    QGridLayout* m_dcaOverviewLayout = nullptr;
+    QVector<QLabel*> m_dcaOverviewTitles;
+    QVector<QLabel*> m_dcaOverviewMembers;
 
     QGroupBox* m_channelGroup;
     QGridLayout* m_channelLayout;

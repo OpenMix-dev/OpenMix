@@ -1,4 +1,5 @@
 #include "core/Cue.h"
+#include "core/DCAMapping.h"
 #include <QtTest/QtTest>
 
 using namespace OpenMix;
@@ -275,6 +276,47 @@ class TestCue : public QObject {
         QVERIFY(!a.channelProfiles().contains(1));
         QCOMPARE(b.color(), QString("#111111"));
         QCOMPARE(b.channelProfiles().value(1), QString("aProfile"));
+    }
+
+    void testAssignChannelToDCAMapping_seedsFromShowMapping() {
+        DCAMapping show;
+        show.assignChannelToDCA(1, 1);
+        show.assignChannelToDCA(2, 2);
+
+        Cue cue(1.0, "Opening");
+        QVERIFY(!cue.hasCustomDCAMapping());
+
+        cue.assignChannelToDCAMapping(2, 1, &show);
+
+        QVERIFY(cue.hasCustomDCAMapping());
+        QCOMPARE(cue.dcaChannelMapping().value(1), QList<int>({1, 2}));
+        QVERIFY(cue.dcaChannelMapping().value(2).isEmpty());
+        // show mapping untouched
+        QCOMPARE(show.channelsForDCA(2), QList<int>({2}));
+    }
+
+    void testAssignChannelToDCAMapping_movesWithinExistingCustom() {
+        Cue cue;
+        QMap<int, QList<int>> mapping;
+        mapping[1] = {5};
+        cue.setDCAChannelMapping(mapping);
+
+        cue.assignChannelToDCAMapping(5, 3, nullptr);
+
+        QVERIFY(cue.dcaChannelMapping().value(1).isEmpty());
+        QCOMPARE(cue.dcaChannelMapping().value(3), QList<int>({5}));
+    }
+
+    void testAssignChannelToDCAMapping_nullSeedStartsEmpty() {
+        Cue cue;
+        cue.assignChannelToDCAMapping(7, 4, nullptr);
+
+        QVERIFY(cue.hasCustomDCAMapping());
+        QCOMPARE(cue.dcaChannelMapping().value(4), QList<int>({7}));
+
+        // round-trips through JSON
+        Cue r = Cue::fromJson(cue.toJson());
+        QCOMPARE(r.dcaChannelMapping().value(4), QList<int>({7}));
     }
 };
 

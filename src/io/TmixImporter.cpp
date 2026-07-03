@@ -68,7 +68,8 @@ void clearShow(Show* show) {
 
 } // namespace
 
-bool TmixImporter::import(const QString& path, Show* show, QString* error) {
+bool TmixImporter::import(const QString& path, Show* show, QString* error,
+                          TmixImportSummary* summary) {
     if (!show)
         return false;
 
@@ -101,6 +102,8 @@ bool TmixImporter::import(const QString& path, Show* show, QString* error) {
                     const QString newId = show->positionLibrary()->addPosition(p);
                     if (r.indexOf("id") >= 0)
                         posIdMap.insert(r.value("id").toInt(), newId);
+                    if (summary)
+                        ++summary->positions;
                 }
             }
 
@@ -112,8 +115,11 @@ bool TmixImporter::import(const QString& path, Show* show, QString* error) {
                     QString label = r.value("label").toString();
                     if (label.isEmpty())
                         label = r.value("name").toString();
-                    if (!label.isEmpty())
+                    if (!label.isEmpty()) {
                         show->actorProfileLibrary()->addSlot(label);
+                        if (summary)
+                            summary->profileSlots.append(label);
+                    }
                     if (r.indexOf("id") >= 0)
                         profileSlotMap.insert(r.value("id").toInt(), label);
                 }
@@ -127,6 +133,8 @@ bool TmixImporter::import(const QString& path, Show* show, QString* error) {
                     a.setOrder(r.value("order").toInt());
                     a.setActive(r.value("active").toInt() != 0);
                     show->actorProfileLibrary()->addActor(a);
+                    if (summary)
+                        ++summary->actors;
                 }
             }
 
@@ -137,10 +145,15 @@ bool TmixImporter::import(const QString& path, Show* show, QString* error) {
                     Ensemble e(r.value("name").toString());
                     e.setChannels(parseIntList(r.value("channels").toString()));
                     show->ensembleLibrary()->addEnsemble(e);
+                    if (summary)
+                        ++summary->ensembles;
                 }
             }
 
-            // cues
+            // cues; along the way, guess actor roles from DCA labels: a label
+            // on a single-channel DCA names whoever is on that channel (multi-
+            // channel labels are group names, conflicting labels are skipped)
+            QHash<int, QString> channelRoleGuess;
             if (q.exec("SELECT * FROM cues")) {
                 while (q.next()) {
                     const QSqlRecord r = q.record();
@@ -163,6 +176,15 @@ bool TmixImporter::import(const QString& path, Show* show, QString* error) {
                                 DCAOverride ov;
                                 ov.label = label;
                                 cue.setDCAOverride(i, ov);
+
+                                if (dcaMap.value(i).size() == 1) {
+                                    const int ch = dcaMap.value(i).first();
+                                    const QString prior = channelRoleGuess.value(ch);
+                                    if (!channelRoleGuess.contains(ch))
+                                        channelRoleGuess.insert(ch, label);
+                                    else if (prior.compare(label, Qt::CaseInsensitive) != 0)
+                                        channelRoleGuess.insert(ch, QString()); // ambiguous
+                                }
                             }
                         }
                     }
@@ -196,7 +218,23 @@ bool TmixImporter::import(const QString& path, Show* show, QString* error) {
                     }
 
                     show->cueList()->addCue(cue);
+                    if (summary)
+                        ++summary->cues;
                 }
+            }
+
+            // apply the unambiguous role guesses to actors without one
+            // (iterate a copy: updateActor mutates the library's list)
+            const QList<Actor> actors = show->actorProfileLibrary()->actors();
+            for (const Actor& a : actors) {
+                const QString guess = channelRoleGuess.value(a.channel());
+                if (guess.isEmpty() || !a.role().isEmpty())
+                    continue;
+                Actor copy = a;
+                copy.setRole(guess);
+                show->actorProfileLibrary()->updateActor(a.id(), copy);
+                if (summary)
+                    ++summary->rolesInferred;
             }
 
             // config parameters mapped onto Show fields

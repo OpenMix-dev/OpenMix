@@ -24,7 +24,7 @@ class BubbleBar : public QWidget {
     QStringList buttonIds() const;
 
   signals:
-    void buttonClicked(const QString& id, bool checked);
+    void buttonClicked(const QString& id);
 
   protected:
     void resizeEvent(QResizeEvent* event) override;

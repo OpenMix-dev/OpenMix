@@ -114,7 +114,7 @@ class MainWindow : public QMainWindow {
     void showMarkerNotesDialog();
 
     // bubble bar interaction
-    void onBubbleButtonClicked(const QString& id, bool checked);
+    void onBubbleButtonClicked(const QString& id);
 
   private:
     [[nodiscard]] bool isTextEntryFocused() const;

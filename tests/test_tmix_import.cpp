@@ -63,6 +63,51 @@ class TestTmixImport : public QObject {
         QCOMPARE(show.actorProfileLibrary()->actors().size(), 1);
         QCOMPARE(show.actorProfileLibrary()->actors().first().name(), QString("Alice"));
         QCOMPARE(show.actorProfileLibrary()->actors().first().channel(), 3);
+        // 'Vox' labels a two-channel DCA: a group name, never a role
+        QVERIFY(show.actorProfileLibrary()->actors().first().role().isEmpty());
+    }
+
+    void testRoleBackfillFromCueDcaLabels() {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath("roles.tmix");
+
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "tmixroles");
+            db.setDatabaseName(path);
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            QVERIFY(q.exec("CREATE TABLE actors (id INTEGER PRIMARY KEY, channel INTEGER, "
+                           "name TEXT, `order` INTEGER, active INTEGER)"));
+            QVERIFY(q.exec("INSERT INTO actors (channel,name,`order`,active) VALUES(3,'Alice',0,1)"));
+            QVERIFY(q.exec("INSERT INTO actors (channel,name,`order`,active) VALUES(4,'Bob',1,1)"));
+            QVERIFY(q.exec("INSERT INTO actors (channel,name,`order`,active) VALUES(5,'Cleo',2,1)"));
+            QVERIFY(q.exec("CREATE TABLE cues (number INTEGER, point INTEGER, name TEXT, "
+                           "dca01Channels TEXT, dca01Label TEXT, "
+                           "dca02Channels TEXT, dca02Label TEXT, "
+                           "dca03Channels TEXT, dca03Label TEXT)"));
+            // ch3 always labeled 'Cosette' (single channel) -> role
+            // ch4 labeled 'Marius' then 'Valjean' -> conflicting, no role
+            // ch5 only ever in a multi-channel DCA 'ENS' -> no role
+            QVERIFY(q.exec("INSERT INTO cues VALUES(1,0,'One','3','Cosette','4','Marius','5,6','ENS')"));
+            QVERIFY(q.exec("INSERT INTO cues VALUES(2,0,'Two','3','Cosette','4','Valjean','5,6','ENS')"));
+            db.close();
+        }
+        QSqlDatabase::removeDatabase("tmixroles");
+
+        Show show;
+        TmixImporter importer;
+        QString err;
+        TmixImportSummary summary;
+        QVERIFY2(importer.import(path, &show, &err, &summary), qPrintable(err));
+
+        const ActorProfileLibrary* lib = show.actorProfileLibrary();
+        QCOMPARE(lib->actorForChannel(3)->role(), QString("Cosette"));
+        QVERIFY(lib->actorForChannel(4)->role().isEmpty());
+        QVERIFY(lib->actorForChannel(5)->role().isEmpty());
+        QCOMPARE(summary.rolesInferred, 1);
+        QCOMPARE(summary.actors, 3);
+        QCOMPARE(summary.cues, 2);
     }
 
     void testImportMissingFileFails() {

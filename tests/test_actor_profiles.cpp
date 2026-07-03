@@ -73,6 +73,26 @@ class TestActorProfiles : public QObject {
         QCOMPARE(*r.profile("Main").main().gainDb, 3.0);
     }
 
+    void actor_role_roundTrip() {
+        Actor a("Alice", 5);
+        a.setRole("Cosette");
+
+        const QJsonObject json = a.toJson();
+        QCOMPARE(json["role"].toString(), QString("Cosette"));
+
+        Actor r = Actor::fromJson(json);
+        QCOMPARE(r.role(), QString("Cosette"));
+    }
+
+    void actor_emptyRole_omittedFromJson() {
+        Actor a("Alice", 5);
+        QVERIFY(!a.toJson().contains("role"));
+
+        // absent key loads as empty (pre-1.8 shows)
+        Actor r = Actor::fromJson(a.toJson());
+        QVERIFY(r.role().isEmpty());
+    }
+
     // --- ActorProfileLibrary: lookup + backup -----------------------------
     void library_voiceFor_resolvesActiveActor() {
         ActorProfileLibrary lib;
@@ -113,6 +133,58 @@ class TestActorProfiles : public QObject {
         primary.setActive(false);
         lib.updateActor(primary.id(), primary);
         QCOMPARE(lib.actorForChannel(3)->name(), QString("Understudy"));
+    }
+
+    void library_resolveActor_roleBeatsName_caseInsensitive_trimmed() {
+        ActorProfileLibrary lib;
+        Actor alice("Alice", 5);
+        alice.setRole("Cosette");
+        lib.addActor(alice);
+        // an actor literally named "Cosette" must lose to the role match
+        lib.addActor(Actor("Cosette", 6));
+
+        QCOMPARE(lib.resolveActor("cosette")->channel(), 5);
+        QCOMPARE(lib.resolveActor("  ALICE  ")->channel(), 5);
+        QCOMPARE(lib.resolveActor("alice")->name(), QString("Alice"));
+    }
+
+    void library_resolveActor_prefersActiveThenLowestOrder() {
+        ActorProfileLibrary lib;
+        Actor lead("Lead", 3);
+        lead.setRole("Evan");
+        lead.setOrder(1);
+        Actor understudy("Understudy", 4);
+        understudy.setRole("Evan");
+        understudy.setOrder(2);
+        lib.addActor(understudy);
+        lib.addActor(lead);
+
+        QCOMPARE(lib.resolveActor("Evan")->name(), QString("Lead"));
+
+        lead.setActive(false);
+        lib.updateActor(lead.id(), lead);
+        QCOMPARE(lib.resolveActor("Evan")->name(), QString("Understudy"));
+    }
+
+    void library_resolveActor_noMatchReturnsNull() {
+        ActorProfileLibrary lib;
+        lib.addActor(Actor("Alice", 5));
+        QVERIFY(lib.resolveActor("Bob") == nullptr);
+        QVERIFY(lib.resolveActor("") == nullptr);
+        QVERIFY(lib.resolveActor("   ") == nullptr);
+    }
+
+    void library_completionCandidates_dedupSkipsEmpty() {
+        ActorProfileLibrary lib;
+        Actor alice("Alice", 5);
+        alice.setRole("Cosette");
+        lib.addActor(alice);
+        lib.addActor(Actor("Bob", 6)); // no role
+        Actor dup("COSETTE", 7);       // ci-duplicate of the role
+        lib.addActor(dup);
+
+        const QStringList candidates = lib.completionCandidates();
+        QCOMPARE(candidates, QStringList({"Alice", "Bob", "Cosette"}));
     }
 
     void library_emitsSignals() {
@@ -169,17 +241,19 @@ class TestActorProfiles : public QObject {
         Show show;
         QSignalSpy spy(&show, &Show::modifiedChanged);
         Actor a("Eve", 4);
+        a.setRole("Elle");
         show.actorProfileLibrary()->addActor(a);
         QVERIFY(show.isModified()); // library change propagates dirty
         QVERIFY(spy.count() >= 1);
 
         const QJsonObject json = show.toJson();
-        QCOMPARE(json["version"].toString(), QString("1.7"));
+        QCOMPARE(json["version"].toString(), QString("1.8"));
 
         Show loaded;
         loaded.fromJson(json);
         QCOMPARE(loaded.actorProfileLibrary()->actorCount(), 1);
         QCOMPARE(loaded.actorProfileLibrary()->actorForChannel(4)->name(), QString("Eve"));
+        QCOMPARE(loaded.actorProfileLibrary()->actorForChannel(4)->role(), QString("Elle"));
     }
 
     void show_loadsLegacy_1_1_withoutActors() {

@@ -16,6 +16,8 @@ QJsonObject Actor::toJson() const {
     QJsonObject json;
     json["id"] = m_id;
     json["name"] = m_name;
+    if (!m_role.isEmpty())
+        json["role"] = m_role;
     json["channel"] = m_channel;
     json["order"] = m_order;
     json["active"] = m_active;
@@ -39,6 +41,7 @@ Actor Actor::fromJson(const QJsonObject& json) {
     if (actor.m_id.isEmpty())
         actor.m_id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     actor.m_name = json["name"].toString();
+    actor.m_role = json["role"].toString();
     actor.m_channel = json["channel"].toInt();
     actor.m_order = json["order"].toInt();
     actor.m_active = json["active"].toBool(true);

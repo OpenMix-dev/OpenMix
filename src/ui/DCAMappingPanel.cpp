@@ -1,6 +1,8 @@
 #include "DCAMappingPanel.h"
 #include "app/Application.h"
 #include "MainWindow.h"
+#include "core/Actor.h"
+#include "core/ActorProfileLibrary.h"
 #include "core/Cue.h"
 #include "core/DCAMapping.h"
 #include "core/ShortcutManager.h"
@@ -78,6 +80,10 @@ DCAMappingPanel::DCAMappingPanel(Application* app, QWidget* parent)
         if (m_mapping) {
             connect(m_mapping, &DCAMapping::mappingCleared, this, &DCAMappingPanel::refresh);
         }
+
+        // actor renames/role edits change the channel labels shown here
+        connect(m_app->show()->actorProfileLibrary(), &ActorProfileLibrary::changed, this,
+                &DCAMappingPanel::onActorsChanged);
     }
 
     refresh();
@@ -97,6 +103,11 @@ void DCAMappingPanel::setupUi() {
     m_contextLabel->setStyleSheet(
         QString("font-weight: bold; color: %1;").arg(Theme::Colors::TextPrimary));
     contextLayout->addWidget(m_contextLabel);
+
+    // says out loud whether the combos below reflect this cue or the show
+    m_mappingStateLabel = new QLabel(m_contextHeader);
+    m_mappingStateLabel->setVisible(false);
+    contextLayout->addWidget(m_mappingStateLabel);
 
     m_useCueMappingCheck = new QCheckBox(tr("Use Cue-Specific Mapping"), m_contextHeader);
     m_useCueMappingCheck->setToolTip(tr("Enable to override show-level mapping for this cue only"));
@@ -196,6 +207,12 @@ void DCAMappingPanel::setupUi() {
     scrollLayout->setContentsMargins(0, 0, 0, 0);
     scrollLayout->setSpacing(12);
 
+    // per-DCA overview of the current cue (label + members)
+    m_dcaOverviewGroup = new QGroupBox(tr("DCA Overview (current cue)"), m_scrollContent);
+    m_dcaOverviewLayout = new QGridLayout(m_dcaOverviewGroup);
+    m_dcaOverviewLayout->setSpacing(4);
+    scrollLayout->addWidget(m_dcaOverviewGroup);
+
     // channel section
     m_channelGroup = new QGroupBox(tr("Channel Assignments"), m_scrollContent);
     m_channelLayout = new QGridLayout(m_channelGroup);
@@ -213,8 +230,38 @@ void DCAMappingPanel::setupUi() {
     m_scrollArea->setWidget(m_scrollContent);
     mainLayout->addWidget(m_scrollArea, 1);
 
+    createDcaOverviewSection();
     createChannelSection();
     createBusSection();
+}
+
+void DCAMappingPanel::createDcaOverviewSection() {
+    while (QLayoutItem* item = m_dcaOverviewLayout->takeAt(0)) {
+        if (item->widget()) {
+            item->widget()->deleteLater();
+        }
+        delete item;
+    }
+    m_dcaOverviewTitles.clear();
+    m_dcaOverviewMembers.clear();
+
+    for (int d = 1; d <= m_dcaCount; ++d) {
+        int row = (d - 1) % 4;
+        int col = ((d - 1) / 4) * 2;
+
+        QLabel* title = new QLabel(tr("DCA %1").arg(d), m_dcaOverviewGroup);
+        title->setStyleSheet(QString("font-weight: bold; color: %1;").arg(Theme::Colors::TextPrimary));
+        title->setMinimumWidth(120);
+        m_dcaOverviewLayout->addWidget(title, row, col);
+        m_dcaOverviewTitles.append(title);
+
+        QLabel* members = new QLabel(m_dcaOverviewGroup);
+        members->setWordWrap(true);
+        members->setStyleSheet(QString("color: %1;").arg(Theme::Colors::TextSecondary));
+        m_dcaOverviewLayout->addWidget(members, row, col + 1);
+        m_dcaOverviewLayout->setColumnStretch(col + 1, 1);
+        m_dcaOverviewMembers.append(members);
+    }
 }
 
 void DCAMappingPanel::createChannelSection() {
@@ -238,8 +285,9 @@ void DCAMappingPanel::createChannelSection() {
         int row = ((ch - 1) % 16) + 1;
         colOffset = ((ch - 1) / 16) * 3;
 
-        QLabel* label = new QLabel(tr("Ch %1").arg(ch), m_channelGroup);
+        QLabel* label = new QLabel(channelDisplayName(ch), m_channelGroup);
         label->setMinimumWidth(60);
+        label->setToolTip(channelDisplayName(ch));
         m_channelLayout->addWidget(label, row, colOffset);
         m_channelLabels.append(label);
 
@@ -341,6 +389,7 @@ void DCAMappingPanel::updateDCAOptions() {
     }
 
     // rebuild sections with new counts
+    createDcaOverviewSection();
     createChannelSection();
     createBusSection();
     populateFromMapping();
@@ -402,6 +451,7 @@ void DCAMappingPanel::populateFromMapping() {
     m_updatingUi = false;
 
     updateComboItemStates();
+    updateDcaOverview();
 }
 
 void DCAMappingPanel::updateComboItemStates() {
@@ -450,15 +500,18 @@ void DCAMappingPanel::updateComboItemStates() {
     for (int ch = 1; ch <= m_channelLabels.size(); ++ch) {
         int dca = channelToDCA.value(ch, -1);
         QLabel* label = m_channelLabels[ch - 1];
+        const QString display = channelDisplayName(ch);
 
         if (dca > 0) {
-            label->setText(tr("Ch %1 [%2]").arg(ch).arg(dca));
+            label->setText(tr("%1 [%2]").arg(display).arg(dca));
             label->setStyleSheet(assignedStyle);
-            label->setToolTip(tr("Assigned to DCA %1 - locked from other DCAs").arg(dca));
+            label->setToolTip(tr("%1 — assigned to DCA %2, locked from other DCAs")
+                                  .arg(display)
+                                  .arg(dca));
         } else {
-            label->setText(tr("Ch %1").arg(ch));
+            label->setText(display);
             label->setStyleSheet("");
-            label->setToolTip(tr("Not assigned to any DCA"));
+            label->setToolTip(tr("%1 — not assigned to any DCA").arg(display));
         }
     }
 
@@ -775,6 +828,17 @@ void DCAMappingPanel::updateContextHeader() {
         }
         m_contextLabel->setText(cueText);
 
+        if (m_currentCue->hasCustomDCAMapping()) {
+            m_mappingStateLabel->setText(tr("cue-specific mapping"));
+            m_mappingStateLabel->setStyleSheet(
+                QString("color: %1;").arg(Theme::Colors::AccentBlue));
+        } else {
+            m_mappingStateLabel->setText(tr("using show-level mapping"));
+            m_mappingStateLabel->setStyleSheet(
+                QString("color: %1;").arg(Theme::Colors::TextSecondary));
+        }
+        m_mappingStateLabel->setVisible(true);
+
         m_useCueMappingCheck->setVisible(true);
         m_copyFromShowButton->setVisible(m_showingCueMapping);
         m_clearCueMappingButton->setVisible(m_showingCueMapping &&
@@ -782,6 +846,7 @@ void DCAMappingPanel::updateContextHeader() {
     } else {
         // show-level context
         m_contextLabel->setText(tr("Show Level"));
+        m_mappingStateLabel->setVisible(false);
         m_useCueMappingCheck->setVisible(false);
         m_copyFromShowButton->setVisible(false);
         m_clearCueMappingButton->setVisible(false);
@@ -836,6 +901,55 @@ QString DCAMappingPanel::busDisplayName(int bus) const {
             return name;
     }
     return tr("Bus %1").arg(bus);
+}
+
+QString DCAMappingPanel::channelDisplayName(int channel) const {
+    const ActorProfileLibrary* library =
+        (m_app && m_app->show()) ? m_app->show()->actorProfileLibrary() : nullptr;
+    const Actor* actor = library ? library->actorForChannel(channel) : nullptr;
+    if (actor && !actor->role().isEmpty())
+        return tr("Ch %1 — %2 (%3)").arg(channel).arg(actor->name(), actor->role());
+    if (actor && !actor->name().isEmpty())
+        return tr("Ch %1 — %2").arg(channel).arg(actor->name());
+    return tr("Ch %1").arg(channel);
+}
+
+void DCAMappingPanel::updateDcaOverview() {
+    if (!m_mapping)
+        return;
+
+    // effective mapping = what playback would use: cue custom when present,
+    // else show-level (deliberately not gated on the editing toggle)
+    const bool cueMapped = m_currentCue && m_currentCue->hasCustomDCAMapping();
+    const QMap<int, QList<int>> channelMap =
+        cueMapped ? m_currentCue->dcaChannelMapping() : m_mapping->channelAssignments();
+    const QMap<int, QList<int>> busMap =
+        cueMapped ? m_currentCue->dcaBusMapping() : m_mapping->busAssignments();
+
+    for (int d = 1; d <= m_dcaOverviewTitles.size(); ++d) {
+        QLabel* title = m_dcaOverviewTitles[d - 1];
+        QLabel* members = m_dcaOverviewMembers[d - 1];
+
+        QString titleText = tr("DCA %1").arg(d);
+        if (m_currentCue) {
+            const QString label = m_currentCue->dcaOverride(d).label.value_or(QString());
+            if (!label.isEmpty())
+                titleText += QString(" — %1").arg(label);
+        }
+        title->setText(titleText);
+
+        QStringList parts;
+        for (int ch : channelMap.value(d))
+            parts << channelDisplayName(ch);
+        for (int bus : busMap.value(d))
+            parts << busDisplayName(bus);
+        members->setText(parts.isEmpty() ? tr("(empty)") : parts.join(", "));
+    }
+}
+
+void DCAMappingPanel::onActorsChanged() {
+    updateComboItemStates();
+    updateDcaOverview();
 }
 
 bool DCAMappingPanel::eventFilter(QObject* obj, QEvent* event) {

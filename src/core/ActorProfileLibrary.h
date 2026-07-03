@@ -34,6 +34,11 @@ class ActorProfileLibrary : public QObject {
     [[nodiscard]] int actorCount() const { return m_actors.size(); }
     [[nodiscard]] const Actor* actorById(const QString& id) const;
     [[nodiscard]] const Actor* actorForChannel(int channel) const; // active actor on channel
+    // resolve free text to an actor: exact case-insensitive role match first,
+    // then actor name; among duplicates prefer active, then lowest order
+    [[nodiscard]] const Actor* resolveActor(const QString& text) const;
+    // role + actor names for autocomplete (non-empty, deduplicated, sorted)
+    [[nodiscard]] QStringList completionCandidates() const;
     void addActor(const Actor& actor);
     void updateActor(const QString& id, const Actor& actor);
     void removeActor(const QString& id);

@@ -114,6 +114,10 @@ class Cue {
     [[nodiscard]] QMap<int, QList<int>> dcaBusMapping() const;
     void clearCustomDCAMapping();
     void copyDCAMappingFrom(const class DCAMapping* showMapping);
+    // assign a channel to a DCA in this cue's custom mapping (removing it from
+    // any other DCA); seeds the custom mapping from the show mapping first if
+    // the cue has none
+    void assignChannelToDCAMapping(int channel, int dca, const class DCAMapping* seedFrom);
 
     [[nodiscard]] bool isMacro() const noexcept { return m_type == CueType::Macro; }
     [[nodiscard]] QStringList childCueIds() const { return m_childCueIds; }

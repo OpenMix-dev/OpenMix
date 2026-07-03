@@ -44,6 +44,7 @@ class ActorSetupPanel : public QWidget {
 
     // per-actor fields
     void onNameChanged(const QString& text);
+    void onRoleChanged(const QString& text);
     void onChannelChanged(int channel);
     void onActiveToggled(bool on);
     void onBackupToggled(bool on);
@@ -101,6 +102,7 @@ class ActorSetupPanel : public QWidget {
     // editor
     QWidget* m_editor = nullptr;
     QLineEdit* m_nameEdit = nullptr;
+    QLineEdit* m_roleEdit = nullptr;
     QSpinBox* m_channelSpin = nullptr;
     QCheckBox* m_activeCheck = nullptr;
     QCheckBox* m_backupCheck = nullptr;

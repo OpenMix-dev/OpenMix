@@ -817,7 +817,7 @@ void MainWindow::createBubbleBar() {
     m_cueEditor->addBottomWidget(m_bubbleBar);
 }
 
-void MainWindow::onBubbleButtonClicked(const QString& id, [[maybe_unused]] bool checked) {
+void MainWindow::onBubbleButtonClicked(const QString& id) {
 
     if (id == "dcaMapping") {
         toggleDCAMappingPanel();
@@ -888,14 +888,25 @@ void MainWindow::connectSignals() {
         }
     });
 
-    // double-click opens the cue editor for that cue (GO/Space fires cues)
+    // double-click opens the cue editor for that cue (GO/Space fires cues);
+    // the visibilityChanged sync keeps the view-menu check in step
     connect(m_cueListView, &CueListView::cueDoubleClicked, [this](int index) {
         m_cueEditor->setCue(index);
         m_cueEditorPopOut->showAndRestore();
-        m_showCueEditorAction->setChecked(true);
     });
 
-    connect(m_cueEditor, &CueEditor::cueModified, [this]() { m_cueListView->refreshCurrentCue(); });
+    connect(m_cueEditor, &CueEditor::cueModified, [this]() {
+        m_cueListView->refreshCurrentCue();
+        // editor edits can change the cue's DCA mapping/labels; keep the DCA
+        // panel showing the same cue in step (skip when hidden: rebuild is
+        // per-keystroke while typing in the editor)
+        if (m_dcaMappingPopOut->isVisible()) {
+            CueList* cueList = m_app->show()->cueList();
+            const int index = m_cueListView->selectedCueIndex();
+            if (index >= 0 && index < cueList->count())
+                m_dcaMappingPanel->setCurrentCue(&(*cueList)[index]);
+        }
+    });
 
     connect(m_app->playbackEngine(), &PlaybackEngine::goLockout, this, &MainWindow::onGoLockout);
     connect(m_app->playbackEngine(), &PlaybackEngine::cueValidationFailed, this,
@@ -1048,7 +1059,8 @@ void MainWindow::importTmixShow() {
 
     QString error;
     TmixImporter importer;
-    if (!importer.import(filePath, m_app->show(), &error)) {
+    TmixImportSummary summary;
+    if (!importer.import(filePath, m_app->show(), &error, &summary)) {
         QMessageBox::warning(this, tr("Error"), tr("Failed to import show:\n%1").arg(error));
         return;
     }
@@ -1057,8 +1069,42 @@ void MainWindow::importTmixShow() {
     m_app->show()->setModified(true);
     m_cueEditor->setCue(-1);
     m_cueListView->refreshAll();
+    if (m_actorSetupPopOut->isEffectivelyVisible())
+        m_actorSetupPanel->refresh();
     updateTitle();
     updateStatusBar();
+
+    // explain how TheatreMix concepts landed in OpenMix
+    QString rolesLine;
+    if (summary.rolesInferred > 0) {
+        rolesLine = tr("<li><b>%1 role(s)</b> were inferred from cue DCA labels — review them "
+                       "in Actor Setup (F9).</li>")
+                        .arg(summary.rolesInferred);
+    }
+    const QString html =
+        tr("<p>Imported <b>%1 actors</b>, <b>%2 cues</b>, <b>%3 positions</b> and "
+           "<b>%4 ensembles</b>.</p>"
+           "<p>How TheatreMix concepts map onto OpenMix:</p>"
+           "<ul>"
+           "<li>TheatreMix <b>actors</b> are OpenMix actors. Each also has a new <b>Role</b> "
+           "(character) field; typing a role or actor name into a cue's DCA slot assigns "
+           "their channel to that DCA.</li>"
+           "%5"
+           "<li>TheatreMix <b>profiles</b> (%6) became <b>voice profile slots</b>: show-wide "
+           "voice categories shared by every actor — not per-mic names. Each actor stores "
+           "their own EQ/dynamics per slot in Actor Setup.</li>"
+           "<li>Cue <b>DCA labels and channel lists</b> became per-cue DCA label overrides "
+           "and cue-specific DCA mappings — see the DCA Mapping view (F5).</li>"
+           "</ul>")
+            .arg(summary.actors)
+            .arg(summary.cues)
+            .arg(summary.positions)
+            .arg(summary.ensembles)
+            .arg(rolesLine)
+            .arg(summary.profileSlots.isEmpty() ? tr("none found")
+                                                : summary.profileSlots.join(", "));
+    HelpDialog dialog(tr("Imported from TheatreMix"), html, this);
+    dialog.exec();
 }
 
 void MainWindow::saveShow() {
@@ -1148,7 +1194,7 @@ void MainWindow::showAllocateSpareDialog() {
 }
 
 void MainWindow::openConnectionPanel() {
-    if (!m_connectionPopOut->isVisible()) {
+    if (!m_connectionPopOut->isEffectivelyVisible()) {
         m_connectionPopOut->showAndRestore();
     }
 }
@@ -1185,7 +1231,7 @@ void MainWindow::showWelcomeDialog() {
 }
 
 void MainWindow::toggleConnectionPanel() {
-    if (m_connectionPopOut->isVisible()) {
+    if (m_connectionPopOut->isEffectivelyVisible()) {
         m_connectionPopOut->hide();
     } else {
         m_connectionPopOut->showAndRestore();
@@ -1193,7 +1239,7 @@ void MainWindow::toggleConnectionPanel() {
 }
 
 void MainWindow::toggleMixerFeedbackPanel() {
-    if (m_mixerFeedbackPopOut->isVisible())
+    if (m_mixerFeedbackPopOut->isEffectivelyVisible())
         m_mixerFeedbackPopOut->hide();
     else
         m_mixerFeedbackPopOut->showAndRestore();
@@ -1206,7 +1252,7 @@ void MainWindow::toggleChannelStrip() {
 }
 
 void MainWindow::toggleCueEditorPanel() {
-    if (m_cueEditorPopOut->isVisible()) {
+    if (m_cueEditorPopOut->isEffectivelyVisible()) {
         m_cueEditorPopOut->hide();
     } else {
         m_cueEditorPopOut->showAndRestore();
@@ -1215,7 +1261,7 @@ void MainWindow::toggleCueEditorPanel() {
 }
 
 void MainWindow::toggleDCAMappingPanel() {
-    if (m_dcaMappingPopOut->isVisible()) {
+    if (m_dcaMappingPopOut->isEffectivelyVisible()) {
         m_dcaMappingPopOut->hide();
     } else {
         m_dcaMappingPopOut->showAndRestore();
@@ -1224,7 +1270,7 @@ void MainWindow::toggleDCAMappingPanel() {
 }
 
 void MainWindow::toggleActorSetupPanel() {
-    if (m_actorSetupPopOut->isVisible()) {
+    if (m_actorSetupPopOut->isEffectivelyVisible()) {
         m_actorSetupPopOut->hide();
     } else {
         m_actorSetupPopOut->showAndRestore();
@@ -1233,7 +1279,7 @@ void MainWindow::toggleActorSetupPanel() {
 }
 
 void MainWindow::toggleEnsemblePanel() {
-    if (m_ensemblePopOut->isVisible()) {
+    if (m_ensemblePopOut->isEffectivelyVisible()) {
         m_ensemblePopOut->hide();
     } else {
         m_ensemblePopOut->showAndRestore();
@@ -1242,7 +1288,7 @@ void MainWindow::toggleEnsemblePanel() {
 }
 
 void MainWindow::togglePositionPanel() {
-    if (m_positionPopOut->isVisible()) {
+    if (m_positionPopOut->isEffectivelyVisible()) {
         m_positionPopOut->hide();
     } else {
         m_positionPopOut->showAndRestore();
@@ -1251,7 +1297,7 @@ void MainWindow::togglePositionPanel() {
 }
 
 void MainWindow::toggleTimecodePanel() {
-    if (m_timecodePopOut->isVisible()) {
+    if (m_timecodePopOut->isEffectivelyVisible()) {
         m_timecodePopOut->hide();
     } else {
         m_timecodePopOut->showAndRestore();
@@ -1260,7 +1306,7 @@ void MainWindow::toggleTimecodePanel() {
 }
 
 void MainWindow::toggleActiveCueInfoPanel() {
-    if (m_activeCueInfoPopOut->isVisible()) {
+    if (m_activeCueInfoPopOut->isEffectivelyVisible()) {
         m_activeCueInfoPopOut->hide();
     } else {
         m_activeCueInfoPopOut->showAndRestore();
@@ -1482,19 +1528,23 @@ void MainWindow::showQuickStart() {
         "<ol>"
         "<li><b>Connect your console.</b> Open <i>View &rarr; Connection</i> (F7). Scan for an "
         "OSC-capable console, or pick the protocol and enter its IP and port, then Connect.</li>"
-        "<li><b>Set up your cast.</b> In <i>View &rarr; Actor Setup</i> (F9) add actors, assign "
-        "each to a channel, and store their voice (gain, HPF, EQ, dynamics) plus a backup "
-        "voice for a spare mic.</li>"
+        "<li><b>Set up your cast.</b> In <i>View &rarr; Actor Setup</i> (F9) add actors "
+        "(performers), give each a <b>Role</b> (the character they play) and a channel, and "
+        "store their voice (gain, HPF, EQ, dynamics) plus a backup voice for a spare mic.</li>"
         "<li><b>Build cues.</b> <i>Edit &rarr; Add Cue</i>, then use the Cue Editor: DCA "
-        "targeting and labels, per-channel profiles, levels and positions, fade time and "
-        "curve, FX mutes and console snippets.</li>"
+        "targeting and labels &mdash; typing a role or actor name into a DCA slot assigns "
+        "their channel to it &mdash; per-channel profiles, levels and positions, fade time "
+        "and curve, FX mutes and console snippets.</li>"
         "<li><b>Run the show.</b> Press <b>Space</b> to GO. <b>Up/Down</b> move the standby cue "
         "without firing; <i>Edit &rarr; Jump to Selected Cue</i> sets standby to any cue.</li>"
         "<li><b>Stay safe.</b> <b>Shift+Esc</b> panics to the Cue Zero safe values. "
         "<i>Edit &rarr; Lock Editing</i> prevents accidental edits during a performance.</li>"
         "</ol>"
         "<p>Already have a show file? <i>File &rarr; Import Show File&hellip;</i> reads a "
-        "<tt>.tmix</tt> database directly.</p>");
+        "<tt>.tmix</tt> database directly: TheatreMix actors become actors (roles are "
+        "inferred from cue DCA labels where unambiguous), TheatreMix profiles become "
+        "show-wide voice profile slots, and cue DCA labels/channels become per-cue DCA "
+        "overrides and mappings.</p>");
     HelpDialog dialog(tr("Quick Start"), html, this);
     dialog.exec();
 }

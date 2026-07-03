@@ -4,6 +4,8 @@
 #include "CueItemDelegates.h"
 #include "CueTableModel.h"
 #include "app/Application.h"
+#include "core/Actor.h"
+#include "core/ActorProfileLibrary.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
 #include "core/PlaybackEngine.h"
@@ -16,9 +18,12 @@
 #include <QFocusEvent>
 #include "theme/Theme.h"
 
+#include <QCompleter>
+#include <QDialogButtonBox>
 #include <QHeaderView>
 #include <QInputDialog>
 #include <QLabel>
+#include <QLineEdit>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QRegularExpression>
@@ -662,20 +667,43 @@ void CueListView::onCellDoubleClicked(const QModelIndex& proxyIndex) {
         return out;
     };
 
-    // per-DCA assignment cell: set the DCA's label/mute override
+    // per-DCA assignment cell: set the DCA's label override; a typed role or
+    // actor name also assigns their channel to this DCA for this cue
     const int dca = m_model->dcaOfColumn(col);
     if (dca > 0 && m_model->dcaSubColumn(col) == 0) {
         const DCAOverride cur = cue.dcaOverride(dca);
-        bool ok = false;
-        const QString label = QInputDialog::getText(
-            this, tr("Assign DCA %1").arg(dca), tr("Label (blank to clear):"), QLineEdit::Normal,
-            cur.label.value_or(QString()), &ok);
-        if (!ok)
+        ActorProfileLibrary* library = m_app->show()->actorProfileLibrary();
+
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Assign DCA %1").arg(dca));
+        auto* layout = new QVBoxLayout(&dialog);
+        auto* hint = new QLabel(tr("Type a role or actor name to auto-assign their channel to "
+                                   "this DCA for this cue; any other text is just a scribble "
+                                   "label. Blank clears."),
+                                &dialog);
+        hint->setWordWrap(true);
+        layout->addWidget(hint);
+        auto* edit = new QLineEdit(cur.label.value_or(QString()), &dialog);
+        auto* completer = new QCompleter(library->completionCandidates(), &dialog);
+        completer->setCaseSensitivity(Qt::CaseInsensitive);
+        edit->setCompleter(completer);
+        layout->addWidget(edit);
+        auto* buttons =
+            new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+        connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        layout->addWidget(buttons);
+        edit->setFocus();
+
+        if (dialog.exec() != QDialog::Accepted)
             return;
-        DCAOverride ov;
-        if (!label.isEmpty())
-            ov.label = label;
+
+        const QString label = edit->text();
+        DCAOverride ov = cur; // keep an existing mute override
+        ov.label = label.isEmpty() ? std::nullopt : std::optional<QString>(label);
         cue.setDCAOverride(dca, ov);
+        if (const Actor* actor = library->resolveActor(label))
+            cue.assignChannelToDCAMapping(actor->channel(), dca, m_app->show()->dcaMapping());
         commit();
         return;
     }

@@ -51,6 +51,42 @@ const Actor* ActorProfileLibrary::actorForChannel(int channel) const {
     return best;
 }
 
+const Actor* ActorProfileLibrary::resolveActor(const QString& text) const {
+    const QString needle = text.trimmed();
+    if (needle.isEmpty())
+        return nullptr;
+
+    auto better = [](const Actor* candidate, const Actor* best) {
+        if (!best)
+            return true;
+        if (candidate->active() != best->active())
+            return candidate->active();
+        return candidate->order() < best->order();
+    };
+
+    const Actor* byRole = nullptr;
+    const Actor* byName = nullptr;
+    for (const Actor& a : m_actors) {
+        if (needle.compare(a.role(), Qt::CaseInsensitive) == 0 && better(&a, byRole))
+            byRole = &a;
+        if (needle.compare(a.name(), Qt::CaseInsensitive) == 0 && better(&a, byName))
+            byName = &a;
+    }
+    return byRole ? byRole : byName;
+}
+
+QStringList ActorProfileLibrary::completionCandidates() const {
+    QStringList candidates;
+    for (const Actor& a : m_actors) {
+        for (const QString& text : {a.role(), a.name()}) {
+            if (!text.isEmpty() && !candidates.contains(text, Qt::CaseInsensitive))
+                candidates.append(text);
+        }
+    }
+    candidates.sort(Qt::CaseInsensitive);
+    return candidates;
+}
+
 void ActorProfileLibrary::addActor(const Actor& actor) {
     m_actors.append(actor);
     emit actorAdded(actor.id());
