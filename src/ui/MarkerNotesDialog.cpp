@@ -1,4 +1,5 @@
 #include "MarkerNotesDialog.h"
+#include "WindowSizing.h"
 #include "app/Application.h"
 #include "app/ReaperClient.h"
 #include "core/Show.h"
@@ -20,6 +21,7 @@ MarkerNotesDialog::MarkerNotesDialog(Application* app, QWidget* parent)
     : QDialog(parent), m_app(app) {
     setWindowTitle(tr("Marker Notes"));
     resize(560, 480);
+    WindowSizing::widenOnShow(this);
     setupUi();
     reload();
 

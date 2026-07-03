@@ -1,4 +1,5 @@
 #include "WelcomeDialog.h"
+#include "WindowSizing.h"
 #include "io/ProjectFile.h"
 
 #include <QCheckBox>
@@ -21,6 +22,7 @@ WelcomeDialog::WelcomeDialog(QWidget* parent) : QDialog(parent) {
     setWindowTitle(tr("Welcome to OpenMix"));
     setModal(true);
     resize(560, 460);
+    WindowSizing::widenOnShow(this);
     setupUi();
 }
 

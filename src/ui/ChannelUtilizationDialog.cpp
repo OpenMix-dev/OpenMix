@@ -1,4 +1,5 @@
 #include "ChannelUtilizationDialog.h"
+#include "WindowSizing.h"
 #include "app/Application.h"
 #include "core/Actor.h"
 #include "core/ActorProfileLibrary.h"
@@ -17,6 +18,7 @@ ChannelUtilizationDialog::ChannelUtilizationDialog(Application* app, QWidget* pa
     : QDialog(parent) {
     setWindowTitle(tr("Channel Utilization"));
     resize(520, 520);
+    WindowSizing::widenOnShow(this);
 
     QVBoxLayout* layout = new QVBoxLayout(this);
 

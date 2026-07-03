@@ -1,4 +1,5 @@
 #include "MidiConfigDialog.h"
+#include "WindowSizing.h"
 #include "midi/MidiInputManager.h"
 #include "theme/Icons.h"
 #include "theme/Theme.h"
@@ -18,6 +19,7 @@ MidiConfigDialog::MidiConfigDialog(MidiInputManager* manager, int channelCount, 
     : QDialog(parent), m_manager(manager), m_channelCount(qMax(1, channelCount)) {
     setWindowTitle(tr("MIDI Controller"));
     setMinimumSize(600, 620);
+    WindowSizing::widenOnShow(this);
 
     // load current settings
     m_pendingMappings = manager->mappings();

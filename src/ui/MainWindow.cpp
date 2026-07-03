@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "WindowSizing.h"
 #include "ActorSetupPanel.h"
 #include "BubbleBar.h"
 #include "BubbleButton.h"
@@ -81,6 +82,7 @@ MainWindow::MainWindow(Application* app, QWidget* parent) : QMainWindow(parent),
     setWindowTitle("OpenMix");
     setMinimumSize(1280, 720);
     resize(1920, 1080);
+    WindowSizing::widenOnShow(this);
 
     setStyleSheet(Theme::globalStylesheet());
 
@@ -1626,6 +1628,7 @@ void MainWindow::showEditHistoryDialog() {
     QUndoView* view = new QUndoView(m_app->undoStack(), &dialog);
     view->setEmptyLabel(tr("<clean>"));
     layout->addWidget(view);
+    WindowSizing::widenOnShow(&dialog);
     dialog.exec();
 }
 

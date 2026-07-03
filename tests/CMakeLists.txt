@@ -559,6 +559,7 @@ add_test(NAME ConsoleNameCacheTest COMMAND test_console_name_cache)
 add_executable(test_midi_config_dialog
     test_midi_config_dialog.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/MidiConfigDialog.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/WindowSizing.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/theme/Theme.cpp
     ${CMAKE_SOURCE_DIR}/src/midi/MidiInputManager.cpp
     ${CMAKE_SOURCE_DIR}/src/midi/MidiControlMapping.cpp
@@ -591,6 +592,7 @@ add_test(NAME MidiConfigDialogTest COMMAND test_midi_config_dialog)
 add_executable(test_popout_window
     test_popout_window.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/PopOutWindow.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/WindowSizing.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/theme/Theme.cpp
 )
 target_link_libraries(test_popout_window PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)

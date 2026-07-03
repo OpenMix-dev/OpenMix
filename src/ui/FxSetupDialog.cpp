@@ -1,4 +1,5 @@
 #include "FxSetupDialog.h"
+#include "WindowSizing.h"
 #include "app/Application.h"
 #include "core/FxLibrary.h"
 #include "core/Show.h"
@@ -40,6 +41,7 @@ FxSetupDialog::FxSetupDialog(Application* app, QWidget* parent) : QDialog(parent
     setWindowTitle(tr("FX Setup"));
     setModal(true);
     resize(460, 520);
+    WindowSizing::widenOnShow(this);
     setupUi();
     load();
 }

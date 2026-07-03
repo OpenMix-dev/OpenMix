@@ -1,4 +1,5 @@
 #include "PopOutWindow.h"
+#include "WindowSizing.h"
 #include "theme/Theme.h"
 
 #include <QCloseEvent>
@@ -21,6 +22,7 @@ PopOutWindow::PopOutWindow(const QString& settingsKey, const QString& title, QWi
 
     setupUi(title);
     loadGeometry();
+    WindowSizing::widenOnShow(this);
 }
 
 PopOutWindow::~PopOutWindow() { saveGeometry(); }

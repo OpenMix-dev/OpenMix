@@ -1,4 +1,5 @@
 #include "CueZeroDialog.h"
+#include "WindowSizing.h"
 #include "app/Application.h"
 #include "core/CueZero.h"
 #include "core/Show.h"
@@ -20,6 +21,7 @@ CueZeroDialog::CueZeroDialog(Application* app, QWidget* parent) : QDialog(parent
     setWindowTitle(tr("Cue Zero"));
     setModal(true);
     resize(480, 520);
+    WindowSizing::widenOnShow(this);
     setupUi();
     load();
 }

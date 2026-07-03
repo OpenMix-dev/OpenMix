@@ -160,6 +160,7 @@ set(SOURCES
     src/ui/HelpDialog.cpp
     src/ui/MarkerNotesDialog.cpp
     src/ui/PopOutWindow.cpp
+    src/ui/WindowSizing.cpp
     src/ui/BubbleButton.cpp
     src/ui/BubbleBar.cpp
     src/ui/theme/Theme.cpp

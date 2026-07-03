@@ -1,4 +1,5 @@
 #include "KeyboardShortcutsDialog.h"
+#include "WindowSizing.h"
 #include "core/ShortcutManager.h"
 
 #include <QGroupBox>
@@ -13,6 +14,7 @@ KeyboardShortcutsDialog::KeyboardShortcutsDialog(ShortcutManager* manager, QWidg
     : QDialog(parent), m_manager(manager) {
     setWindowTitle(tr("Keyboard Shortcuts"));
     setMinimumSize(600, 500);
+    WindowSizing::widenOnShow(this);
 
     setupUi();
     populateShortcutTree();
