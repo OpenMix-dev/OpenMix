@@ -228,10 +228,10 @@ bool TmixImporter::import(const QString& path, Show* show, QString* error,
             const QList<Actor> actors = show->actorProfileLibrary()->actors();
             for (const Actor& a : actors) {
                 const QString guess = channelRoleGuess.value(a.channel());
-                if (guess.isEmpty() || !a.role().isEmpty())
+                if (guess.isEmpty() || !a.roles().isEmpty())
                     continue;
                 Actor copy = a;
-                copy.setRole(guess);
+                copy.setRoles({guess});
                 show->actorProfileLibrary()->updateActor(a.id(), copy);
                 if (summary)
                     ++summary->rolesInferred;

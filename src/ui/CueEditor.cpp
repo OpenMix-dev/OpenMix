@@ -1,5 +1,6 @@
 #include "CueEditor.h"
 #include "CollapsibleSection.h"
+#include "DCAOverrideStrip.h"
 #include "app/Application.h"
 #include "core/Actor.h"
 #include "core/ActorProfileLibrary.h"
@@ -59,6 +60,8 @@ CueEditor::CueEditor(Application* app, QWidget* parent) : QWidget(parent), m_app
         connect(engine, &PlaybackEngine::checkModeChanged, this,
                 &CueEditor::onEngineCheckModeChanged);
     }
+    if (m_app)
+        connect(m_app, &Application::dcaCountChanged, this, &CueEditor::onDcaCountChanged);
     updateGangsUI();
 }
 
@@ -154,82 +157,22 @@ void CueEditor::setupUi() {
     createDCATargetingSection();
     m_mainLayout->addWidget(m_dcaTargetingGroup);
 
-    // DCA overrides section
-    m_dcaOverridesGroup = new CollapsibleSection(tr("DCA Overrides (Mute/Label)"), this);
+    // DCA overrides section: one strip per DCA, styled like the mixer-feedback
+    // widgets, rebuilt when the effective DCA count changes
+    m_dcaOverridesGroup = new CollapsibleSection(tr("DCA Overrides"), this);
     QVBoxLayout* overridesLayout = new QVBoxLayout();
 
     // no inner scroll here: the whole editor is already scrollable, so let the
     // overrides expand inline rather than nesting a second scrollbar
     QWidget* overridesContent = new QWidget(m_dcaOverridesGroup);
-    QVBoxLayout* overridesContentLayout = new QVBoxLayout(overridesContent);
-    overridesContentLayout->setContentsMargins(0, 0, 0, 0);
-    overridesContentLayout->setSpacing(4);
+    m_dcaOverridesContentLayout = new QVBoxLayout(overridesContent);
+    m_dcaOverridesContentLayout->setContentsMargins(0, 0, 0, 0);
+    m_dcaOverridesContentLayout->setSpacing(4);
+    m_dcaOverridesContentLayout->addStretch();
 
-    // create override widgets for 8 DCAs (updated based on mixer)
-    for (int i = 1; i <= 8; ++i) {
-        QGroupBox* dcaBox = new QGroupBox(tr("DCA %1").arg(i), overridesContent);
-        QGridLayout* dcaLayout = new QGridLayout(dcaBox);
-        dcaLayout->setContentsMargins(4, 4, 4, 4);
-        dcaLayout->setSpacing(4);
+    rebuildDcaOverrideStrips(m_app ? m_app->effectiveDcaCount() : 8);
 
-        DCAOverrideWidgets widgets;
-
-        widgets.enableMute = new QCheckBox(tr("Set Mute"), dcaBox);
-        widgets.muteValue = new QCheckBox(tr("Muted"), dcaBox);
-        widgets.muteValue->setEnabled(false);
-        dcaLayout->addWidget(widgets.enableMute, 0, 0);
-        dcaLayout->addWidget(widgets.muteValue, 0, 1);
-
-        widgets.enableLabel = new QCheckBox(tr("Set Label"), dcaBox);
-        widgets.labelValue = new QLineEdit(dcaBox);
-        widgets.labelValue->setPlaceholderText(tr("Role, actor, or label"));
-        widgets.labelValue->setToolTip(
-            tr("Typing a role or actor name assigns their channel to this DCA for this cue; "
-               "the console truncates long scribble labels"));
-        widgets.labelValue->setEnabled(false);
-        widgets.labelValue->setMaxLength(32);
-        dcaLayout->addWidget(widgets.enableLabel, 1, 0);
-        dcaLayout->addWidget(widgets.labelValue, 1, 1);
-
-        auto* completer = new QCompleter(m_actorCompletionModel, dcaBox);
-        completer->setCaseSensitivity(Qt::CaseInsensitive);
-        completer->setCompletionMode(QCompleter::PopupCompletion);
-        widgets.labelValue->setCompleter(completer);
-
-        widgets.assignInfo = new QLabel(dcaBox);
-        widgets.assignInfo->setWordWrap(true);
-        widgets.assignInfo->setStyleSheet(QString("color: %1;").arg(Theme::Colors::TextSecondary));
-        dcaLayout->addWidget(widgets.assignInfo, 2, 0, 1, 2);
-
-        // connect enable checkboxes to enable/disable value widgets
-        connect(widgets.enableMute, &QCheckBox::toggled, widgets.muteValue, &QCheckBox::setEnabled);
-        connect(widgets.enableLabel, &QCheckBox::toggled, widgets.labelValue,
-                &QLineEdit::setEnabled);
-
-        // connect changes to save
-        int dca = i;
-        connect(widgets.enableMute, &QCheckBox::toggled,
-                [this, dca]() { onDCAOverrideChanged(dca); });
-        connect(widgets.muteValue, &QCheckBox::toggled,
-                [this, dca]() { onDCAOverrideChanged(dca); });
-        connect(widgets.enableLabel, &QCheckBox::toggled,
-                [this, dca]() { onDCAOverrideChanged(dca); });
-        connect(widgets.labelValue, &QLineEdit::textChanged,
-                [this, dca]() { onDCAOverrideChanged(dca); });
-        // name resolution runs at commit time, not per keystroke, so a prefix
-        // of one name never assigns while typing another ("Anna" vs "Annabelle")
-        connect(widgets.labelValue, &QLineEdit::editingFinished,
-                [this, dca]() { onDCALabelCommitted(dca); });
-        connect(completer, QOverload<const QString&>::of(&QCompleter::activated),
-                [this, dca](const QString&) { onDCALabelCommitted(dca); });
-
-        m_dcaOverrideWidgets.append(widgets);
-        overridesContentLayout->addWidget(dcaBox);
-    }
-
-    overridesContentLayout->addStretch();
     overridesLayout->addWidget(overridesContent);
-
     m_dcaOverridesGroup->setContentLayout(overridesLayout);
     m_mainLayout->addWidget(m_dcaOverridesGroup);
 
@@ -399,30 +342,11 @@ void CueEditor::createDCATargetingSection() {
     layout->addWidget(m_targetAllDCAsCheck);
 
     QWidget* dcaChecksWidget = new QWidget(this);
-    QGridLayout* dcaGrid = new QGridLayout(dcaChecksWidget);
-    dcaGrid->setContentsMargins(0, 0, 0, 0);
-    dcaGrid->setSpacing(4);
+    m_dcaTargetGrid = new QGridLayout(dcaChecksWidget);
+    m_dcaTargetGrid->setContentsMargins(0, 0, 0, 0);
+    m_dcaTargetGrid->setSpacing(4);
 
-    // create checkboxes for 8 DCAs (2 rows x 4 cols)
-    for (int i = 1; i <= 8; ++i) {
-        QCheckBox* check = new QCheckBox(tr("DCA %1").arg(i), dcaChecksWidget);
-        int row = (i - 1) / 4;
-        int col = (i - 1) % 4;
-        dcaGrid->addWidget(check, row, col);
-        m_dcaTargetChecks.append(check);
-
-        // when individual DCA is checked, uncheck "target all"
-        connect(check, &QCheckBox::toggled, this, [this](bool checked) {
-            if (m_updatingUi)
-                return;
-            if (checked && m_targetAllDCAsCheck->isChecked()) {
-                m_targetAllDCAsCheck->blockSignals(true);
-                m_targetAllDCAsCheck->setChecked(false);
-                m_targetAllDCAsCheck->blockSignals(false);
-            }
-            onTargetedDCAsChanged();
-        });
-    }
+    rebuildDcaTargetChecks(m_app ? m_app->effectiveDcaCount() : 8);
 
     layout->addWidget(dcaChecksWidget);
 
@@ -441,6 +365,52 @@ void CueEditor::createDCATargetingSection() {
     });
 
     m_dcaTargetingGroup->setContentLayout(layout);
+}
+
+void CueEditor::rebuildDcaTargetChecks(int count) {
+    for (QCheckBox* check : m_dcaTargetChecks)
+        check->deleteLater();
+    m_dcaTargetChecks.clear();
+
+    for (int i = 1; i <= count; ++i) {
+        auto* check = new QCheckBox(tr("DCA %1").arg(i), m_dcaTargetGrid->parentWidget());
+        m_dcaTargetGrid->addWidget(check, (i - 1) / 4, (i - 1) % 4);
+        m_dcaTargetChecks.append(check);
+
+        // when individual DCA is checked, uncheck "target all"
+        connect(check, &QCheckBox::toggled, this, [this](bool checked) {
+            if (m_updatingUi)
+                return;
+            if (checked && m_targetAllDCAsCheck->isChecked()) {
+                m_targetAllDCAsCheck->blockSignals(true);
+                m_targetAllDCAsCheck->setChecked(false);
+                m_targetAllDCAsCheck->blockSignals(false);
+            }
+            onTargetedDCAsChanged();
+        });
+    }
+}
+
+void CueEditor::rebuildDcaOverrideStrips(int count) {
+    for (DCAOverrideStrip* strip : m_dcaOverrideStrips)
+        strip->deleteLater();
+    m_dcaOverrideStrips.clear();
+
+    QWidget* content = m_dcaOverridesContentLayout->parentWidget();
+    for (int i = 1; i <= count; ++i) {
+        auto* strip = new DCAOverrideStrip(i, m_actorCompletionModel, content);
+        connect(strip, &DCAOverrideStrip::overrideEdited, this, &CueEditor::onDCAOverrideChanged);
+        connect(strip, &DCAOverrideStrip::labelCommitted, this, &CueEditor::onDCALabelCommitted);
+        // keep the trailing stretch last
+        m_dcaOverridesContentLayout->insertWidget(m_dcaOverridesContentLayout->count() - 1, strip);
+        m_dcaOverrideStrips.append(strip);
+    }
+}
+
+void CueEditor::onDcaCountChanged(int count) {
+    rebuildDcaTargetChecks(count);
+    rebuildDcaOverrideStrips(count);
+    updateFromCue(); // repopulate the fresh widgets from the current cue
 }
 
 bool CueEditor::hasFocus() const { return m_nameEdit->hasFocus() || m_notesEdit->hasFocus(); }
@@ -558,19 +528,8 @@ void CueEditor::updateDCAOverridesUI() {
 
     QMap<int, DCAOverride> overrides = cue->dcaOverrides();
 
-    for (int i = 0; i < m_dcaOverrideWidgets.size(); ++i) {
-        int dca = i + 1;
-        DCAOverride override = overrides.value(dca);
-        DCAOverrideWidgets& widgets = m_dcaOverrideWidgets[i];
-
-        widgets.enableMute->setChecked(override.mute.has_value());
-        widgets.muteValue->setChecked(override.mute.value_or(false));
-        widgets.muteValue->setEnabled(override.mute.has_value());
-
-        widgets.enableLabel->setChecked(override.label.has_value());
-        widgets.labelValue->setText(override.label.value_or(""));
-        widgets.labelValue->setEnabled(override.label.has_value());
-    }
+    for (DCAOverrideStrip* strip : m_dcaOverrideStrips)
+        strip->setOverride(overrides.value(strip->dcaNumber()));
 
     updateDCAAssignInfo();
 }
@@ -720,21 +679,10 @@ void CueEditor::onDCAOverrideChanged(int dca) {
         return;
 
     Cue* cue = currentCue();
-    if (!cue || dca < 1 || dca > m_dcaOverrideWidgets.size())
+    if (!cue || dca < 1 || dca > m_dcaOverrideStrips.size())
         return;
 
-    DCAOverrideWidgets& widgets = m_dcaOverrideWidgets[dca - 1];
-    DCAOverride override;
-
-    if (widgets.enableMute->isChecked()) {
-        override.mute = widgets.muteValue->isChecked();
-    }
-
-    if (widgets.enableLabel->isChecked()) {
-        override.label = widgets.labelValue->text();
-    }
-
-    cue->setDCAOverride(dca, override);
+    cue->setDCAOverride(dca, m_dcaOverrideStrips[dca - 1]->overrideValue());
     m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
     emit cueModified();
 }
@@ -744,16 +692,12 @@ void CueEditor::onDCALabelCommitted(int dca) {
         return;
 
     Cue* cue = currentCue();
-    if (!cue || dca < 1 || dca > m_dcaOverrideWidgets.size() || !m_actorLibrary)
-        return;
-
-    const DCAOverrideWidgets& widgets = m_dcaOverrideWidgets[dca - 1];
-    if (!widgets.enableLabel->isChecked())
+    if (!cue || dca < 1 || dca > m_dcaOverrideStrips.size() || !m_actorLibrary)
         return;
 
     // a matching role/actor name assigns their channel to this DCA for this
     // cue; any other text stays a plain scribble label
-    const Actor* actor = m_actorLibrary->resolveActor(widgets.labelValue->text());
+    const Actor* actor = m_actorLibrary->resolveActor(m_dcaOverrideStrips[dca - 1]->labelText());
     if (!actor)
         return;
 
@@ -768,15 +712,14 @@ void CueEditor::updateDCAAssignInfo() {
     const DCAMapping* showMapping =
         (m_app && m_app->show()) ? m_app->show()->dcaMapping() : nullptr;
 
-    for (int i = 0; i < m_dcaOverrideWidgets.size(); ++i) {
-        QLabel* info = m_dcaOverrideWidgets[i].assignInfo;
+    for (DCAOverrideStrip* strip : m_dcaOverrideStrips) {
         if (!cue) {
-            info->clear();
+            strip->setAssignInfo(QString());
             continue;
         }
 
         // same precedence as playback: cue custom mapping, else show mapping
-        const int dca = i + 1;
+        const int dca = strip->dcaNumber();
         QList<int> channels;
         if (cue->hasCustomDCAMapping())
             channels = cue->dcaChannelMapping().value(dca);
@@ -784,21 +727,28 @@ void CueEditor::updateDCAAssignInfo() {
             channels = showMapping->channelsForDCA(dca);
 
         if (channels.isEmpty()) {
-            info->setText(tr("No channels assigned"));
+            strip->setAssignInfo(tr("No channels assigned"));
             continue;
         }
 
+        // when the DCA label names one of the actor's roles, show that role
+        const QString dcaLabel = cue->dcaOverride(dca).label.value_or(QString());
         QStringList parts;
         for (int ch : channels) {
             const Actor* actor = m_actorLibrary ? m_actorLibrary->actorForChannel(ch) : nullptr;
-            if (actor && !actor->role().isEmpty())
-                parts << tr("Ch %1 %2 (%3)").arg(ch).arg(actor->name(), actor->role());
-            else if (actor)
-                parts << tr("Ch %1 %2").arg(ch).arg(actor->name());
-            else
+            if (actor) {
+                QString role = actor->matchedRole(dcaLabel);
+                if (role.isEmpty())
+                    role = actor->primaryRole();
+                if (!role.isEmpty())
+                    parts << tr("Ch %1 %2 (%3)").arg(ch).arg(actor->name(), role);
+                else
+                    parts << tr("Ch %1 %2").arg(ch).arg(actor->name());
+            } else {
                 parts << tr("Ch %1").arg(ch);
+            }
         }
-        info->setText(tr("Members: %1").arg(parts.join(", ")));
+        strip->setAssignInfo(tr("Members: %1").arg(parts.join(", ")));
     }
 }
 
@@ -831,8 +781,8 @@ void CueEditor::rebuildChannelTable() {
         m_channelTable->setItem(row, 0, chItem);
 
         QString display = a.name().isEmpty() ? tr("(unnamed)") : a.name();
-        if (!a.role().isEmpty())
-            display = tr("%1 (%2)").arg(display, a.role());
+        if (!a.roles().isEmpty())
+            display = tr("%1 (%2)").arg(display, a.rolesDisplay());
         auto* nameItem = new QTableWidgetItem(display);
         nameItem->setFlags(Qt::ItemIsEnabled);
         m_channelTable->setItem(row, 1, nameItem);

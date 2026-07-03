@@ -1,5 +1,6 @@
 #pragma once
 
+#include "protocol/MixerCapabilities.h"
 #include <QObject>
 #include <QPointer>
 #include <QUndoStack>
@@ -90,6 +91,12 @@ class Application : public QObject {
     void connectToDiscoveredConsole(const DiscoveredConsole& console);
     void disconnectFromMixer();
 
+    // capabilities of the connected mixer, or of the console type selected in
+    // the show's mixer config when disconnected — the app-wide source of truth
+    // for DCA/channel/bus counts
+    [[nodiscard]] MixerCapabilities effectiveCapabilities() const;
+    [[nodiscard]] int effectiveDcaCount() const { return effectiveCapabilities().dcaCount; }
+
     // main window
     void setMainWindow(MainWindow* window);
     [[nodiscard]] MainWindow* mainWindow();
@@ -109,9 +116,11 @@ class Application : public QObject {
     void mixerConnected();
     void mixerDisconnected();
     void recordFadersActiveChanged(bool active);
+    void dcaCountChanged(int count);
 
   private:
     void setupMixerConnection(const QString& type, const QString& host, int port);
+    void refreshDcaCount();
 
     static Application* s_instance;
 
@@ -163,6 +172,9 @@ class Application : public QObject {
 
     // scribble-strip driver
     ScribbleController* m_scribbleController;
+
+    // last dcaCountChanged emission, so sinks only rebuild on real change
+    int m_lastDcaCount = -1;
 };
 
 } // namespace OpenMix

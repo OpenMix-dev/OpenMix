@@ -123,6 +123,50 @@ target_link_libraries(test_msc PRIVATE Qt6::Core Qt6::Test)
 target_include_directories(test_msc PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME MscTest COMMAND test_msc)
 
+add_executable(test_cast_text_parse test_cast_text_parse.cpp)
+target_link_libraries(test_cast_text_parse PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(test_cast_text_parse PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME CastTextParseTest COMMAND test_cast_text_parse)
+
+add_executable(test_dca_grid_nav test_dca_grid_nav.cpp)
+target_link_libraries(test_dca_grid_nav PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(test_dca_grid_nav PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME DcaGridNavTest COMMAND test_dca_grid_nav)
+
+add_executable(test_cue_table_model
+    test_cue_table_model.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/CueTableModel.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/theme/Theme.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
+)
+target_link_libraries(test_cue_table_model PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
+target_include_directories(test_cue_table_model PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME CueTableModelTest COMMAND test_cue_table_model)
+
+add_executable(test_mixer_capabilities
+    test_mixer_capabilities.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+)
+target_link_libraries(test_mixer_capabilities PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(test_mixer_capabilities PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME MixerCapabilitiesTest COMMAND test_mixer_capabilities)
+
+add_executable(test_dca_override_strip
+    test_dca_override_strip.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/DCAOverrideStrip.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/theme/Theme.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+)
+target_link_libraries(test_dca_override_strip PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
+target_include_directories(test_dca_override_strip PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME DCAOverrideStripTest COMMAND test_dca_override_strip)
+
 add_executable(test_midi_mute
     test_midi_mute.cpp
     ${CMAKE_SOURCE_DIR}/src/midi/MidiControlMapping.cpp
@@ -210,6 +254,9 @@ add_executable(test_delete_playing_cue
     ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
     ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
     ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
 )
 target_link_libraries(test_delete_playing_cue PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
 target_include_directories(test_delete_playing_cue PRIVATE ${CMAKE_SOURCE_DIR}/src)
@@ -508,6 +555,38 @@ add_executable(test_console_name_cache
 target_link_libraries(test_console_name_cache PRIVATE Qt6::Core Qt6::Test)
 target_include_directories(test_console_name_cache PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME ConsoleNameCacheTest COMMAND test_console_name_cache)
+
+add_executable(test_midi_config_dialog
+    test_midi_config_dialog.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/MidiConfigDialog.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/theme/Theme.cpp
+    ${CMAKE_SOURCE_DIR}/src/midi/MidiInputManager.cpp
+    ${CMAKE_SOURCE_DIR}/src/midi/MidiControlMapping.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackGuard.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackLogger.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueValidator.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/FadeEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+)
+target_link_libraries(test_midi_config_dialog PRIVATE
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::Svg
+    Qt6::Test
+    RtMidi
+)
+target_include_directories(test_midi_config_dialog PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME MidiConfigDialogTest COMMAND test_midi_config_dialog)
 
 add_executable(test_popout_window
     test_popout_window.cpp

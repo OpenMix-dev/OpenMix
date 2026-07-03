@@ -887,6 +887,8 @@ void MainWindow::connectSignals() {
             m_dcaMappingPanel->clearCurrentCue();
         }
     });
+    connect(m_dcaMappingPanel, &DCAMappingPanel::adjacentCueRequested, m_cueListView,
+            &CueListView::selectAdjacentCue);
 
     // double-click opens the cue editor for that cue (GO/Space fires cues);
     // the visibilityChanged sync keeps the view-menu check in step
@@ -1086,9 +1088,9 @@ void MainWindow::importTmixShow() {
            "<b>%4 ensembles</b>.</p>"
            "<p>How TheatreMix concepts map onto OpenMix:</p>"
            "<ul>"
-           "<li>TheatreMix <b>actors</b> are OpenMix actors. Each also has a new <b>Role</b> "
-           "(character) field; typing a role or actor name into a cue's DCA slot assigns "
-           "their channel to that DCA.</li>"
+           "<li>TheatreMix <b>actors</b> are OpenMix actors. Each also has a new <b>Roles</b> "
+           "(characters) field; typing one of their roles or the actor name into a cue's "
+           "DCA slot assigns their channel to that DCA.</li>"
            "%5"
            "<li>TheatreMix <b>profiles</b> (%6) became <b>voice profile slots</b>: show-wide "
            "voice categories shared by every actor — not per-mic names. Each actor stores "
@@ -1498,7 +1500,8 @@ void MainWindow::onLockoutStateChanged(bool locked) {
 }
 
 void MainWindow::showMidiConfigDialog() {
-    MidiConfigDialog dialog(m_app->midiInputManager(), this);
+    MidiConfigDialog dialog(m_app->midiInputManager(),
+                            m_app->effectiveCapabilities().inputChannels, this);
     dialog.exec();
 }
 

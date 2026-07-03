@@ -6,6 +6,7 @@
 class QKeyEvent;
 class QHBoxLayout;
 class QLabel;
+class QToolButton;
 
 namespace OpenMix {
 
@@ -65,6 +66,10 @@ class MixerFeedbackPanel : public QWidget {
     // post-fire ("did the cue land?") status row
     CueConfidenceIndicator* m_fireIndicator = nullptr;
     QLabel* m_fireStatusLabel = nullptr;
+
+    // cue transport (standby back/next, same semantics as the main toolbar)
+    QToolButton* m_prevCueButton = nullptr;
+    QToolButton* m_nextCueButton = nullptr;
 };
 
 } // namespace OpenMix

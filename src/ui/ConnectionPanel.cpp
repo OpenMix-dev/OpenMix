@@ -27,6 +27,9 @@ ConnectionPanel::ConnectionPanel(Application* app, QWidget* parent) : QWidget(pa
     loadFromConfig();
     onProtocolTypeChanged(m_protocolCombo->currentIndex());
     updateUiState();
+
+    // re-sync the fields when a project is loaded (fromJson emits nameChanged)
+    connect(m_app->show(), &Show::nameChanged, this, &ConnectionPanel::loadFromConfig);
 }
 
 void ConnectionPanel::populateProtocolCombo() {
@@ -351,6 +354,16 @@ void ConnectionPanel::onProtocolTypeChanged(int index) {
         m_portEdit->setText(QString::number(caps.defaultPort));
     }
 
+    // persist the selection so the whole app (DCA counts etc.) follows the
+    // chosen console even before a connection is made. Empty data = the
+    // disabled manufacturer header rows. dcaCount is only refreshed on an
+    // explicit save/connect so reopening an old show stays clean.
+    if (!type.isEmpty()) {
+        MixerConfig config = m_app->show()->mixerConfig();
+        config.type = type;
+        m_app->show()->setMixerConfig(config); // no-op when unchanged
+    }
+
     updateUiState();
 }
 
@@ -419,10 +432,11 @@ void ConnectionPanel::loadFromConfig() {
 }
 
 void ConnectionPanel::saveToConfig() {
-    MixerConfig config;
+    MixerConfig config = m_app->show()->mixerConfig();
     config.type = m_protocolCombo->currentData().toString();
     config.host = m_hostEdit->text().trimmed();
     config.port = m_portEdit->text().toInt();
+    config.dcaCount = MixerCapabilities::forProtocolId(config.type).dcaCount;
     m_app->show()->setMixerConfig(config);
 }
 

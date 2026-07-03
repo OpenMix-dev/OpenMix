@@ -93,6 +93,28 @@ class TestScribble : public QObject {
         QVERIFY(mixer.hasName(4, "Lead"));
     }
 
+    void actorRename_pushesNewNameToConsole() {
+        // the DCA mapping panel's inline channel rename goes through
+        // updateActor -> changed() -> onActorLibraryChanged -> setChannelName
+        ActorProfileLibrary lib;
+        Actor alice("Alice", 3);
+        lib.addActor(alice);
+
+        RecordingMixer mixer;
+        ScribbleController ctl;
+        ctl.setActorLibrary(&lib);
+        ctl.setMixer(&mixer);
+        connect(&lib, &ActorProfileLibrary::changed, &ctl,
+                &ScribbleController::onActorLibraryChanged);
+
+        mixer.nameCalls.clear();
+        Actor renamed = alice;
+        renamed.setName("New Name");
+        lib.updateActor(alice.id(), renamed);
+
+        QVERIFY(mixer.hasName(3, "New Name"));
+    }
+
     void setMixer_refreshesOnlyWhenConnected() {
         ActorProfileLibrary lib;
         lib.addActor(Actor("Cleo", 1));

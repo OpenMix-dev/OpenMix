@@ -7,6 +7,7 @@
 #include "core/PlaybackEngine.h"
 #include "core/Show.h"
 #include "protocol/MixerProtocol.h"
+#include "theme/Icons.h"
 #include "theme/Theme.h"
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -14,6 +15,7 @@
 #include <QLineEdit>
 #include <QRegularExpression>
 #include <QTimer>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <algorithm>
 
@@ -27,6 +29,8 @@ MixerFeedbackPanel::MixerFeedbackPanel(Application* app, QWidget* parent)
         connect(m_app, &Application::mixerConnected, this, &MixerFeedbackPanel::onMixerConnected);
         connect(m_app, &Application::mixerDisconnected, this,
                 &MixerFeedbackPanel::onMixerDisconnected);
+        connect(m_app, &Application::dcaCountChanged, this, &MixerFeedbackPanel::setDCACount);
+        setDCACount(m_app->effectiveDcaCount());
 
         if (m_app->mixer() && m_app->mixer()->isConnected()) {
             onMixerConnected();
@@ -56,6 +60,36 @@ void MixerFeedbackPanel::setupUi() {
     statusRow->addWidget(m_fireIndicator);
     statusRow->addWidget(m_fireStatusLabel, 1);
     statusRow->addStretch();
+
+    // standby back/next, same semantics as the main toolbar's transport.
+    // NoFocus is load-bearing: keyPressEvent implements Tab into DCA label
+    // editing, which focusable buttons would capture.
+    m_prevCueButton = new QToolButton(this);
+    m_prevCueButton->setIcon(Icons::mediaPrevious());
+    m_prevCueButton->setAutoRaise(true);
+    m_prevCueButton->setFixedSize(28, 28);
+    m_prevCueButton->setIconSize(QSize(16, 16));
+    m_prevCueButton->setFocusPolicy(Qt::NoFocus);
+    m_prevCueButton->setToolTip(tr("Back cue (Up)"));
+    connect(m_prevCueButton, &QToolButton::clicked, this, [this]() {
+        if (m_app && m_app->playbackEngine())
+            m_app->playbackEngine()->previous();
+    });
+    statusRow->addWidget(m_prevCueButton);
+
+    m_nextCueButton = new QToolButton(this);
+    m_nextCueButton->setIcon(Icons::mediaNext());
+    m_nextCueButton->setAutoRaise(true);
+    m_nextCueButton->setFixedSize(28, 28);
+    m_nextCueButton->setIconSize(QSize(16, 16));
+    m_nextCueButton->setFocusPolicy(Qt::NoFocus);
+    m_nextCueButton->setToolTip(tr("Next cue (Down)"));
+    connect(m_nextCueButton, &QToolButton::clicked, this, [this]() {
+        if (m_app && m_app->playbackEngine())
+            m_app->playbackEngine()->next();
+    });
+    statusRow->addWidget(m_nextCueButton);
+
     outer->addLayout(statusRow);
 
     m_dcaLayout = new QHBoxLayout();
@@ -91,6 +125,7 @@ void MixerFeedbackPanel::setDCACount(int count) {
         dca->deleteLater();
     }
 
+    bool added = false;
     while (m_dcaWidgets.size() < count) {
         int dcaNum = m_dcaWidgets.size() + 1;
         DCAWidget* dca = new DCAWidget(dcaNum, this);
@@ -98,6 +133,18 @@ void MixerFeedbackPanel::setDCACount(int count) {
         m_dcaWidgets.append(dca);
         // insert before stretch
         m_dcaLayout->insertWidget(m_dcaLayout->count() - 1, dca);
+        added = true;
+    }
+
+    // hydrate widgets created after startup with the current cue + mixer state
+    if (added) {
+        if (!m_activeCueId.isEmpty()) {
+            loadCueSettings(m_activeCueId);
+            for (DCAWidget* dca : m_dcaWidgets)
+                dca->setLabelEditEnabled(true);
+        }
+        if (m_app && m_app->mixer() && m_app->mixer()->isConnected())
+            refresh();
     }
 }
 

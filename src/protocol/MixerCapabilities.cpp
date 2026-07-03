@@ -272,7 +272,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.displayName = "Yamaha QL1";
         caps.protocolId = "ql1";
         caps.defaultPort = 49280;
-        caps.dcaCount = 8;
+        caps.dcaCount = 16;
         caps.inputChannels = 32;
         caps.mixBuses = 16;
         caps.matrixOutputs = 8;
@@ -292,7 +292,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.displayName = "Yamaha QL5";
         caps.protocolId = "ql5";
         caps.defaultPort = 49280;
-        caps.dcaCount = 8;
+        caps.dcaCount = 16;
         caps.inputChannels = 64;
         caps.mixBuses = 16;
         caps.matrixOutputs = 8;

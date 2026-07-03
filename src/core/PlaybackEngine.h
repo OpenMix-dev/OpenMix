@@ -68,6 +68,9 @@ class PlaybackEngine : public QObject {
     void setMuteDcaUnassign(bool enabled) { m_muteDcaUnassign = enabled; }
     [[nodiscard]] bool muteDcaUnassign() const noexcept { return m_muteDcaUnassign; }
 
+    // DCA count assumed while no mixer is connected (from the configured console)
+    void setFallbackDcaCount(int count) { m_fallbackDcaCount = count; }
+
     // channel mute state driven by MIDI mute buttons (console-style mute toggle)
     [[nodiscard]] bool isChannelMuted(int channel) const { return m_channelMutes.value(channel); }
 
@@ -177,6 +180,7 @@ class PlaybackEngine : public QObject {
     bool m_verifyCues = false;
     bool m_dimDcaFaders = false;              // dim a DCA's fader when a cue mutes it
     bool m_muteDcaUnassign = false;           // unassign a DCA's channels when muted
+    int m_fallbackDcaCount = 8;               // disconnected-state DCA count
     QHash<int, bool> m_channelMutes;          // channel -> mute state (MIDI mute buttons)
     PlaybackState m_state = PlaybackState::Stopped;
     int m_currentIndex = -1;

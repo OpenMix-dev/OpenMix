@@ -122,6 +122,14 @@ void Application::initialize() {
         m_playbackEngine->setMuteDcaUnassign(m_show->muteDcaUnassign());
     });
 
+    // effective DCA count follows the selected console type, project loads,
+    // and live connections
+    connect(m_show, &Show::mixerConfigChanged, this, &Application::refreshDcaCount);
+    connect(m_show, &Show::nameChanged, this, &Application::refreshDcaCount);
+    connect(this, &Application::mixerConnected, this, &Application::refreshDcaCount);
+    connect(this, &Application::mixerDisconnected, this, &Application::refreshDcaCount);
+    refreshDcaCount(); // seed before any UI queries it
+
     if (m_mixer) {
         m_playbackEngine->setMixer(m_mixer);
     }
@@ -381,7 +389,23 @@ void Application::disconnectFromMixer() {
         m_playbackEngine->setMixer(nullptr);
         delete m_mixer;
         m_mixer = nullptr;
+        refreshDcaCount(); // back to the configured console type's count
     }
+}
+
+MixerCapabilities Application::effectiveCapabilities() const {
+    if (m_mixer && m_mixer->isConnected())
+        return m_mixer->capabilities();
+    return MixerCapabilities::forProtocolId(m_show->mixerConfig().type);
+}
+
+void Application::refreshDcaCount() {
+    const int count = effectiveDcaCount();
+    if (count == m_lastDcaCount)
+        return;
+    m_lastDcaCount = count;
+    m_playbackEngine->setFallbackDcaCount(count);
+    emit dcaCountChanged(count);
 }
 
 void Application::startupScan() {

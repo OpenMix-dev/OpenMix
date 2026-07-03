@@ -227,16 +227,9 @@ QString DCAWidget::levelToDb(float level) const {
 void DCAWidget::updateDisplay() {
     m_levelLabel->setText(levelToDb(m_level) + " dB");
 
-    // update mute button style using theme colors
-    if (m_muted) {
-        m_muteButton->setStyleSheet(
-            QString("QPushButton { background-color: %1; color: white; font-weight: bold; }")
-                .arg(Theme::Colors::AccentRed));
-    } else {
-        m_muteButton->setStyleSheet(QString("QPushButton { background-color: %1; color: %2; }")
-                                        .arg(Theme::Colors::BgActive)
-                                        .arg(Theme::Colors::TextSecondary));
-    }
+    // muted = red, unmuted = the shared inert look (not force-unmute green)
+    m_muteButton->setStyleSheet(
+        Theme::muteButtonStyle(m_muted ? std::optional<bool>(true) : std::nullopt));
 }
 
 void DCAWidget::paintEvent(QPaintEvent* event) {

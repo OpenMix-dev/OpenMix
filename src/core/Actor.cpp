@@ -1,5 +1,6 @@
 #include "Actor.h"
 
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QUuid>
 
@@ -12,12 +13,23 @@ Actor::Actor(const QString& name, int channel)
 
 void Actor::regenerateId() { m_id = QUuid::createUuid().toString(QUuid::WithoutBraces); }
 
+QString Actor::matchedRole(const QString& text) const {
+    for (const QString& role : m_roles) {
+        if (text.compare(role, Qt::CaseInsensitive) == 0)
+            return role;
+    }
+    return {};
+}
+
 QJsonObject Actor::toJson() const {
     QJsonObject json;
     json["id"] = m_id;
     json["name"] = m_name;
-    if (!m_role.isEmpty())
-        json["role"] = m_role;
+    if (!m_roles.isEmpty()) {
+        json["roles"] = QJsonArray::fromStringList(m_roles);
+        // legacy key so pre-1.9 builds still see the primary role
+        json["role"] = m_roles.first();
+    }
     json["channel"] = m_channel;
     json["order"] = m_order;
     json["active"] = m_active;
@@ -41,7 +53,18 @@ Actor Actor::fromJson(const QJsonObject& json) {
     if (actor.m_id.isEmpty())
         actor.m_id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     actor.m_name = json["name"].toString();
-    actor.m_role = json["role"].toString();
+    if (json.contains("roles")) {
+        const QJsonArray rolesArr = json["roles"].toArray();
+        for (const QJsonValue& val : rolesArr) {
+            const QString role = val.toString();
+            if (!role.isEmpty())
+                actor.m_roles.append(role);
+        }
+    } else {
+        const QString legacyRole = json["role"].toString();
+        if (!legacyRole.isEmpty())
+            actor.m_roles.append(legacyRole);
+    }
     actor.m_channel = json["channel"].toInt();
     actor.m_order = json["order"].toInt();
     actor.m_active = json["active"].toBool(true);

@@ -68,6 +68,9 @@ void CueListView::setupUi() {
     // create model & proxy
     m_model = new CueTableModel(m_app->show()->cueList(), this);
     m_model->setDcaMapping(m_app->show()->dcaMapping());
+    m_model->setDcaCount(m_app->effectiveDcaCount());
+    connect(m_app, &Application::dcaCountChanged, this,
+            [this](int count) { m_model->setDcaCount(count); });
     m_proxyModel = new CueFilterProxyModel(this);
     m_proxyModel->setSourceModel(m_model);
 
@@ -84,7 +87,8 @@ void CueListView::setupUi() {
     m_tableView->setSelectionMode(QAbstractItemView::SingleSelection);
     m_tableView->setEditTriggers(QAbstractItemView::DoubleClicked |
                                  QAbstractItemView::EditKeyPressed |
-                                 QAbstractItemView::SelectedClicked);
+                                 QAbstractItemView::SelectedClicked |
+                                 QAbstractItemView::AnyKeyPressed);
 
     m_tableView->setAlternatingRowColors(true);
     m_tableView->setTabKeyNavigation(false);
@@ -100,12 +104,11 @@ void CueListView::setupUi() {
     m_tableView->verticalHeader()->setVisible(false);
     m_tableView->setShowGrid(false);
 
-    // hide the per-DCA fx/pos sub-columns by default
-    for (int c = CueTableModel::ColCount; c < m_model->columnCount(); ++c) {
-        const int sub = m_model->dcaSubColumn(c);
-        if (sub == 1 || sub == 2)
-            m_tableView->setColumnHidden(c, true);
-    }
+    // hide the per-DCA fx/pos sub-columns by default; a model reset (DCA count
+    // change) recreates the columns unhidden, so re-apply afterwards
+    applyDcaSubColumnVisibility();
+    connect(m_proxyModel, &QAbstractItemModel::modelReset, this,
+            &CueListView::applyDcaSubColumnVisibility);
 
     // columns auto-fit their contents; leftover space is shared, and columns only
     // shrink below their natural width when the viewport can't fit them all
@@ -138,15 +141,23 @@ void CueListView::setupUi() {
     connect(m_tableView->selectionModel(), &QItemSelectionModel::selectionChanged, this,
             &CueListView::onSelectionChanged);
 
-    // update filter options when group/tags are edited
+    // update filter options when group/tags are edited; a DCA assignment edit
+    // re-emits cueSelected so CueEditor and the DCA mapping panel refresh (the
+    // cascade the old assign dialog triggered)
     connect(
         m_model, &CueTableModel::cueEditRequested, this,
-        [this](int, int column, const QVariant&, const QVariant&) {
+        [this](int row, int column, const QVariant&, const QVariant&) {
             if (column == CueTableModel::ColGroup || column == CueTableModel::ColTags) {
                 m_filterBar->updateFilterOptions();
             }
+            if (m_model->dcaSubColumn(column) == 0)
+                emit cueSelected(row);
         },
         Qt::QueuedConnection);
+
+    // repaint DCA assignment cells when actors are renamed / roles change
+    connect(m_app->show()->actorProfileLibrary(), &ActorProfileLibrary::changed,
+            m_tableView->viewport(), qOverload<>(&QWidget::update));
 
     layout->addWidget(m_filterBar);
     layout->addWidget(m_tableView);
@@ -190,10 +201,13 @@ void CueListView::setupDelegates() {
     m_numberDelegate = new CueNumberDelegate(cueList, this);
     m_typeDelegate = new CueTypeDelegate(this);
     m_textDelegate = new CueTextDelegate(this);
+    m_dcaAssignDelegate = new DCAAssignDelegate(m_app->show()->actorProfileLibrary(), this);
 
     // default delegate covers the dynamic per-DCA columns (strips the selection
-    // block so the row's standby/current colour shows through)
-    m_tableView->setItemDelegate(m_textDelegate);
+    // block so the row's standby/current colour shows through; only the DCA
+    // assignment sub-columns are editable, so its completer editor never
+    // appears elsewhere). Covers columns added by later DCA-count changes too.
+    m_tableView->setItemDelegate(m_dcaAssignDelegate);
 
     // assign delegates to columns
     m_tableView->setItemDelegateForColumn(CueTableModel::ColNumber, m_numberDelegate);
@@ -219,6 +233,9 @@ void CueListView::setupDelegates() {
             &CueListView::onTabNavigationRequested);
 
     connect(m_textDelegate, &CueTextDelegate::tabNavigationRequested, this,
+            &CueListView::onTabNavigationRequested);
+
+    connect(m_dcaAssignDelegate, &DCAAssignDelegate::tabNavigationRequested, this,
             &CueListView::onTabNavigationRequested);
 }
 
@@ -528,10 +545,24 @@ void CueListView::setColumnVisible(int column, bool visible) {
 }
 
 void CueListView::setDcaSubColumnsVisible(int sub, bool visible) {
+    if (sub == 1)
+        m_dcaFxColsVisible = visible;
+    else if (sub == 2)
+        m_dcaPosColsVisible = visible;
     for (int c = CueTableModel::ColCount; c < m_model->columnCount(); ++c)
         if (m_model->dcaSubColumn(c) == sub)
             m_tableView->setColumnHidden(c, !visible);
     scheduleColumnRelayout();
+}
+
+void CueListView::applyDcaSubColumnVisibility() {
+    for (int c = CueTableModel::ColCount; c < m_model->columnCount(); ++c) {
+        const int sub = m_model->dcaSubColumn(c);
+        if (sub == 1)
+            m_tableView->setColumnHidden(c, !m_dcaFxColsVisible);
+        else if (sub == 2)
+            m_tableView->setColumnHidden(c, !m_dcaPosColsVisible);
+    }
 }
 
 void CueListView::setEditingLocked(bool locked) {
@@ -667,46 +698,11 @@ void CueListView::onCellDoubleClicked(const QModelIndex& proxyIndex) {
         return out;
     };
 
-    // per-DCA assignment cell: set the DCA's label override; a typed role or
-    // actor name also assigns their channel to this DCA for this cue
-    const int dca = m_model->dcaOfColumn(col);
-    if (dca > 0 && m_model->dcaSubColumn(col) == 0) {
-        const DCAOverride cur = cue.dcaOverride(dca);
-        ActorProfileLibrary* library = m_app->show()->actorProfileLibrary();
-
-        QDialog dialog(this);
-        dialog.setWindowTitle(tr("Assign DCA %1").arg(dca));
-        auto* layout = new QVBoxLayout(&dialog);
-        auto* hint = new QLabel(tr("Type a role or actor name to auto-assign their channel to "
-                                   "this DCA for this cue; any other text is just a scribble "
-                                   "label. Blank clears."),
-                                &dialog);
-        hint->setWordWrap(true);
-        layout->addWidget(hint);
-        auto* edit = new QLineEdit(cur.label.value_or(QString()), &dialog);
-        auto* completer = new QCompleter(library->completionCandidates(), &dialog);
-        completer->setCaseSensitivity(Qt::CaseInsensitive);
-        edit->setCompleter(completer);
-        layout->addWidget(edit);
-        auto* buttons =
-            new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-        connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-        layout->addWidget(buttons);
-        edit->setFocus();
-
-        if (dialog.exec() != QDialog::Accepted)
-            return;
-
-        const QString label = edit->text();
-        DCAOverride ov = cur; // keep an existing mute override
-        ov.label = label.isEmpty() ? std::nullopt : std::optional<QString>(label);
-        cue.setDCAOverride(dca, ov);
-        if (const Actor* actor = library->resolveActor(label))
-            cue.assignChannelToDCAMapping(actor->channel(), dca, m_app->show()->dcaMapping());
-        commit();
+    // per-DCA assignment cell: the double-click edit trigger opens the inline
+    // completer editor (DCAAssignDelegate); nothing to do here — and without
+    // this early return the default branch would pop the cue-editor window
+    if (m_model->dcaSubColumn(col) == 0)
         return;
-    }
 
     switch (col) {
     case CueTableModel::ColScene: {
@@ -756,6 +752,17 @@ void CueListView::onCellDoubleClicked(const QModelIndex& proxyIndex) {
             emit cueDoubleClicked(row);
         return;
     }
+}
+
+void CueListView::selectAdjacentCue(int delta) {
+    const int rows = m_proxyModel->rowCount();
+    if (rows == 0)
+        return;
+    const QModelIndex current = m_tableView->currentIndex();
+    const int row = current.isValid() ? qBound(0, current.row() + delta, rows - 1)
+                                      : (delta > 0 ? 0 : rows - 1);
+    m_tableView->selectRow(row);
+    m_tableView->scrollTo(m_proxyModel->index(row, 0));
 }
 
 void CueListView::onSelectionChanged() { emit cueSelected(selectedCueIndex()); }
@@ -850,10 +857,12 @@ bool CueListView::eventFilter(QObject* watched, QEvent* event) {
                     // advance to next cell
                     targetCell = nextEditableIndex(current, forward);
                 } else {
-                    // start at first/last column
-                    int row = current.row();
-                    int col = forward ? CueTableModel::ColNumber : CueTableModel::ColNotes;
-                    targetCell = m_proxyModel->index(row, col);
+                    // start at first/last visible editable column
+                    const int row = current.row();
+                    const QList<int> columns = editableColumns(row);
+                    if (!columns.isEmpty())
+                        targetCell =
+                            m_proxyModel->index(row, forward ? columns.first() : columns.last());
                 }
 
                 if (targetCell.isValid()) {
@@ -883,6 +892,21 @@ void CueListView::editNextCell(bool forward) {
     }
 }
 
+QList<int> CueListView::editableColumns(int proxyRow) const {
+    // visible, editable columns in display order — keeps the Tab cycle off
+    // hidden columns (Type..Notes by default, per-DCA fx/pos) and includes the
+    // DCA assignment cells
+    QList<int> columns;
+    for (int c = 0; c < m_proxyModel->columnCount(); ++c) {
+        if (m_tableView->isColumnHidden(c))
+            continue;
+        const QModelIndex idx = m_proxyModel->index(proxyRow, c);
+        if (m_proxyModel->flags(idx) & Qt::ItemIsEditable)
+            columns.append(c);
+    }
+    return columns;
+}
+
 QModelIndex CueListView::nextEditableIndex(const QModelIndex& current, bool forward) const {
     if (!current.isValid())
         return QModelIndex();
@@ -892,28 +916,21 @@ QModelIndex CueListView::nextEditableIndex(const QModelIndex& current, bool forw
         return QModelIndex();
 
     int row = current.row();
-    int col = current.column();
+    const int col = current.column();
 
-    // order of editable columns
-    static constexpr int editableColumns[] = {CueTableModel::ColNumber, CueTableModel::ColName,
-                                             CueTableModel::ColType,   CueTableModel::ColGroup,
-                                             CueTableModel::ColTags,   CueTableModel::ColNotes};
+    const QList<int> columns = editableColumns(row);
+    if (columns.isEmpty())
+        return QModelIndex();
 
-    static constexpr int editableCount = sizeof(editableColumns) / sizeof(editableColumns[0]);
+    const int foundPos = static_cast<int>(columns.indexOf(col));
+    int colPos = foundPos >= 0 ? foundPos : 0;
 
-    // find column's position in list
-    const auto* found = std::find(std::begin(editableColumns), std::end(editableColumns), col);
-    int colPos = (found != std::end(editableColumns))
-        ? static_cast<int>(std::distance(std::begin(editableColumns), found))
-        : 0;
-
-    // move to next position
+    // move to next position, wrapping across rows
     if (forward) {
         colPos++;
-        if (colPos >= editableCount) {
+        if (colPos >= columns.size()) {
             colPos = 0;
             row++;
-            // wrap to first row if past end
             if (row >= rowCount) {
                 row = 0;
             }
@@ -921,16 +938,15 @@ QModelIndex CueListView::nextEditableIndex(const QModelIndex& current, bool forw
     } else {
         colPos--;
         if (colPos < 0) {
-            colPos = editableCount - 1;
+            colPos = static_cast<int>(columns.size()) - 1;
             row--;
-            // wrap to last row if before start
             if (row < 0) {
                 row = rowCount - 1;
             }
         }
     }
 
-    return m_proxyModel->index(row, editableColumns[colPos]);
+    return m_proxyModel->index(row, columns[colPos]);
 }
 
 } // namespace OpenMix

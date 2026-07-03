@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QJsonObject>
+#include <QSet>
 #include <QWidget>
 
 class QCheckBox;
@@ -11,6 +12,7 @@ class QPushButton;
 class QSpinBox;
 class QTabWidget;
 class QTreeWidget;
+class QTreeWidgetItem;
 
 namespace OpenMix {
 
@@ -38,13 +40,15 @@ class ActorSetupPanel : public QWidget {
     // actor list
     void onActorSelectionChanged();
     void addActor();
+    void addActors(); // bulk add: paste one actor per line
     void removeActor();
     void moveActorUp();
     void moveActorDown();
+    void onActorItemChanged(QTreeWidgetItem* item, int column); // inline edits
 
     // per-actor fields
     void onNameChanged(const QString& text);
-    void onRoleChanged(const QString& text);
+    void onRolesChanged(const QString& text);
     void onChannelChanged(int channel);
     void onActiveToggled(bool on);
     void onBackupToggled(bool on);
@@ -76,6 +80,8 @@ class ActorSetupPanel : public QWidget {
 
     [[nodiscard]] QString selectedActorId() const;
     [[nodiscard]] int channelCount() const;
+    // lowest channel not in used, capped at channelCount(); inserts the result
+    [[nodiscard]] int takeLowestFreeChannel(QSet<int>& used) const;
 
     Application* m_app;
     ActorProfileLibrary* m_library = nullptr;
@@ -87,6 +93,7 @@ class ActorSetupPanel : public QWidget {
     // actor list
     QTreeWidget* m_actorTree = nullptr;
     QPushButton* m_addActorBtn = nullptr;
+    QPushButton* m_addActorsBtn = nullptr;
     QPushButton* m_removeActorBtn = nullptr;
     QPushButton* m_moveUpBtn = nullptr;
     QPushButton* m_moveDownBtn = nullptr;
@@ -102,7 +109,7 @@ class ActorSetupPanel : public QWidget {
     // editor
     QWidget* m_editor = nullptr;
     QLineEdit* m_nameEdit = nullptr;
-    QLineEdit* m_roleEdit = nullptr;
+    QLineEdit* m_rolesEdit = nullptr;
     QSpinBox* m_channelSpin = nullptr;
     QCheckBox* m_activeCheck = nullptr;
     QCheckBox* m_backupCheck = nullptr;

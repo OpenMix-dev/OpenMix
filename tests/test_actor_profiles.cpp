@@ -73,24 +73,61 @@ class TestActorProfiles : public QObject {
         QCOMPARE(*r.profile("Main").main().gainDb, 3.0);
     }
 
-    void actor_role_roundTrip() {
+    void actor_roles_roundTrip() {
         Actor a("Alice", 5);
-        a.setRole("Cosette");
+        a.setRoles({"Cosette", "Singer #1"});
 
         const QJsonObject json = a.toJson();
+        const QJsonArray rolesArr = json["roles"].toArray();
+        QCOMPARE(rolesArr.size(), 2);
+        QCOMPARE(rolesArr[0].toString(), QString("Cosette"));
+        QCOMPARE(rolesArr[1].toString(), QString("Singer #1"));
+        // legacy key carries the primary role for pre-1.9 builds
         QCOMPARE(json["role"].toString(), QString("Cosette"));
 
         Actor r = Actor::fromJson(json);
-        QCOMPARE(r.role(), QString("Cosette"));
+        QCOMPARE(r.roles(), QStringList({"Cosette", "Singer #1"}));
     }
 
-    void actor_emptyRole_omittedFromJson() {
+    void actor_emptyRoles_omittedFromJson() {
         Actor a("Alice", 5);
+        QVERIFY(!a.toJson().contains("roles"));
         QVERIFY(!a.toJson().contains("role"));
 
-        // absent key loads as empty (pre-1.8 shows)
+        // absent keys load as empty (pre-1.8 shows)
         Actor r = Actor::fromJson(a.toJson());
-        QVERIFY(r.role().isEmpty());
+        QVERIFY(r.roles().isEmpty());
+    }
+
+    void actor_legacySingleRole_loadsIntoRoles() {
+        // the exact shape a 1.8 build writes: single "role" string, no "roles"
+        QJsonObject legacy;
+        legacy["id"] = "some-id";
+        legacy["name"] = "Alice";
+        legacy["role"] = "Cosette";
+        legacy["channel"] = 5;
+
+        Actor r = Actor::fromJson(legacy);
+        QCOMPARE(r.roles(), QStringList({"Cosette"}));
+
+        // when both keys are present, "roles" wins
+        legacy["roles"] = QJsonArray({"Eponine", "Dancer"});
+        Actor both = Actor::fromJson(legacy);
+        QCOMPARE(both.roles(), QStringList({"Eponine", "Dancer"}));
+    }
+
+    void actor_roleHelpers() {
+        Actor a("Alice", 5);
+        QVERIFY(a.primaryRole().isEmpty());
+        QVERIFY(a.rolesDisplay().isEmpty());
+        QVERIFY(a.matchedRole("Cosette").isEmpty());
+
+        a.setRoles({"Cosette", "Singer #1"});
+        QCOMPARE(a.primaryRole(), QString("Cosette"));
+        QCOMPARE(a.rolesDisplay(), QString("Cosette, Singer #1"));
+        QCOMPARE(a.matchedRole("singer #1"), QString("Singer #1")); // ci hit, stored casing
+        QVERIFY(a.matchedRole("Eponine").isEmpty());
+        QVERIFY(a.matchedRole("").isEmpty());
     }
 
     // --- ActorProfileLibrary: lookup + backup -----------------------------
@@ -138,7 +175,7 @@ class TestActorProfiles : public QObject {
     void library_resolveActor_roleBeatsName_caseInsensitive_trimmed() {
         ActorProfileLibrary lib;
         Actor alice("Alice", 5);
-        alice.setRole("Cosette");
+        alice.setRoles({"Cosette"});
         lib.addActor(alice);
         // an actor literally named "Cosette" must lose to the role match
         lib.addActor(Actor("Cosette", 6));
@@ -148,13 +185,25 @@ class TestActorProfiles : public QObject {
         QCOMPARE(lib.resolveActor("alice")->name(), QString("Alice"));
     }
 
+    void library_resolveActor_matchesAnyRole() {
+        ActorProfileLibrary lib;
+        Actor alice("Alice", 5);
+        alice.setRoles({"Cosette", "Singer #1"});
+        lib.addActor(alice);
+        // a non-primary role still beats an actor named like it
+        lib.addActor(Actor("Singer #1", 6));
+
+        QCOMPARE(lib.resolveActor("singer #1")->channel(), 5);
+        QCOMPARE(lib.resolveActor("Cosette")->channel(), 5);
+    }
+
     void library_resolveActor_prefersActiveThenLowestOrder() {
         ActorProfileLibrary lib;
         Actor lead("Lead", 3);
-        lead.setRole("Evan");
+        lead.setRoles({"Evan"});
         lead.setOrder(1);
         Actor understudy("Understudy", 4);
-        understudy.setRole("Evan");
+        understudy.setRoles({"Evan"});
         understudy.setOrder(2);
         lib.addActor(understudy);
         lib.addActor(lead);
@@ -177,14 +226,14 @@ class TestActorProfiles : public QObject {
     void library_completionCandidates_dedupSkipsEmpty() {
         ActorProfileLibrary lib;
         Actor alice("Alice", 5);
-        alice.setRole("Cosette");
+        alice.setRoles({"Cosette", "Singer #1"}); // every role becomes a candidate
         lib.addActor(alice);
         lib.addActor(Actor("Bob", 6)); // no role
         Actor dup("COSETTE", 7);       // ci-duplicate of the role
         lib.addActor(dup);
 
         const QStringList candidates = lib.completionCandidates();
-        QCOMPARE(candidates, QStringList({"Alice", "Bob", "Cosette"}));
+        QCOMPARE(candidates, QStringList({"Alice", "Bob", "Cosette", "Singer #1"}));
     }
 
     void library_emitsSignals() {
@@ -241,19 +290,19 @@ class TestActorProfiles : public QObject {
         Show show;
         QSignalSpy spy(&show, &Show::modifiedChanged);
         Actor a("Eve", 4);
-        a.setRole("Elle");
+        a.setRoles({"Elle"});
         show.actorProfileLibrary()->addActor(a);
         QVERIFY(show.isModified()); // library change propagates dirty
         QVERIFY(spy.count() >= 1);
 
         const QJsonObject json = show.toJson();
-        QCOMPARE(json["version"].toString(), QString("1.8"));
+        QCOMPARE(json["version"].toString(), QString("1.9"));
 
         Show loaded;
         loaded.fromJson(json);
         QCOMPARE(loaded.actorProfileLibrary()->actorCount(), 1);
         QCOMPARE(loaded.actorProfileLibrary()->actorForChannel(4)->name(), QString("Eve"));
-        QCOMPARE(loaded.actorProfileLibrary()->actorForChannel(4)->role(), QString("Elle"));
+        QCOMPARE(loaded.actorProfileLibrary()->actorForChannel(4)->roles(), QStringList({"Elle"}));
     }
 
     void show_loadsLegacy_1_1_withoutActors() {

@@ -141,6 +141,7 @@ set(SOURCES
     src/ui/ConnectionStateWidget.cpp
     src/ui/MixerFeedbackPanel.cpp
     src/ui/DCAWidget.cpp
+    src/ui/DCAOverrideStrip.cpp
     src/ui/CueConfidenceIndicator.cpp
     src/ui/MacroPreviewWidget.cpp
     src/ui/DCAMappingPanel.cpp

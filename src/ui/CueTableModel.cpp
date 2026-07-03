@@ -1,4 +1,6 @@
 #include "CueTableModel.h"
+#include "core/Actor.h"
+#include "core/ActorProfileLibrary.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
 #include "core/DCAMapping.h"
@@ -82,8 +84,24 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
             const int dca = dcaOfColumn(col);
             const DCAOverride ov = cue.dcaOverride(dca);
             if (sub == 0) { // assignment: the cue's DCA label / mute override
-                if (ov.label.has_value())
+                if (ov.label.has_value()) {
+                    // editors get the raw typed label; display resolves it to
+                    // the actor in that role
+                    if (role == Qt::EditRole)
+                        return *ov.label;
+                    const Actor* actor =
+                        m_actorLibrary ? m_actorLibrary->resolveActor(*ov.label) : nullptr;
+                    if (actor) {
+                        // prefer the role the label matched, else the primary
+                        QString actorRole = actor->matchedRole(*ov.label);
+                        if (actorRole.isEmpty())
+                            actorRole = actor->primaryRole();
+                        return actorRole.isEmpty()
+                                   ? actor->name()
+                                   : tr("%1 (%2)").arg(actor->name(), actorRole);
+                    }
                     return *ov.label;
+                }
                 if (ov.mute.has_value())
                     return *ov.mute ? tr("mute") : tr("on");
                 return QString();
@@ -202,6 +220,47 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
     }
 
     if (role == Qt::ToolTipRole) {
+        // DCA assignment cells: overrides + resolved members, like the cue
+        // editor's assign info
+        if (dcaSubColumn(col) == 0) {
+            const int dca = dcaOfColumn(col);
+            const DCAOverride ov = cue.dcaOverride(dca);
+            QStringList lines;
+            if (ov.label.has_value())
+                lines << tr("Label: %1").arg(*ov.label);
+            if (ov.mute.has_value())
+                lines << (*ov.mute ? tr("Mutes on fire") : tr("Unmutes on fire"));
+
+            QList<int> channels;
+            if (cue.hasCustomDCAMapping())
+                channels = cue.dcaChannelMapping().value(dca);
+            else if (m_dcaMapping)
+                channels = m_dcaMapping->channelsForDCA(dca);
+            if (!channels.isEmpty()) {
+                const QString dcaLabel = ov.label.value_or(QString());
+                QStringList members;
+                for (int ch : channels) {
+                    const Actor* actor =
+                        m_actorLibrary ? m_actorLibrary->actorForChannel(ch) : nullptr;
+                    if (actor) {
+                        QString actorRole = actor->matchedRole(dcaLabel);
+                        if (actorRole.isEmpty())
+                            actorRole = actor->primaryRole();
+                        members << (actorRole.isEmpty()
+                                        ? tr("Ch %1 %2").arg(ch).arg(actor->name())
+                                        : tr("Ch %1 %2 (%3)")
+                                              .arg(ch)
+                                              .arg(actor->name(), actorRole));
+                    } else {
+                        members << tr("Ch %1").arg(ch);
+                    }
+                }
+                lines << tr("Members: %1").arg(members.join(", "));
+            }
+            lines << tr("Type a role or actor name to auto-assign their channel to this DCA");
+            return lines.join("\n");
+        }
+
         QString tip = QString("Cue %1: %2").arg(cue.number(), 0, 'f', 1).arg(cue.name());
         if (!cue.notes().isEmpty()) {
             tip += "\n" + cue.notes();
@@ -277,10 +336,10 @@ Qt::ItemFlags CueTableModel::flags(const QModelIndex& index) const {
     // all rows are draggable & drop targets
     Qt::ItemFlags flags = defaultFlags | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled;
 
-    // enable editing for primary cue props
+    // enable editing for primary cue props and DCA assignment cells
     int col = index.column();
     if (col == ColNumber || col == ColName || col == ColType || col == ColGroup || col == ColTags ||
-        col == ColNotes) {
+        col == ColNotes || dcaSubColumn(col) == 0) {
         flags |= Qt::ItemIsEditable;
     }
 
@@ -300,6 +359,25 @@ bool CueTableModel::setData(const QModelIndex& index, const QVariant& value, int
 
     Cue cue = m_cueList->at(row);
     QVariant oldValue;
+
+    // DCA assignment cells: set the label override (preserving any mute) and
+    // resolve a typed role/actor name to a channel assignment — the same
+    // commit path the assign dialog used
+    if (dcaSubColumn(col) == 0) {
+        const int dca = dcaOfColumn(col);
+        DCAOverride ov = cue.dcaOverride(dca);
+        oldValue = ov.label.value_or(QString());
+        const QString text = value.toString().trimmed();
+        ov.label = text.isEmpty() ? std::nullopt : std::optional<QString>(text);
+        cue.setDCAOverride(dca, ov);
+        if (m_actorLibrary && !text.isEmpty()) {
+            if (const Actor* actor = m_actorLibrary->resolveActor(text))
+                cue.assignChannelToDCAMapping(actor->channel(), dca, m_dcaMapping);
+        }
+        emit cueEditRequested(row, col, oldValue, value);
+        m_cueList->updateCue(row, cue);
+        return true;
+    }
 
     switch (col) {
     case ColNumber: {
@@ -435,10 +513,10 @@ void CueTableModel::setCurrentCueIndex(int index) {
 
     // refresh old & new rows
     if (oldIndex >= 0 && oldIndex < rowCount()) {
-        emit dataChanged(this->index(oldIndex, 0), this->index(oldIndex, ColCount - 1));
+        emit dataChanged(this->index(oldIndex, 0), this->index(oldIndex, columnCount() - 1));
     }
     if (index >= 0 && index < rowCount()) {
-        emit dataChanged(this->index(index, 0), this->index(index, ColCount - 1));
+        emit dataChanged(this->index(index, 0), this->index(index, columnCount() - 1));
     }
 }
 
@@ -448,10 +526,10 @@ void CueTableModel::setStandbyCueIndex(int index) {
 
     // refresh old & new rows
     if (oldIndex >= 0 && oldIndex < rowCount()) {
-        emit dataChanged(this->index(oldIndex, 0), this->index(oldIndex, ColCount - 1));
+        emit dataChanged(this->index(oldIndex, 0), this->index(oldIndex, columnCount() - 1));
     }
     if (index >= 0 && index < rowCount()) {
-        emit dataChanged(this->index(index, 0), this->index(index, ColCount - 1));
+        emit dataChanged(this->index(index, 0), this->index(index, columnCount() - 1));
     }
 }
 
@@ -499,7 +577,7 @@ void CueTableModel::onCueRemoved(int index) {
 }
 
 void CueTableModel::onCueUpdated(int index) {
-    emit dataChanged(this->index(index, 0), this->index(index, ColCount - 1));
+    emit dataChanged(this->index(index, 0), this->index(index, columnCount() - 1));
 }
 
 void CueTableModel::onCueAboutToBeMoved(int from, int to) {

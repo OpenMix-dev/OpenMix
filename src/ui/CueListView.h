@@ -19,6 +19,7 @@ class CueFilterBar;
 class CueNumberDelegate;
 class CueTypeDelegate;
 class CueTextDelegate;
+class DCAAssignDelegate;
 
 class CueListView : public QWidget {
     Q_OBJECT
@@ -51,6 +52,7 @@ class CueListView : public QWidget {
     void cloneOffsets();      // copy just the selected cue's level offsets to the next cue
     int recordOffsets();      // capture live console faders into the selected cue; returns count
     void jumpToSelectedCue(); // set the selected cue as standby without firing
+    void selectAdjacentCue(int delta); // move selection by delta in visible (proxy) order
     void setEditingLocked(bool locked); // make the cue table read-only
     void setRowHeight(int pixels);      // cue-table row height
     void setColumnVisible(int column, bool visible);
@@ -79,11 +81,13 @@ class CueListView : public QWidget {
   private:
     void setupUi();
     void setupDelegates();
+    void applyDcaSubColumnVisibility(); // re-hide fx/pos columns after model resets
     void scheduleColumnRelayout();
     void relayoutColumns();
     void updateEmptyHint();
     void createActions();
     void editNextCell(bool forward);
+    QList<int> editableColumns(int proxyRow) const; // visible + editable, display order
     QModelIndex nextEditableIndex(const QModelIndex& current, bool forward) const;
     void insertCueAt(int index, const Cue& cue); // undoable insert + select
     void selectSourceRow(int sourceRow);
@@ -99,11 +103,14 @@ class CueListView : public QWidget {
     QTimer* m_relayoutTimer = nullptr; // coalesces column relayout requests
     int m_currentCueIndex = -1;
     int m_standbyCueIndex = -1;
+    bool m_dcaFxColsVisible = false;  // per-DCA fx sub-columns shown
+    bool m_dcaPosColsVisible = false; // per-DCA pos sub-columns shown
 
     // delegates
     CueNumberDelegate* m_numberDelegate;
     CueTypeDelegate* m_typeDelegate;
     CueTextDelegate* m_textDelegate;
+    DCAAssignDelegate* m_dcaAssignDelegate;
 
     // tab navigation guard
     bool m_tabNavigationPending = false;

@@ -1,4 +1,5 @@
 #include "DCAMappingPanel.h"
+#include "DcaGridNav.h"
 #include "app/Application.h"
 #include "MainWindow.h"
 #include "core/Actor.h"
@@ -74,6 +75,8 @@ DCAMappingPanel::DCAMappingPanel(Application* app, QWidget* parent)
         connect(m_app, &Application::mixerConnected, this, &DCAMappingPanel::onMixerConnected);
         connect(m_app, &Application::mixerDisconnected, this,
                 &DCAMappingPanel::onMixerDisconnected);
+        // console-type selection changes the DCA/channel/bus counts shown here
+        connect(m_app, &Application::dcaCountChanged, this, &DCAMappingPanel::refresh);
 
         // get mapping from show
         m_mapping = m_app->show()->dcaMapping();
@@ -98,6 +101,24 @@ void DCAMappingPanel::setupUi() {
     QHBoxLayout* contextLayout = new QHBoxLayout(m_contextHeader);
     contextLayout->setContentsMargins(4, 4, 4, 4);
     contextLayout->setSpacing(8);
+
+    // step the cue-list selection from here, so the operator can walk cues
+    // without leaving the mapping screen
+    m_prevCueButton = new QPushButton(Icons::mediaPrevious(), QString(), m_contextHeader);
+    m_prevCueButton->setFixedSize(24, 24);
+    m_prevCueButton->setToolTip(tr("Previous cue"));
+    m_prevCueButton->setFocusPolicy(Qt::NoFocus);
+    connect(m_prevCueButton, &QPushButton::clicked, this,
+            [this]() { emit adjacentCueRequested(-1); });
+    contextLayout->addWidget(m_prevCueButton);
+
+    m_nextCueButton = new QPushButton(Icons::mediaNext(), QString(), m_contextHeader);
+    m_nextCueButton->setFixedSize(24, 24);
+    m_nextCueButton->setToolTip(tr("Next cue"));
+    m_nextCueButton->setFocusPolicy(Qt::NoFocus);
+    connect(m_nextCueButton, &QPushButton::clicked, this,
+            [this]() { emit adjacentCueRequested(1); });
+    contextLayout->addWidget(m_nextCueButton);
 
     m_contextLabel = new QLabel(tr("Show Level"), m_contextHeader);
     m_contextLabel->setStyleSheet(
@@ -274,6 +295,7 @@ void DCAMappingPanel::createChannelSection() {
     }
     m_channelCombos.clear();
     m_channelLabels.clear();
+    m_channelNameEdits.clear();
 
     // header
     m_channelLayout->addWidget(new QLabel(tr("Channel"), m_channelGroup), 0, 0);
@@ -285,11 +307,32 @@ void DCAMappingPanel::createChannelSection() {
         int row = ((ch - 1) % 16) + 1;
         colOffset = ((ch - 1) / 16) * 3;
 
-        QLabel* label = new QLabel(channelDisplayName(ch), m_channelGroup);
+        // stacked label + line edit, like the bus rows: double-click renames
+        // the actor on the channel (or casts a new one)
+        QWidget* nameContainer = new QWidget(m_channelGroup);
+        QVBoxLayout* nameLayout = new QVBoxLayout(nameContainer);
+        nameLayout->setContentsMargins(0, 0, 0, 0);
+        nameLayout->setSpacing(0);
+
+        QLabel* label = new QLabel(channelDisplayName(ch), nameContainer);
         label->setMinimumWidth(60);
-        label->setToolTip(channelDisplayName(ch));
-        m_channelLayout->addWidget(label, row, colOffset);
+        label->setProperty("channelIndex", ch);
+        label->installEventFilter(this);
+        label->setToolTip(tr("Double-click to rename the actor on this channel"));
+        nameLayout->addWidget(label);
         m_channelLabels.append(label);
+
+        QLineEdit* edit = new QLineEdit(nameContainer);
+        edit->setVisible(false);
+        edit->setPlaceholderText(tr("Actor name"));
+        edit->setProperty("channelIndex", ch);
+        edit->installEventFilter(this);
+        nameLayout->addWidget(edit);
+        m_channelNameEdits.append(edit);
+
+        connect(edit, &QLineEdit::returnPressed, [this, ch]() { finishChannelNameEdit(ch); });
+
+        m_channelLayout->addWidget(nameContainer, row, colOffset);
 
         NoScrollComboBox* combo = new NoScrollComboBox(m_channelGroup);
         combo->addItem(tr("None"), -1);
@@ -297,6 +340,7 @@ void DCAMappingPanel::createChannelSection() {
             combo->addItem(tr("DCA %1").arg(d), d);
         }
         combo->setProperty("channel", ch);
+        combo->installEventFilter(this); // arrow/digit keyboard navigation
         connect(combo, QOverload<int>::of(&QComboBox::currentIndexChanged), [this, ch](int index) {
             if (!m_updatingUi) {
                 int dca = m_channelCombos[ch - 1]->currentData().toInt();
@@ -362,6 +406,7 @@ void DCAMappingPanel::createBusSection() {
             combo->addItem(tr("DCA %1").arg(d), d);
         }
         combo->setProperty("bus", bus);
+        combo->installEventFilter(this); // arrow/digit keyboard navigation
         connect(combo, QOverload<int>::of(&QComboBox::currentIndexChanged), [this, bus](int index) {
             if (!m_updatingUi) {
                 int dca = m_busCombos[bus - 1]->currentData().toInt();
@@ -375,14 +420,13 @@ void DCAMappingPanel::createBusSection() {
 }
 
 void DCAMappingPanel::updateDCAOptions() {
-    // update number of DCA options based on mixer capabilities
-    if (m_app && m_app->mixer() && m_app->mixer()->isConnected()) {
-        const MixerCapabilities& caps = m_app->mixer()->capabilities();
+    // counts follow the connected mixer, else the configured console type
+    if (m_app) {
+        const MixerCapabilities caps = m_app->effectiveCapabilities();
         m_dcaCount = caps.dcaCount;
         m_channelCount = caps.inputChannels;
         m_busCount = caps.mixBuses;
     } else {
-        // default values
         m_dcaCount = 8;
         m_channelCount = 32;
         m_busCount = 16;
@@ -505,13 +549,15 @@ void DCAMappingPanel::updateComboItemStates() {
         if (dca > 0) {
             label->setText(tr("%1 [%2]").arg(display).arg(dca));
             label->setStyleSheet(assignedStyle);
-            label->setToolTip(tr("%1 — assigned to DCA %2, locked from other DCAs")
+            label->setToolTip(tr("%1 — assigned to DCA %2, locked from other DCAs; "
+                                 "double-click to rename")
                                   .arg(display)
                                   .arg(dca));
         } else {
             label->setText(display);
             label->setStyleSheet("");
-            label->setToolTip(tr("%1 — not assigned to any DCA").arg(display));
+            label->setToolTip(
+                tr("%1 — not assigned to any DCA; double-click to rename").arg(display));
         }
     }
 
@@ -722,10 +768,14 @@ void DCAMappingPanel::loadMappingPreset() {
 }
 
 void DCAMappingPanel::clearAllMappings() {
-    if (m_mapping) {
-        m_mapping->clear();
-        m_app->show()->setModified(true);
-    }
+    if (!m_mapping)
+        return;
+    if (QMessageBox::question(this, tr("Clear All DCA Mappings"),
+                              tr("Remove all channel and bus DCA assignments?")) !=
+        QMessageBox::Yes)
+        return;
+    m_mapping->clear();
+    m_app->show()->setModified(true);
 }
 
 void DCAMappingPanel::onChannelDCAChanged(int channel, int dca) {
@@ -787,6 +837,8 @@ void DCAMappingPanel::onBusDCAChanged(int bus, int dca) {
 void DCAMappingPanel::onMixerConnected() {
     m_syncButton->setEnabled(true);
     m_syncFromMixerAction->setEnabled(true);
+    // count changes arrive via Application::dcaCountChanged -> refresh(), but
+    // same-count consoles still need channel/bus counts re-read
     updateDCAOptions();
 }
 
@@ -907,8 +959,8 @@ QString DCAMappingPanel::channelDisplayName(int channel) const {
     const ActorProfileLibrary* library =
         (m_app && m_app->show()) ? m_app->show()->actorProfileLibrary() : nullptr;
     const Actor* actor = library ? library->actorForChannel(channel) : nullptr;
-    if (actor && !actor->role().isEmpty())
-        return tr("Ch %1 — %2 (%3)").arg(channel).arg(actor->name(), actor->role());
+    if (actor && !actor->primaryRole().isEmpty())
+        return tr("Ch %1 — %2 (%3)").arg(channel).arg(actor->name(), actor->primaryRole());
     if (actor && !actor->name().isEmpty())
         return tr("Ch %1 — %2").arg(channel).arg(actor->name());
     return tr("Ch %1").arg(channel);
@@ -959,6 +1011,11 @@ bool DCAMappingPanel::eventFilter(QObject* obj, QEvent* event) {
             startBusNameEdit(bus);
             return true;
         }
+        if (auto* label = qobject_cast<QLabel*>(obj);
+            label && label->property("channelIndex").isValid()) {
+            startChannelNameEdit(label->property("channelIndex").toInt());
+            return true;
+        }
     }
     if (event->type() == QEvent::KeyPress) {
         if (auto* edit = qobject_cast<QLineEdit*>(obj); edit && edit->property("busIndex").isValid()) {
@@ -969,11 +1026,74 @@ bool DCAMappingPanel::eventFilter(QObject* obj, QEvent* event) {
                 return true;
             }
         }
+        if (auto* edit = qobject_cast<QLineEdit*>(obj);
+            edit && edit->property("channelIndex").isValid()) {
+            QKeyEvent* ke = static_cast<QKeyEvent*>(event);
+            if (ke->key() == Qt::Key_Escape) {
+                cancelChannelNameEdit(edit->property("channelIndex").toInt());
+                return true;
+            }
+        }
+        // grid keyboard navigation on the assignment combos: arrows move
+        // focus, digits assign, 0/Delete/Backspace clear. Enter stays with
+        // NoScrollComboBox (opens the popup); popup-open arrows go to the
+        // popup view, never through this filter.
+        if (auto* combo = qobject_cast<QComboBox*>(obj)) {
+            const bool isChannel = combo->property("channel").isValid();
+            const bool isBus = combo->property("bus").isValid();
+            if (isChannel || isBus) {
+                QKeyEvent* ke = static_cast<QKeyEvent*>(event);
+                if (ke->modifiers() & (Qt::ControlModifier | Qt::AltModifier))
+                    return QWidget::eventFilter(obj, event);
+
+                QVector<QComboBox*>& combos = isChannel ? m_channelCombos : m_busCombos;
+                const int rowsPerBlock = isChannel ? 16 : 8;
+                const int index =
+                    combo->property(isChannel ? "channel" : "bus").toInt() - 1;
+
+                int dRow = 0, dCol = 0;
+                switch (ke->key()) {
+                case Qt::Key_Up:
+                    dRow = -1;
+                    break;
+                case Qt::Key_Down:
+                    dRow = 1;
+                    break;
+                case Qt::Key_Left:
+                    dCol = -1;
+                    break;
+                case Qt::Key_Right:
+                    dCol = 1;
+                    break;
+                default: {
+                    const int comboRow = DcaGridNav::comboRowForKey(ke->key(), m_dcaCount);
+                    if (comboRow >= 0 && comboRow < combo->count()) {
+                        combo->setCurrentIndex(comboRow); // fires the commit path
+                        return true;
+                    }
+                    return QWidget::eventFilter(obj, event);
+                }
+                }
+
+                const int target =
+                    DcaGridNav::move(index, combos.size(), rowsPerBlock, dRow, dCol);
+                if (target >= 0) {
+                    combos[target]->setFocus(Qt::OtherFocusReason);
+                    m_scrollArea->ensureWidgetVisible(combos[target]);
+                }
+                return true; // swallow arrows either way: no silent value change
+            }
+        }
     }
     if (event->type() == QEvent::FocusOut) {
         if (auto* edit = qobject_cast<QLineEdit*>(obj); edit && edit->property("busIndex").isValid()) {
             int bus = edit->property("busIndex").toInt();
             finishBusNameEdit(bus);
+            return false;
+        }
+        if (auto* edit = qobject_cast<QLineEdit*>(obj);
+            edit && edit->property("channelIndex").isValid()) {
+            finishChannelNameEdit(edit->property("channelIndex").toInt());
             return false;
         }
     }
@@ -1020,6 +1140,63 @@ void DCAMappingPanel::cancelBusNameEdit(int bus) {
 
     m_busNameEdits[bus - 1]->setVisible(false);
     m_busLabels[bus - 1]->setVisible(true);
+}
+
+void DCAMappingPanel::startChannelNameEdit(int channel) {
+    if (channel < 1 || channel > m_channelNameEdits.size())
+        return;
+
+    const ActorProfileLibrary* library =
+        (m_app && m_app->show()) ? m_app->show()->actorProfileLibrary() : nullptr;
+    const Actor* actor = library ? library->actorForChannel(channel) : nullptr;
+
+    QLabel* label = m_channelLabels[channel - 1];
+    QLineEdit* edit = m_channelNameEdits[channel - 1];
+
+    label->setVisible(false);
+    edit->setVisible(true);
+    edit->setText(actor ? actor->name() : QString());
+    edit->setFocus();
+    edit->selectAll();
+}
+
+void DCAMappingPanel::finishChannelNameEdit(int channel) {
+    if (channel < 1 || channel > m_channelNameEdits.size())
+        return;
+
+    QLineEdit* edit = m_channelNameEdits[channel - 1];
+    if (!edit->isVisible())
+        return;
+    const QString name = edit->text().trimmed();
+
+    edit->setVisible(false);
+    m_channelLabels[channel - 1]->setVisible(true);
+
+    ActorProfileLibrary* library =
+        (m_app && m_app->show()) ? m_app->show()->actorProfileLibrary() : nullptr;
+    if (!library)
+        return;
+
+    // rename the actor on this channel; with no actor, cast a new one. Empty
+    // text never deletes cast from this panel. The library's changed() signal
+    // relabels this panel, Actor Setup, the cue list, and the console strips.
+    if (const Actor* existing = library->actorForChannel(channel)) {
+        if (!name.isEmpty() && name != existing->name()) {
+            Actor copy = *existing;
+            copy.setName(name);
+            library->updateActor(copy.id(), copy);
+        }
+    } else if (!name.isEmpty()) {
+        library->addActor(Actor(name, channel));
+    }
+}
+
+void DCAMappingPanel::cancelChannelNameEdit(int channel) {
+    if (channel < 1 || channel > m_channelNameEdits.size())
+        return;
+
+    m_channelNameEdits[channel - 1]->setVisible(false);
+    m_channelLabels[channel - 1]->setVisible(true);
 }
 
 } // namespace OpenMix

@@ -28,6 +28,9 @@ struct MixerConfig {
     int port = DEFAULT_PORT;
     int dcaCount = DEFAULT_DCA_COUNT;
 
+    [[nodiscard]] bool operator==(const MixerConfig& other) const;
+    [[nodiscard]] bool operator!=(const MixerConfig& other) const { return !(*this == other); }
+
     QJsonObject toJson() const;
     [[nodiscard]] static MixerConfig fromJson(const QJsonObject& json);
 };
@@ -90,7 +93,7 @@ class Show : public QObject {
     void applyCueZero(MixerProtocol* mixer) const { m_cueZero.apply(mixer); }
 
     [[nodiscard]] MixerConfig mixerConfig() const { return m_mixerConfig; }
-    void setMixerConfig(const MixerConfig& config) { m_mixerConfig = config; checkModifiedState(); }
+    void setMixerConfig(const MixerConfig& config);
 
     // ganged input-channel pairs; on fire a level applied to one channel is
     // mirrored to its partner. Show-level, shared across all cues.
@@ -123,6 +126,7 @@ class Show : public QObject {
   signals:
     void nameChanged(const QString& name);
     void modifiedChanged(bool modified);
+    void mixerConfigChanged();
 
   private:
     void connectCueListSignals();

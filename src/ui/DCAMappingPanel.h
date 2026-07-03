@@ -54,6 +54,16 @@ class DCAMappingPanel : public QWidget {
     void finishBusNameEdit(int bus);
     void cancelBusNameEdit(int bus);
 
+    // channel (actor) name editing
+    void startChannelNameEdit(int channel);
+    void finishChannelNameEdit(int channel);
+    void cancelChannelNameEdit(int channel);
+
+  signals:
+    // prev/next buttons: ask the cue list to move its selection, so the whole
+    // app follows via the normal cueSelected cascade
+    void adjacentCueRequested(int delta);
+
   protected:
     bool eventFilter(QObject* obj, QEvent* event) override;
 
@@ -79,6 +89,8 @@ class DCAMappingPanel : public QWidget {
 
     // UI elements
     QWidget* m_contextHeader;
+    QPushButton* m_prevCueButton = nullptr;
+    QPushButton* m_nextCueButton = nullptr;
     QLabel* m_contextLabel;
     QLabel* m_mappingStateLabel;
     QCheckBox* m_useCueMappingCheck;
@@ -98,6 +110,7 @@ class DCAMappingPanel : public QWidget {
     QGridLayout* m_channelLayout;
     QVector<QComboBox*> m_channelCombos;
     QVector<QLabel*> m_channelLabels;
+    QVector<QLineEdit*> m_channelNameEdits;
 
     QGroupBox* m_busGroup;
     QGridLayout* m_busLayout;

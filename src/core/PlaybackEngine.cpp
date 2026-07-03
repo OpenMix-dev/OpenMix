@@ -142,7 +142,7 @@ void PlaybackEngine::toggleChannelMute(int channel) {
         return;
     const bool muted = !m_channelMutes.value(channel, false);
     m_channelMutes[channel] = muted;
-    if (m_mixer)
+    if (m_mixer && m_mixer->isConnected())
         m_mixer->setChannelMute(channel, muted);
     emit channelMuteChanged(channel, muted);
 }
@@ -670,7 +670,7 @@ QSet<int> PlaybackEngine::allDCAs() const {
             dcas.insert(i);
         }
     } else {
-        for (int i = 1; i <= 8; ++i) {
+        for (int i = 1; i <= m_fallbackDcaCount; ++i) {
             dcas.insert(i);
         }
     }

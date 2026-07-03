@@ -67,7 +67,7 @@ const Actor* ActorProfileLibrary::resolveActor(const QString& text) const {
     const Actor* byRole = nullptr;
     const Actor* byName = nullptr;
     for (const Actor& a : m_actors) {
-        if (needle.compare(a.role(), Qt::CaseInsensitive) == 0 && better(&a, byRole))
+        if (!a.matchedRole(needle).isEmpty() && better(&a, byRole))
             byRole = &a;
         if (needle.compare(a.name(), Qt::CaseInsensitive) == 0 && better(&a, byName))
             byName = &a;
@@ -78,7 +78,8 @@ const Actor* ActorProfileLibrary::resolveActor(const QString& text) const {
 QStringList ActorProfileLibrary::completionCandidates() const {
     QStringList candidates;
     for (const Actor& a : m_actors) {
-        for (const QString& text : {a.role(), a.name()}) {
+        const QStringList texts = a.roles() + QStringList{a.name()};
+        for (const QString& text : texts) {
             if (!text.isEmpty() && !candidates.contains(text, Qt::CaseInsensitive))
                 candidates.append(text);
         }

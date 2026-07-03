@@ -15,6 +15,7 @@ class QGroupBox;
 class QScrollArea;
 class QStringListModel;
 class QVBoxLayout;
+class QGridLayout;
 class QTableWidget;
 
 namespace OpenMix {
@@ -23,6 +24,7 @@ class Application;
 class ActorProfileLibrary;
 class Cue;
 class CollapsibleSection;
+class DCAOverrideStrip;
 
 class CueEditor : public QWidget {
     Q_OBJECT
@@ -68,10 +70,13 @@ class CueEditor : public QWidget {
     void onGangsChanged();
     void onCheckModeToggled(bool checked);
     void onEngineCheckModeChanged(bool enabled);
+    void onDcaCountChanged(int count);
 
   private:
     void setupUi();
     void createDCATargetingSection();
+    void rebuildDcaTargetChecks(int count);
+    void rebuildDcaOverrideStrips(int count);
     void createFadeSection();
     void createChannelProfilesSection();
     void createFxMutesSection();
@@ -131,23 +136,18 @@ class CueEditor : public QWidget {
     CollapsibleSection* m_channelProfilesGroup = nullptr;
     QTableWidget* m_channelTable = nullptr;
 
-    // DCA targeting widgets
+    // DCA targeting widgets (rebuilt when the effective DCA count changes)
     CollapsibleSection* m_dcaTargetingGroup = nullptr;
     QCheckBox* m_targetAllDCAsCheck;
+    QGridLayout* m_dcaTargetGrid = nullptr;
     QVector<QCheckBox*> m_dcaTargetChecks;
 
-    // DCA overrides (mute/label per DCA)
+    // DCA overrides (mute/label per DCA), one strip per DCA
     CollapsibleSection* m_dcaOverridesGroup = nullptr;
-    struct DCAOverrideWidgets {
-        QCheckBox* enableMute;
-        QCheckBox* muteValue;
-        QCheckBox* enableLabel;
-        QLineEdit* labelValue;
-        QLabel* assignInfo;
-    };
-    QVector<DCAOverrideWidgets> m_dcaOverrideWidgets;
+    QVBoxLayout* m_dcaOverridesContentLayout = nullptr;
+    QVector<DCAOverrideStrip*> m_dcaOverrideStrips;
 
-    // role/actor names offered while typing a DCA label; shared by all 8 fields
+    // role/actor names offered while typing a DCA label; shared by all fields
     QStringListModel* m_actorCompletionModel = nullptr;
 };
 

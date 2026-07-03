@@ -21,6 +21,11 @@ MixerConfig MixerConfig::fromJson(const QJsonObject& json) {
     return config;
 }
 
+bool MixerConfig::operator==(const MixerConfig& other) const {
+    return type == other.type && host == other.host && port == other.port &&
+           dcaCount == other.dcaCount;
+}
+
 Show::Show(QObject* parent)
     : QObject(parent), m_cueList(this), m_dcaMapping(this), m_actorProfileLibrary(this),
       m_positionLibrary(this), m_ensembleLibrary(this), m_cueZero(this), m_spareBackup(this),
@@ -43,6 +48,14 @@ void Show::setName(const QString& name) {
         emit nameChanged(name);
         setModified(true);
     }
+}
+
+void Show::setMixerConfig(const MixerConfig& config) {
+    if (config == m_mixerConfig)
+        return;
+    m_mixerConfig = config;
+    emit mixerConfigChanged();
+    checkModifiedState();
 }
 
 bool Show::isModified() const { return m_isDirty; }
@@ -149,11 +162,13 @@ void Show::newShow() {
     m_consoleNameCache.clear();
     m_channelGangs.clear();
     m_isDirty = false;
+    // same "project (re)loaded" hook fromJson fires, so sinks reset to defaults
+    emit nameChanged(m_name);
 }
 
 QJsonObject Show::toJson() const {
     QJsonObject json;
-    json["version"] = "1.8"; // 1.8: actor roles
+    json["version"] = "1.9"; // 1.9: multiple roles per actor
     json["name"] = m_name;
     json["author"] = m_author;
     json["designer"] = m_designer;

@@ -64,7 +64,7 @@ class TestTmixImport : public QObject {
         QCOMPARE(show.actorProfileLibrary()->actors().first().name(), QString("Alice"));
         QCOMPARE(show.actorProfileLibrary()->actors().first().channel(), 3);
         // 'Vox' labels a two-channel DCA: a group name, never a role
-        QVERIFY(show.actorProfileLibrary()->actors().first().role().isEmpty());
+        QVERIFY(show.actorProfileLibrary()->actors().first().roles().isEmpty());
     }
 
     void testRoleBackfillFromCueDcaLabels() {
@@ -102,9 +102,9 @@ class TestTmixImport : public QObject {
         QVERIFY2(importer.import(path, &show, &err, &summary), qPrintable(err));
 
         const ActorProfileLibrary* lib = show.actorProfileLibrary();
-        QCOMPARE(lib->actorForChannel(3)->role(), QString("Cosette"));
-        QVERIFY(lib->actorForChannel(4)->role().isEmpty());
-        QVERIFY(lib->actorForChannel(5)->role().isEmpty());
+        QCOMPARE(lib->actorForChannel(3)->roles(), QStringList({"Cosette"}));
+        QVERIFY(lib->actorForChannel(4)->roles().isEmpty());
+        QVERIFY(lib->actorForChannel(5)->roles().isEmpty());
         QCOMPARE(summary.rolesInferred, 1);
         QCOMPARE(summary.actors, 3);
         QCOMPARE(summary.cues, 2);

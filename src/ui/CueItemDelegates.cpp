@@ -1,10 +1,12 @@
 #include "CueItemDelegates.h"
+#include "core/ActorProfileLibrary.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
 #include "theme/Theme.h"
 
 #include <QAbstractItemView>
 #include <QApplication>
+#include <QCompleter>
 #include <QDoubleValidator>
 #include <QKeyEvent>
 #include <QLineEdit>
@@ -248,6 +250,78 @@ bool CueTypeDelegate::eventFilter(QObject* object, QEvent* event) {
             if (m_currentEditIndex.isValid()) {
                 bool forward = (keyEvent->key() == Qt::Key_Tab);
                 // emit navigation signal - view will handle closing the editor
+                emit tabNavigationRequested(m_currentEditIndex, forward);
+                return true;
+            }
+        }
+    }
+    return QStyledItemDelegate::eventFilter(object, event);
+}
+
+DCAAssignDelegate::DCAAssignDelegate(ActorProfileLibrary* library, QObject* parent)
+    : QStyledItemDelegate(parent), m_library(library) {}
+
+void DCAAssignDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
+                              const QModelIndex& index) const {
+    QStyleOptionViewItem opt = option;
+    opt.state &= ~QStyle::State_HasFocus;
+
+    QVariant bgData = index.data(Qt::BackgroundRole);
+    if (bgData.isValid()) {
+        opt.state &= ~QStyle::State_Selected;
+        painter->fillRect(opt.rect, bgData.value<QBrush>());
+        opt.backgroundBrush = bgData.value<QBrush>();
+    }
+
+    QStyledItemDelegate::paint(painter, opt, index);
+}
+
+QWidget* DCAAssignDelegate::createEditor(QWidget* parent,
+                                         [[maybe_unused]] const QStyleOptionViewItem& option,
+                                         const QModelIndex& index) const {
+    m_currentEditIndex = index;
+
+    QLineEdit* editor = new QLineEdit(parent);
+    editor->setFrame(false);
+    editor->setFocusPolicy(Qt::StrongFocus);
+    editor->setPlaceholderText(tr("Role, actor, or label"));
+    if (m_library) {
+        // fresh completer per edit so the candidates are always current
+        auto* completer = new QCompleter(m_library->completionCandidates(), editor);
+        completer->setCaseSensitivity(Qt::CaseInsensitive);
+        completer->setCompletionMode(QCompleter::PopupCompletion);
+        editor->setCompleter(completer);
+    }
+    editor->installEventFilter(const_cast<DCAAssignDelegate*>(this));
+
+    return editor;
+}
+
+void DCAAssignDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const {
+    QString value = index.model()->data(index, Qt::EditRole).toString();
+    QLineEdit* lineEdit = static_cast<QLineEdit*>(editor);
+    lineEdit->setText(value);
+    lineEdit->selectAll();
+}
+
+void DCAAssignDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
+                                     const QModelIndex& index) const {
+    QLineEdit* lineEdit = static_cast<QLineEdit*>(editor);
+    model->setData(index, lineEdit->text(), Qt::EditRole);
+}
+
+void DCAAssignDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option,
+                                             [[maybe_unused]] const QModelIndex& index) const {
+    editor->setGeometry(option.rect);
+}
+
+bool DCAAssignDelegate::eventFilter(QObject* object, QEvent* event) {
+    if (event->type() == QEvent::KeyPress) {
+        QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
+        if (keyEvent->key() == Qt::Key_Tab || keyEvent->key() == Qt::Key_Backtab) {
+            if (auto* editor = qobject_cast<QWidget*>(object);
+                editor && m_currentEditIndex.isValid()) {
+                bool forward = (keyEvent->key() == Qt::Key_Tab);
                 emit tabNavigationRequested(m_currentEditIndex, forward);
                 return true;
             }

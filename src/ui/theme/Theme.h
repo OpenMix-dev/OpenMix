@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QColor>
+#include <optional>
 #include <QFont>
 #include <QString>
 
@@ -158,6 +159,12 @@ QColor color(const char* themeColor);
 
 QColor withAlpha(const char* themeColor, int alpha);
 QColor withAlpha(const QColor& color, int alpha);
+
+// shared mute-button look: true = muted red, false = force-unmute green,
+// nullopt = inert/neutral. The mixer-feedback DCA strips use red/inert; the
+// cue DCA override strips use all three — one definition keeps the two
+// surfaces visually in sync.
+QString muteButtonStyle(const std::optional<bool>& muted);
 
 QFont monoFont(int size = Font::SizeBase);
 

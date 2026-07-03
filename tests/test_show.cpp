@@ -58,6 +58,32 @@ class TestShow : public QObject {
         QCOMPARE(spy.count(), 1);
     }
 
+    void setMixerConfig_identicalConfig_isNoOp() {
+        Show show;
+        MixerConfig config = show.mixerConfig();
+        QSignalSpy changed(&show, &Show::mixerConfigChanged);
+        QSignalSpy modified(&show, &Show::modifiedChanged);
+
+        show.setMixerConfig(config); // same values -> no dirty, no signal
+        QVERIFY(!show.isModified());
+        QCOMPARE(changed.count(), 0);
+        QCOMPARE(modified.count(), 0);
+
+        config.type = "cl5";
+        show.setMixerConfig(config);
+        QCOMPARE(changed.count(), 1);
+        QVERIFY(show.isModified());
+    }
+
+    void mixerConfig_roundTripsDcaCount() {
+        MixerConfig config;
+        config.type = "wing";
+        config.dcaCount = 24;
+        const MixerConfig loaded = MixerConfig::fromJson(config.toJson());
+        QVERIFY(loaded == config);
+        QCOMPARE(loaded.dcaCount, 24);
+    }
+
     void setFilePath_doesNotMarkDirty() {
         Show show;
         QVERIFY(!show.isModified());

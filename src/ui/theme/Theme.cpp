@@ -93,5 +93,19 @@ QFont uiFont(int size, int weight) {
     return font;
 }
 
+QString muteButtonStyle(const std::optional<bool>& muted) {
+    if (muted.has_value() && *muted) {
+        return QString("QPushButton { background-color: %1; color: white; font-weight: bold; }")
+            .arg(Colors::AccentRed);
+    }
+    if (muted.has_value()) {
+        return QString("QPushButton { background-color: %1; color: #131416; font-weight: bold; }")
+            .arg(Colors::AccentGreen);
+    }
+    return QString("QPushButton { background-color: %1; color: %2; }")
+        .arg(Colors::BgActive)
+        .arg(Colors::TextSecondary);
+}
+
 } // namespace Theme
 } // namespace OpenMix

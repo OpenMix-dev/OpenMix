@@ -8,6 +8,7 @@ namespace OpenMix {
 class CueList;
 class Cue;
 class DCAMapping;
+class ActorProfileLibrary;
 
 class CueTableModel : public QAbstractTableModel {
     Q_OBJECT
@@ -48,6 +49,9 @@ class CueTableModel : public QAbstractTableModel {
 
     // show-level DCA→channel mapping, used to fill per-DCA fx/pos columns
     void setDcaMapping(DCAMapping* mapping) { m_dcaMapping = mapping; }
+    // cast library: resolves DCA assignment cells to "Actor (Role)" for display
+    // and routes typed labels to channel assignments on edit
+    void setActorLibrary(ActorProfileLibrary* library) { m_actorLibrary = library; }
 
     explicit CueTableModel(CueList* cueList, QObject* parent = nullptr);
 
@@ -102,6 +106,7 @@ class CueTableModel : public QAbstractTableModel {
     int m_standbyIndex = -1;
     int m_dcaCount = 8;
     DCAMapping* m_dcaMapping = nullptr;
+    ActorProfileLibrary* m_actorLibrary = nullptr;
 
     static const QString s_mimeType;
 };
