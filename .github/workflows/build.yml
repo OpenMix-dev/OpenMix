@@ -338,5 +338,7 @@ jobs:
             echo "::warning::OPENMIX_SITE_DISPATCH_TOKEN not set; site not rebuilt (downloads page stays on previous release)"
             exit 0
           fi
-          gh workflow run deploy.yml -R johnqherman/openmix.dev || \
+          # --ref is required: the Actions-scoped PAT cannot resolve the
+          # default branch on its own
+          gh workflow run deploy.yml -R johnqherman/openmix.dev --ref master || \
             echo "::warning::site rebuild dispatch failed"
