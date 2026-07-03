@@ -334,3 +334,18 @@ jobs:
           # prune download/ to the newest 5 release dirs (version-sorted)
           ssh -i ~/.ssh/deploy "${SSH_USER}@${SSH_HOST}" \
             "cd '${DEPLOY_PATH}/download' && ls -1d v*/ 2>/dev/null | sed 's:/*\$::' | sort -V | head -n -5 | xargs -r rm -rf --"
+
+      # the site bakes release data (downloads table, past releases) at build
+      # time, so rebuild it whenever a release ships. Needs a fine-grained PAT
+      # with Actions write on openmix.dev in OPENMIX_SITE_DISPATCH_TOKEN;
+      # non-fatal so a missing token never blocks a release.
+      - name: Rebuild openmix.dev
+        env:
+          GH_TOKEN: ${{ secrets.OPENMIX_SITE_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::OPENMIX_SITE_DISPATCH_TOKEN not set; site not rebuilt (downloads page stays on previous release)"
+            exit 0
+          fi
+          gh workflow run deploy.yml -R johnqherman/openmix.dev || \
+            echo "::warning::site rebuild dispatch failed"
