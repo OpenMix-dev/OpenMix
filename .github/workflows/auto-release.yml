@@ -1,0 +1,64 @@
+name: Auto Release
+
+# Merging a branch named vX.Y.Z into master tags the merge commit and kicks
+# off the tag-gated release pipeline in build.yml. The Build run is dispatched
+# explicitly because tags pushed with GITHUB_TOKEN never trigger on-push
+# workflows.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [master]
+
+jobs:
+  tag-and-release:
+    if: github.event.pull_request.merged == true &&
+        startsWith(github.event.pull_request.head.ref, 'v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: write
+    env:
+      TAG: ${{ github.event.pull_request.head.ref }}
+      MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+    steps:
+      - name: Validate release branch name
+        id: check
+        run: |
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Branch '$TAG' is not vX.Y.Z; skipping release"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.check.outputs.release == 'true'
+        with:
+          ref: ${{ env.MERGE_SHA }}
+
+      # same guard as build.yml: a tag that disagrees with project(VERSION)
+      # would bake the wrong version into every artifact
+      - name: Check branch matches project version
+        if: steps.check.outputs.release == 'true'
+        run: |
+          VER=$(sed -n 's/^ *VERSION \([0-9.]*\)$/\1/p' CMakeLists.txt | head -1)
+          if [ "${TAG#v}" != "$VER" ]; then
+            echo "::error::Branch ${TAG} != project VERSION ${VER} in CMakeLists.txt"
+            exit 1
+          fi
+
+      - name: Create and push tag
+        if: steps.check.outputs.release == 'true'
+        run: |
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            echo "::error::Tag ${TAG} already exists"
+            exit 1
+          fi
+          git tag "$TAG" "$MERGE_SHA"
+          git push origin "refs/tags/${TAG}"
+
+      - name: Dispatch release build
+        if: steps.check.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build.yml --ref "refs/tags/${TAG}" -R "$GITHUB_REPOSITORY"

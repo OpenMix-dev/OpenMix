@@ -6,6 +6,9 @@ on:
     tags: ["v*"]
   pull_request:
     branches: [master]
+  # auto-release.yml dispatches this on the tag it creates (GITHUB_TOKEN tag
+  # pushes never fire the on-push trigger)
+  workflow_dispatch:
 
 jobs:
   build-linux:
