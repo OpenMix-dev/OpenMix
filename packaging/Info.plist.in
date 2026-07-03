@@ -30,8 +30,6 @@
     <true/>
     <key>SUAutomaticallyUpdate</key>
     <true/>
-    <!-- EdDSA public key; must match the OPENMIX_SPARKLE_ED_PRIVATE_KEY signing
-         secret used by CI (see docs/AUTOUPDATE.md). -->
     <key>SUPublicEDKey</key>
     <string>Th9esMBuKy6nRfgTeOA7eeUr5Ms3fBaGtLZFI5hyH7c=</string>
 </dict>

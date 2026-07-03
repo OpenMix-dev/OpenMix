@@ -6,6 +6,9 @@ on:
     tags: ["v*"]
   pull_request:
     branches: [master]
+  # auto-release.yml dispatches this on the tag it creates (GITHUB_TOKEN tag
+  # pushes never fire the on-push trigger)
+  workflow_dispatch:
 
 jobs:
   build-linux:
@@ -94,8 +97,6 @@ jobs:
         run: choco install nsis -y
 
       - name: Set up MSVC
-        # still node20 upstream (no node24 release as of v1.13.0); the runner
-        # force-runs it on node24, which works but logs a deprecation warning
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
@@ -128,20 +129,14 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: OpenMix-windows
-          # explicit patterns so the raw build/OpenMix.exe binary isn't shipped
           path: |
             build/OpenMix-*-win64.exe
             build/OpenMix-*-win64.zip
 
   build-macos:
-    # pinned: macos-latest is migrating to macOS 26 (June 2026); keep the
-    # known-good image for the universal Qt build until 26 is validated
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
-
-      # runner image ships untrusted third-party taps (aws/tap) that make
-      # every brew call (incl. ccache-action's) log a tap-trust warning
       - name: Remove untrusted brew taps
         run: brew untap aws/tap 2>/dev/null || true
 
@@ -180,8 +175,6 @@ jobs:
             -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
 
       - name: Build
-        # cap parallelism: full -j exhausts the 7GB arm64 runner on Qt PCH
-        # (cc1plus), starving/killing the runner ("lost communication")
         run: cmake --build build --config Release --parallel 2
 
       - name: Test
@@ -222,10 +215,6 @@ jobs:
             OpenMix-windows/*
             OpenMix-macos/*
 
-  # generate the Sparkle/WinSparkle appcasts + installer tree and rsync them to
-  # the openmix.dev VPS. Requires a Sparkle EdDSA private key in
-  # OPENMIX_SPARKLE_ED_PRIVATE_KEY and OPENMIX_DEPLOY_* SSH secrets
-  # (see docs/AUTOUPDATE.md).
   appcast:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [release]
@@ -254,7 +243,6 @@ jobs:
           mkdir -p site/download/${TAG}
           cp OpenMix-macos/* OpenMix-windows/* OpenMix-linux/* site/download/${TAG}/ 2>/dev/null || true
 
-          # macOS: sign the DMG with Sparkle's EdDSA key and emit a full appcast
           SIGN=$(find /opt/homebrew /usr/local -name sign_update -type f 2>/dev/null | head -1)
           DMG=$(ls OpenMix-macos/*.dmg | head -1)
           if [ -n "$SPARKLE_KEY" ] && [ -n "$SIGN" ] && [ -n "$DMG" ]; then
@@ -277,7 +265,8 @@ jobs:
             echo "::warning::No Sparkle key/tool/DMG; skipping macOS appcast (updates will not verify)"
           fi
 
-          # Windows: WinSparkle RSS appcast
+          # legacy feed: pre-1.0.1 clients still run WinSparkle and need this
+          # appcast to reach the first WinSparkle-free build
           EXE=$(ls OpenMix-windows/*.exe | head -1)
           if [ -n "$EXE" ]; then
             cat > site/appcast-windows.xml <<EOF
@@ -294,13 +283,19 @@ jobs:
           EOF
           fi
 
-          # Linux notify-fallback: tiny JSON polled by UpdateChecker
-          cat > site/latest.json <<EOF
+          # the in-app updater (UpdateChecker) reads latest.json; the installer
+          # url + sha256 drive the Windows download-and-install flow
+          if [ -n "$EXE" ]; then
+            EXE_SHA256=$(shasum -a 256 "$EXE" | cut -d' ' -f1)
+            cat > site/latest.json <<EOF
+          {"tag_name": "${TAG}", "html_url": "https://openmix.dev/download", "windows_installer_url": "${BASE}/$(basename "$EXE")", "windows_installer_sha256": "${EXE_SHA256}"}
+          EOF
+          else
+            cat > site/latest.json <<EOF
           {"tag_name": "${TAG}", "html_url": "https://openmix.dev/download"}
           EOF
+          fi
 
-          # download landing page: nginx autoindex is off, so /download/
-          # 403s without an index.html. list the current release's files.
           {
             echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
             echo '<meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -335,10 +330,6 @@ jobs:
           ssh -i ~/.ssh/deploy "${SSH_USER}@${SSH_HOST}" \
             "cd '${DEPLOY_PATH}/download' && ls -1d v*/ 2>/dev/null | sed 's:/*\$::' | sort -V | head -n -5 | xargs -r rm -rf --"
 
-      # the site bakes release data (downloads table, past releases) at build
-      # time, so rebuild it whenever a release ships. Needs a fine-grained PAT
-      # with Actions write on openmix.dev in OPENMIX_SITE_DISPATCH_TOKEN;
-      # non-fatal so a missing token never blocks a release.
       - name: Rebuild openmix.dev
         env:
           GH_TOKEN: ${{ secrets.OPENMIX_SITE_DISPATCH_TOKEN }}

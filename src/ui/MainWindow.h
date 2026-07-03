@@ -107,7 +107,6 @@ class MainWindow : public QMainWindow {
     void showQuickStart();
     void showFeatureGuide();
     void checkForUpdates();
-    void runGithubUpdateCheck(); // notify-and-link fallback (no silent updater)
     void showEditHistoryDialog();
     void exportCuesToCsv();
     void showChannelUtilizationDialog();

@@ -1,17 +1,24 @@
 #pragma once
 
 #include <QObject>
+#include <QPointer>
+
+class QWidget;
 
 namespace OpenMix {
 
+class UpdateDialog;
+struct UpdateInfo;
+
 // Cross-platform automatic updates.
-//   - Windows: WinSparkle (silent background check, download, install, relaunch)
-//   - macOS:   Sparkle    (same, via an Objective-C++ bridge)
-//   - Linux/other: falls back to a GitHub-release check that notifies and links
-//     to the download (no silent self-install; handled by MainWindow's checker)
+//   - Windows/Linux: checks the release feed daily and shows the app-styled
+//     UpdateDialog; on Windows it downloads the installer, quits the app, runs
+//     a silent install, and relaunches
+//   - macOS: Sparkle (via an Objective-C++ bridge), which is native there
 //
-// initialize() wires the framework and enables periodic background checks; call
-// it once at startup. checkForUpdatesNow() runs a user-triggered check with UI.
+// initialize() enables the periodic background checks; call it once at startup
+// with the main window (dialog parent, closed before installing).
+// checkForUpdatesNow() runs a user-triggered check with UI.
 class AutoUpdater : public QObject {
     Q_OBJECT
 
@@ -19,16 +26,19 @@ class AutoUpdater : public QObject {
     explicit AutoUpdater(QObject* parent = nullptr);
     ~AutoUpdater() override;
 
-    // true if a real self-updating framework is compiled in for this platform
-    [[nodiscard]] static bool hasSilentUpdates();
-
-    void initialize();
+    void initialize(QWidget* dialogParent);
     void checkForUpdatesNow();
 
-  signals:
-    // emitted only on platforms without a silent updater, so the UI can fall
-    // back to the notify-and-link checker
-    void manualCheckRequested();
+  private:
+#if !defined(Q_OS_MACOS)
+    void maybeScheduledCheck();
+    void runCheck(bool manual);
+    void showUpdateDialog(const UpdateInfo& info);
+    void launchInstallerAndQuit(const QString& installerPath);
+
+    QWidget* m_dialogParent = nullptr;
+    QPointer<UpdateDialog> m_dialog;
+#endif
 };
 
 } // namespace OpenMix

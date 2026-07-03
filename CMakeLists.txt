@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(OpenMix
-    VERSION 1.0.0
+    VERSION 1.0.1
     DESCRIPTION "Stage mixing software for live theatre that lets engineers program, automate, and run cues seamlessly across 30+ digital mixing consoles"
     LANGUAGES CXX
 )
@@ -157,6 +157,7 @@ set(SOURCES
     src/ui/ActiveCueInfoPanel.cpp
     src/ui/FxSetupDialog.cpp
     src/ui/WelcomeDialog.cpp
+    src/ui/UpdateDialog.cpp
     src/ui/HelpDialog.cpp
     src/ui/MarkerNotesDialog.cpp
     src/ui/PopOutWindow.cpp
@@ -370,40 +371,10 @@ target_link_libraries(${PROJECT_NAME} PRIVATE openmix_liblo)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE RtMidi)
 
-# --- auto-update frameworks (Windows = WinSparkle, macOS = Sparkle) ----------
-# Linux has no silent-update framework; AutoUpdater falls back to the notify-and
-# -link checker there, so nothing extra is linked.
-if(WIN32)
-    FetchContent_Declare(winsparkle
-        URL https://github.com/vslavik/winsparkle/releases/download/v0.8.1/WinSparkle-0.8.1.zip)
-    FetchContent_MakeAvailable(winsparkle)
-    # the 0.8.1 zip layout (nesting, x64/Release/ subdir) is fragile; glob for the
-    # header, x64 lib, and x64 dll so the exact structure can't break the build
-    file(GLOB_RECURSE _ws_hdrs "${winsparkle_SOURCE_DIR}/*winsparkle.h")
-    file(GLOB_RECURSE _ws_libs "${winsparkle_SOURCE_DIR}/*WinSparkle.lib")
-    file(GLOB_RECURSE _ws_dlls "${winsparkle_SOURCE_DIR}/*WinSparkle.dll")
-    list(GET _ws_hdrs 0 _ws_hdr)
-    get_filename_component(WINSPARKLE_INCLUDE ${_ws_hdr} DIRECTORY)
-    foreach(f ${_ws_libs})
-        if(f MATCHES "x64")
-            set(WINSPARKLE_LIB ${f})
-        endif()
-    endforeach()
-    foreach(f ${_ws_dlls})
-        if(f MATCHES "x64")
-            set(WINSPARKLE_DLL ${f})
-        endif()
-    endforeach()
-    if(NOT WINSPARKLE_INCLUDE OR NOT WINSPARKLE_LIB OR NOT WINSPARKLE_DLL)
-        message(FATAL_ERROR "WinSparkle header/x64 lib/dll not found under ${winsparkle_SOURCE_DIR}")
-    endif()
-    target_include_directories(${PROJECT_NAME} PRIVATE ${WINSPARKLE_INCLUDE})
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${WINSPARKLE_LIB})
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${WINSPARKLE_DLL} $<TARGET_FILE_DIR:${PROJECT_NAME}>)
-    install(FILES ${WINSPARKLE_DLL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-elseif(APPLE)
+# --- auto-update framework (macOS = Sparkle) ---------------------------------
+# Windows and Linux use the in-app updater (UpdateChecker + UpdateDialog), so
+# nothing extra is linked there.
+if(APPLE)
     FetchContent_Declare(sparkle
         URL https://github.com/sparkle-project/Sparkle/releases/download/2.6.4/Sparkle-2.6.4.tar.xz)
     FetchContent_MakeAvailable(sparkle)

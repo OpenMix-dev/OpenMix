@@ -27,7 +27,6 @@
 #include "SettingsDialog.h"
 #include "app/Application.h"
 #include "app/AutoUpdater.h"
-#include "app/UpdateChecker.h"
 #include "app/QLabClient.h"
 #include "core/AppLogger.h"
 #include "core/CueList.h"
@@ -62,7 +61,6 @@
 #include <QPlainTextEdit>
 #include <QTextEdit>
 #include <QToolButton>
-#include <QDesktopServices>
 #include <QMessageBox>
 #include <QTextStream>
 #include <QUndoView>
@@ -99,11 +97,9 @@ MainWindow::MainWindow(Application* app, QWidget* parent) : QMainWindow(parent),
     updateActions();
     updateTitle();
 
-    // silent auto-updates; on Linux this falls back to the notify-and-link check
+    // silent auto-updates (daily background check + app-styled update dialog)
     m_autoUpdater = new AutoUpdater(this);
-    m_autoUpdater->initialize();
-    connect(m_autoUpdater, &AutoUpdater::manualCheckRequested, this,
-            &MainWindow::runGithubUpdateCheck);
+    m_autoUpdater->initialize(this);
 }
 
 MainWindow::~MainWindow() { saveSettings(); }
@@ -427,9 +423,10 @@ void MainWindow::createActions() {
         QMessageBox::about(
             this, tr("About OpenMix"),
             tr("<h3>OpenMix</h3>"
-               "<p>Version 0.1.0</p>"
+               "<p>Version %1</p>"
                "<p>Stage mixing software for live theatre that lets engineers program, "
-               "automate, and run cues seamlessly across 30+ digital mixing consoles.</p>"));
+               "automate, and run cues seamlessly across 30+ digital mixing consoles.</p>")
+                .arg(QCoreApplication::applicationVersion()));
     });
 }
 
@@ -1554,39 +1551,7 @@ void MainWindow::showQuickStart() {
     dialog.exec();
 }
 
-void MainWindow::checkForUpdates() {
-    // hand off to the silent updater (WinSparkle/Sparkle); on Linux it signals
-    // back via manualCheckRequested to run the notify-and-link check below
-    m_autoUpdater->checkForUpdatesNow();
-}
-
-void MainWindow::runGithubUpdateCheck() {
-    statusBar()->showMessage(tr("Checking for updates..."), 3000);
-    auto* checker = new UpdateChecker(this);
-    connect(checker, &UpdateChecker::updateAvailable, this,
-            [this, checker](const QString& version, const QString& url) {
-                checker->deleteLater();
-                const auto choice = QMessageBox::question(
-                    this, tr("Update Available"),
-                    tr("OpenMix %1 is available (you have %2).\n\nOpen the download page?")
-                        .arg(version, QCoreApplication::applicationVersion()),
-                    QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
-                if (choice == QMessageBox::Yes)
-                    QDesktopServices::openUrl(QUrl(url));
-            });
-    connect(checker, &UpdateChecker::upToDate, this, [this, checker]() {
-        checker->deleteLater();
-        QMessageBox::information(this, tr("Up to Date"),
-                                 tr("You are running the latest version (%1).")
-                                     .arg(QCoreApplication::applicationVersion()));
-    });
-    connect(checker, &UpdateChecker::checkFailed, this, [this, checker](const QString& error) {
-        checker->deleteLater();
-        QMessageBox::warning(this, tr("Update Check Failed"),
-                             tr("Could not check for updates:\n%1").arg(error));
-    });
-    checker->checkForUpdates();
-}
+void MainWindow::checkForUpdates() { m_autoUpdater->checkForUpdatesNow(); }
 
 void MainWindow::showFeatureGuide() {
     const QString html = tr(

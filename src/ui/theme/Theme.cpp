@@ -6,8 +6,6 @@
 namespace OpenMix {
 namespace Theme {
 
-// Booth-friendly overrides: pure-white text, brighter borders and gridlines so
-// the UI stays legible from a distance in a darkened room.
 static QString highContrastOverrides() {
     return QString(R"QSS(
 QWidget { color: #ffffff; }
