@@ -549,7 +549,7 @@ void DCAMappingPanel::updateComboItemStates() {
         if (dca > 0) {
             label->setText(tr("%1 [%2]").arg(display).arg(dca));
             label->setStyleSheet(assignedStyle);
-            label->setToolTip(tr("%1 — assigned to DCA %2, locked from other DCAs; "
+            label->setToolTip(tr("%1: assigned to DCA %2, locked from other DCAs; "
                                  "double-click to rename")
                                   .arg(display)
                                   .arg(dca));
@@ -557,7 +557,7 @@ void DCAMappingPanel::updateComboItemStates() {
             label->setText(display);
             label->setStyleSheet("");
             label->setToolTip(
-                tr("%1 — not assigned to any DCA; double-click to rename").arg(display));
+                tr("%1: not assigned to any DCA; double-click to rename").arg(display));
         }
     }
 
@@ -960,9 +960,9 @@ QString DCAMappingPanel::channelDisplayName(int channel) const {
         (m_app && m_app->show()) ? m_app->show()->actorProfileLibrary() : nullptr;
     const Actor* actor = library ? library->actorForChannel(channel) : nullptr;
     if (actor && !actor->primaryRole().isEmpty())
-        return tr("Ch %1 — %2 (%3)").arg(channel).arg(actor->name(), actor->primaryRole());
+        return tr("Ch %1: %2 (%3)").arg(channel).arg(actor->name(), actor->primaryRole());
     if (actor && !actor->name().isEmpty())
-        return tr("Ch %1 — %2").arg(channel).arg(actor->name());
+        return tr("Ch %1: %2").arg(channel).arg(actor->name());
     return tr("Ch %1").arg(channel);
 }
 
@@ -986,7 +986,7 @@ void DCAMappingPanel::updateDcaOverview() {
         if (m_currentCue) {
             const QString label = m_currentCue->dcaOverride(d).label.value_or(QString());
             if (!label.isEmpty())
-                titleText += QString(" — %1").arg(label);
+                titleText += QString(": %1").arg(label);
         }
         title->setText(titleText);
 

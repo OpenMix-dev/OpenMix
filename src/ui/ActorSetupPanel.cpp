@@ -439,7 +439,7 @@ void ActorSetupPanel::setupUi() {
     auto* listButtons = new QHBoxLayout();
     m_addActorBtn = new QPushButton(Icons::listAdd(), tr("Add"), left);
     m_addActorsBtn = new QPushButton(Icons::listAdd(), tr("Add Multiple..."), left);
-    m_addActorsBtn->setToolTip(tr("Add several actors at once — paste a cast list, one per line"));
+    m_addActorsBtn->setToolTip(tr("Add several actors at once: paste a cast list, one per line"));
     m_removeActorBtn = new QPushButton(Icons::listRemove(), tr("Remove"), left);
     m_moveUpBtn = new QPushButton(Icons::moveUp(), QString(), left);
     m_moveUpBtn->setToolTip(tr("Move actor up"));
@@ -520,7 +520,7 @@ void ActorSetupPanel::setupUi() {
     auto* slotBox = new QGroupBox(tr("Voice Profile Slots (shared by all actors)"), m_editor);
     auto* slotBoxLayout = new QVBoxLayout(slotBox);
     auto* slotHint = new QLabel(
-        tr("Slots are show-wide voice categories (e.g. \"Main\", \"Cold Day\") — not per-actor "
+        tr("Slots are show-wide voice categories (e.g. \"Main\", \"Cold Day\"), not per-actor "
            "mic names. Adding a slot adds it for every actor; the EQ/dynamics below are this "
            "actor's own settings for the selected slot."),
         slotBox);
@@ -741,7 +741,7 @@ void ActorSetupPanel::addActors() {
     bool ok = false;
     const QString text = QInputDialog::getMultiLineText(
         this, tr("Add Multiple Actors"),
-        tr("One actor per line. Optionally add roles after a tab — pasting Name and "
+        tr("One actor per line. Optionally add roles after a tab; pasting Name and "
            "Role columns from a spreadsheet works."),
         QString(), &ok);
     if (!ok)

@@ -1079,7 +1079,7 @@ void MainWindow::importTmixShow() {
     // explain how TheatreMix concepts landed in OpenMix
     QString rolesLine;
     if (summary.rolesInferred > 0) {
-        rolesLine = tr("<li><b>%1 role(s)</b> were inferred from cue DCA labels — review them "
+        rolesLine = tr("<li><b>%1 role(s)</b> were inferred from cue DCA labels; review them "
                        "in Actor Setup (F9).</li>")
                         .arg(summary.rolesInferred);
     }
@@ -1093,10 +1093,10 @@ void MainWindow::importTmixShow() {
            "DCA slot assigns their channel to that DCA.</li>"
            "%5"
            "<li>TheatreMix <b>profiles</b> (%6) became <b>voice profile slots</b>: show-wide "
-           "voice categories shared by every actor — not per-mic names. Each actor stores "
+           "voice categories shared by every actor, not per-mic names. Each actor stores "
            "their own EQ/dynamics per slot in Actor Setup.</li>"
            "<li>Cue <b>DCA labels and channel lists</b> became per-cue DCA label overrides "
-           "and cue-specific DCA mappings — see the DCA Mapping view (F5).</li>"
+           "and cue-specific DCA mappings; see the DCA Mapping view (F5).</li>"
            "</ul>")
             .arg(summary.actors)
             .arg(summary.cues)
