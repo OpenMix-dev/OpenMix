@@ -1,7 +1,3 @@
-// macOS Sparkle bridge for AutoUpdater. Compiled only on macOS.
-// Sparkle reads SUFeedURL / SUPublicEDKey / SUEnableAutomaticChecks from the
-// app bundle's Info.plist; this just owns the standard updater controller.
-
 #import <Sparkle/Sparkle.h>
 
 static SPUStandardUpdaterController* gUpdaterController = nil;

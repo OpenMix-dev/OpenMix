@@ -10,9 +10,16 @@
 namespace OpenMix {
 
 namespace {
-// small JSON published by CI: {"tag_name":"vX.Y.Z","html_url":"..."}
+// small JSON published by CI: {"tag_name":"vX.Y.Z","html_url":"...",
+// "windows_installer_url":"...","windows_installer_sha256":"..."}
 constexpr const char* kLatestReleaseApi = "https://openmix.dev/latest.json";
+
+QString feedUrl() {
+    // override for local testing against a fake feed
+    const QString env = qEnvironmentVariable("OPENMIX_UPDATE_FEED_URL");
+    return env.isEmpty() ? QString::fromLatin1(kLatestReleaseApi) : env;
 }
+} // namespace
 
 UpdateChecker::UpdateChecker(QObject* parent)
     : QObject(parent), m_net(new QNetworkAccessManager(this)) {}
@@ -37,7 +44,7 @@ bool UpdateChecker::isNewer(const QString& latest, const QString& current) {
 }
 
 void UpdateChecker::checkForUpdates() {
-    QNetworkRequest req{QUrl(kLatestReleaseApi)};
+    QNetworkRequest req{QUrl(feedUrl())};
     req.setHeader(QNetworkRequest::UserAgentHeader, "OpenMix");
     req.setRawHeader("Accept", "application/vnd.github+json");
 
@@ -56,12 +63,16 @@ void UpdateChecker::checkForUpdates() {
             return;
         }
 
-        QString url = obj.value("html_url").toString();
-        if (url.isEmpty())
-            url = "https://openmix.dev/download";
+        UpdateInfo info;
+        info.version = tag;
+        info.pageUrl = obj.value("html_url").toString();
+        if (info.pageUrl.isEmpty())
+            info.pageUrl = "https://openmix.dev/download";
+        info.installerUrl = obj.value("windows_installer_url").toString();
+        info.sha256 = obj.value("windows_installer_sha256").toString().toLower();
 
         if (isNewer(tag, QCoreApplication::applicationVersion()))
-            emit updateAvailable(tag, url);
+            emit updateAvailable(info);
         else
             emit upToDate();
     });

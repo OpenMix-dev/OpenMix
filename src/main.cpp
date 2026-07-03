@@ -14,8 +14,6 @@
 
 namespace OpenMix {
 
-// Show tooltips almost immediately and keep them up longer than the platform
-// default, so hovering an icon reveals its label without a long wait.
 class FastTooltipStyle : public QProxyStyle {
   public:
     using QProxyStyle::QProxyStyle;
