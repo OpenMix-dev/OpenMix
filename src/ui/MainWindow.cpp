@@ -423,9 +423,10 @@ void MainWindow::createActions() {
         QMessageBox::about(
             this, tr("About OpenMix"),
             tr("<h3>OpenMix</h3>"
-               "<p>Version 0.1.0</p>"
+               "<p>Version %1</p>"
                "<p>Stage mixing software for live theatre that lets engineers program, "
-               "automate, and run cues seamlessly across 30+ digital mixing consoles.</p>"));
+               "automate, and run cues seamlessly across 30+ digital mixing consoles.</p>")
+                .arg(QCoreApplication::applicationVersion()));
     });
 }
 
