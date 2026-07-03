@@ -1,13 +1,16 @@
 #pragma once
 
-#include <QDialog>
 #include <QPointer>
+#include <QWidget>
 
 class QVBoxLayout;
 
 namespace OpenMix {
 
-class PopOutWindow : public QDialog {
+// Floating tool window for pop-out panels. Deliberately a plain QWidget, not a
+// QDialog: dialog default-button handling turns Enter in any field into a
+// button click, and Escape into a hidden window.
+class PopOutWindow : public QWidget {
     Q_OBJECT
 
   public:
@@ -18,6 +21,8 @@ class PopOutWindow : public QDialog {
     void setContentWidget(QWidget* content);
     QWidget* contentWidget() const { return m_content; }
     void showAndRestore();
+    // visible to the user, not just mapped (a minimized window stays isVisible())
+    bool isEffectivelyVisible() const { return isVisible() && !isMinimized(); }
     void setMinimumContentSize(int width, int height);
     QString settingsKey() const { return m_settingsKey; }
     void setWindowTitle(const QString& title);
@@ -28,6 +33,7 @@ class PopOutWindow : public QDialog {
 
   protected:
     void closeEvent(QCloseEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
     void moveEvent(QMoveEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
     void showEvent(QShowEvent* event) override;

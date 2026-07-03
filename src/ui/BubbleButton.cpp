@@ -12,7 +12,6 @@ BubbleButton::BubbleButton(const QString& icon, const QString& tooltip, QWidget*
     : QPushButton(parent), m_iconText(icon) {
     setObjectName(Theme::ObjectNames::BubbleButton);
     setToolTip(tooltip);
-    setCheckable(true);
     setFixedSize(30, 30);
 
     QFont f = font();
@@ -26,7 +25,6 @@ BubbleButton::BubbleButton(const QIcon& icon, const QString& tooltip, QWidget* p
     : QPushButton(parent) {
     setObjectName(Theme::ObjectNames::BubbleButton);
     setToolTip(tooltip);
-    setCheckable(true);
     setFixedSize(30, 30);
     QPushButton::setIcon(icon);
     setIconSize(QSize(18, 18));

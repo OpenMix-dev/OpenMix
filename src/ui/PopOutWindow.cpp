@@ -2,6 +2,7 @@
 #include "theme/Theme.h"
 
 #include <QCloseEvent>
+#include <QKeyEvent>
 #include <QMoveEvent>
 #include <QResizeEvent>
 #include <QSettings>
@@ -10,12 +11,13 @@
 namespace OpenMix {
 
 PopOutWindow::PopOutWindow(const QString& settingsKey, const QString& title, QWidget* parent)
-    : QDialog(parent,
+    : QWidget(parent,
               Qt::Window | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint),
       m_settingsKey(settingsKey) {
     setObjectName(Theme::ObjectNames::PopOutWindow);
     setAttribute(Qt::WA_DeleteOnClose, false);
-    setModal(false);
+    // plain QWidgets only paint stylesheet backgrounds when asked
+    setAttribute(Qt::WA_StyledBackground, true);
 
     setupUi(title);
     loadGeometry();
@@ -37,7 +39,7 @@ void PopOutWindow::setupUi(const QString& title) {
 
     m_mainLayout->addWidget(m_contentContainer, 1);
 
-    QDialog::setWindowTitle(title);
+    QWidget::setWindowTitle(title);
 }
 
 void PopOutWindow::setContentWidget(QWidget* content) {
@@ -58,6 +60,9 @@ void PopOutWindow::showAndRestore() {
     if (!m_geometryLoaded) {
         loadGeometry();
     }
+    if (isMinimized()) {
+        setWindowState(windowState() & ~Qt::WindowMinimized);
+    }
     show();
     raise();
     activateWindow();
@@ -68,7 +73,7 @@ void PopOutWindow::setMinimumContentSize(int width, int height) {
 }
 
 void PopOutWindow::setWindowTitle(const QString& title) {
-    QDialog::setWindowTitle(title);
+    QWidget::setWindowTitle(title);
 }
 
 void PopOutWindow::closeEvent(QCloseEvent* event) {
@@ -78,18 +83,28 @@ void PopOutWindow::closeEvent(QCloseEvent* event) {
     hide();
 }
 
-void PopOutWindow::moveEvent(QMoveEvent* event) { QDialog::moveEvent(event); }
+void PopOutWindow::keyPressEvent(QKeyEvent* event) {
+    // Escape intentionally closes the tool window; it routes through
+    // closeEvent -> hide so visibility indicators stay in sync
+    if (event->key() == Qt::Key_Escape) {
+        close();
+        return;
+    }
+    QWidget::keyPressEvent(event);
+}
 
-void PopOutWindow::resizeEvent(QResizeEvent* event) { QDialog::resizeEvent(event); }
+void PopOutWindow::moveEvent(QMoveEvent* event) { QWidget::moveEvent(event); }
+
+void PopOutWindow::resizeEvent(QResizeEvent* event) { QWidget::resizeEvent(event); }
 
 void PopOutWindow::showEvent(QShowEvent* event) {
-    QDialog::showEvent(event);
+    QWidget::showEvent(event);
     emit visibilityChanged(true);
 }
 
 void PopOutWindow::hideEvent(QHideEvent* event) {
     saveGeometry();
-    QDialog::hideEvent(event);
+    QWidget::hideEvent(event);
     emit visibilityChanged(false);
 }
 
@@ -100,7 +115,7 @@ void PopOutWindow::saveGeometry() {
 
     QSettings settings("OpenMix", "OpenMix");
     settings.beginGroup("PopOutWindows");
-    settings.setValue(m_settingsKey + "/geometry", QDialog::saveGeometry());
+    settings.setValue(m_settingsKey + "/geometry", QWidget::saveGeometry());
     settings.endGroup();
 }
 
@@ -112,7 +127,7 @@ void PopOutWindow::loadGeometry() {
     settings.endGroup();
 
     if (!geometry.isEmpty()) {
-        QDialog::restoreGeometry(geometry);
+        QWidget::restoreGeometry(geometry);
     } else {
         resize(DEFAULT_WIDTH, DEFAULT_HEIGHT);
         if (parentWidget()) {

@@ -3,6 +3,7 @@ find_package(Qt6 REQUIRED COMPONENTS Test Network Widgets)
 add_executable(test_cue
     test_cue.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
 )
 target_link_libraries(test_cue PRIVATE
     Qt6::Core
@@ -507,3 +508,22 @@ add_executable(test_console_name_cache
 target_link_libraries(test_console_name_cache PRIVATE Qt6::Core Qt6::Test)
 target_include_directories(test_console_name_cache PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME ConsoleNameCacheTest COMMAND test_console_name_cache)
+
+add_executable(test_popout_window
+    test_popout_window.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/PopOutWindow.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/theme/Theme.cpp
+)
+target_link_libraries(test_popout_window PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
+target_include_directories(test_popout_window PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME PopOutWindowTest COMMAND test_popout_window)
+
+add_executable(test_bubble_button
+    test_bubble_button.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/BubbleButton.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/BubbleBar.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/theme/Theme.cpp
+)
+target_link_libraries(test_bubble_button PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
+target_include_directories(test_bubble_button PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME BubbleButtonTest COMMAND test_bubble_button)

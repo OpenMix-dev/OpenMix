@@ -885,7 +885,7 @@ QDialog {
     background-color: #1e2024;
 }
 
-QDialog#PopOutWindow {
+QWidget#PopOutWindow {
     background-color: #1e2024;
     border: 1px solid #3d4451;
     border-radius: 8px;
@@ -965,7 +965,6 @@ QPushButton#BubbleButton:pressed {
     background-color: #363b44;
 }
 
-QPushButton#BubbleButton:checked,
 QPushButton#BubbleButton[active="true"] {
     background-color: rgba(59, 130, 246, 0.2);
     color: #60a5fa;
