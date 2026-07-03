@@ -11,7 +11,7 @@ jobs:
   build-linux:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install non-Qt dependencies
         run: |
@@ -27,7 +27,7 @@ jobs:
           arch: "linux_gcc_64"
 
       - name: ccache
-        uses: hendrikmuhs/ccache-action@v1
+        uses: hendrikmuhs/ccache-action@v1.2.23
         with:
           key: ${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
 
@@ -47,7 +47,7 @@ jobs:
         run: cd build && cpack
 
       - name: Upload installers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: OpenMix-linux
           path: |
@@ -58,11 +58,11 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Cache Qt
         id: cache-qt
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: C:\Qt\6.11.0\msvc2022_64
           key: qt-6.11.0-msvc2022_64
@@ -82,12 +82,14 @@ jobs:
         run: choco install nsis -y
 
       - name: Set up MSVC
+        # still node20 upstream (no node24 release as of v1.13.0); the runner
+        # force-runs it on node24, which works but logs a deprecation warning
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
       - name: ccache
-        uses: hendrikmuhs/ccache-action@v1
+        uses: hendrikmuhs/ccache-action@v1.2.23
         with:
           key: ${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
 
@@ -111,7 +113,7 @@ jobs:
           cpack -G "NSIS;ZIP"
 
       - name: Upload installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: OpenMix-windows
           # explicit patterns so the raw build/OpenMix.exe binary isn't shipped
@@ -120,9 +122,16 @@ jobs:
             build/OpenMix-*-win64.zip
 
   build-macos:
-    runs-on: macos-latest
+    # pinned: macos-latest is migrating to macOS 26 (June 2026); keep the
+    # known-good image for the universal Qt build until 26 is validated
+    runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      # runner image ships untrusted third-party taps (aws/tap) that make
+      # every brew call (incl. ccache-action's) log a tap-trust warning
+      - name: Remove untrusted brew taps
+        run: brew untap aws/tap 2>/dev/null || true
 
       # official Qt macOS binaries are universal (arm64 + x86_64); brew's are
       # arm64-only, which would make the DMG Apple-silicon-only
@@ -146,7 +155,7 @@ jobs:
           make -j3 && make install
 
       - name: ccache
-        uses: hendrikmuhs/ccache-action@v1
+        uses: hendrikmuhs/ccache-action@v1.2.23
         with:
           key: ${{ runner.os }}-universal-${{ hashFiles('**/CMakeLists.txt') }}
 
@@ -178,7 +187,7 @@ jobs:
         run: cd build && cpack -G DragNDrop
 
       - name: Upload installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: OpenMix-macos
           path: build/*.dmg
@@ -191,10 +200,10 @@ jobs:
       contents: write
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             OpenMix-linux/*
@@ -208,17 +217,20 @@ jobs:
   appcast:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [release]
-    runs-on: macos-latest
+    runs-on: macos-15
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      - name: Remove untrusted brew taps
+        run: brew untap aws/tap 2>/dev/null || true
 
       - name: Install Sparkle tools
         run: brew install --cask sparkle || brew install sparkle
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
 
       - name: Build appcasts + installer tree
         env:
