@@ -9,3 +9,4 @@ build/
 
 # clangd compile database (symlink into build/)
 compile_commands.json
+.playwright-mcp/

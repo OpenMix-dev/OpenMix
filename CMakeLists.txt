@@ -378,14 +378,17 @@ if(APPLE)
     FetchContent_Declare(sparkle
         URL https://github.com/sparkle-project/Sparkle/releases/download/2.6.4/Sparkle-2.6.4.tar.xz)
     FetchContent_MakeAvailable(sparkle)
-    target_sources(${PROJECT_NAME} PRIVATE src/app/AutoUpdaterSparkle.mm)
-    # the C++ PCH is built with Objective-C disabled; reusing it for this
-    # Objective-C++ source fails ("Objective-C was disabled in precompiled
-    # file ... but is currently enabled"), so skip the PCH for it
-    set_source_files_properties(src/app/AutoUpdaterSparkle.mm
+    target_sources(${PROJECT_NAME} PRIVATE
+        src/app/AutoUpdaterSparkle.mm
+        src/app/MoveToApplications.mm)
+    # the C++ PCH is built with Objective-C disabled; reusing it for these
+    # Objective-C++ sources fails ("Objective-C was disabled in precompiled
+    # file ... but is currently enabled"), so skip the PCH for them
+    set_source_files_properties(src/app/AutoUpdaterSparkle.mm src/app/MoveToApplications.mm
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
     target_compile_options(${PROJECT_NAME} PRIVATE -F${sparkle_SOURCE_DIR})
-    target_link_libraries(${PROJECT_NAME} PRIVATE "-F${sparkle_SOURCE_DIR}" "-framework Sparkle")
+    target_link_libraries(${PROJECT_NAME} PRIVATE "-F${sparkle_SOURCE_DIR}" "-framework Sparkle"
+        "-framework AppKit")
     configure_file(${CMAKE_SOURCE_DIR}/packaging/Info.plist.in
         ${CMAKE_BINARY_DIR}/Info.plist @ONLY)
     set_target_properties(${PROJECT_NAME} PROPERTIES
