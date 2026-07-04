@@ -11,6 +11,7 @@
 
 #include <QHash>
 #include <QRegularExpression>
+#include <QSet>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -66,6 +67,36 @@ void clearShow(Show* show) {
         show->ensembleLibrary()->removeEnsemble(e.id());
 }
 
+// give the actor on `channel` this name: an existing named actor wins (the
+// actors table is authoritative), an unnamed one is filled in, otherwise a
+// new active actor is created
+void applyChannelName(Show* show, int channel, const QString& name,
+                      TmixImportSummary* summary) {
+    if (channel <= 0 || name.isEmpty())
+        return;
+    ActorProfileLibrary* lib = show->actorProfileLibrary();
+    const QList<Actor> actors = lib->actors(); // copy: updateActor mutates the list
+    for (const Actor& a : actors) {
+        if (a.channel() != channel)
+            continue;
+        if (!a.name().isEmpty())
+            return;
+        Actor copy = a;
+        copy.setName(name);
+        lib->updateActor(a.id(), copy);
+        if (summary)
+            ++summary->channelNames;
+        return;
+    }
+    Actor a(name, channel);
+    a.setOrder(lib->actorCount());
+    lib->addActor(a);
+    if (summary) {
+        ++summary->actors;
+        ++summary->channelNames;
+    }
+}
+
 } // namespace
 
 bool TmixImporter::import(const QString& path, Show* show, QString* error,
@@ -107,25 +138,8 @@ bool TmixImporter::import(const QString& path, Show* show, QString* error,
                 }
             }
 
-            // channel voice presets become profile slots; map file id to slot name
-            QHash<int, QString> profileSlotMap;
-            if (q.exec("SELECT * FROM profiles")) {
-                while (q.next()) {
-                    const QSqlRecord r = q.record();
-                    QString label = r.value("label").toString();
-                    if (label.isEmpty())
-                        label = r.value("name").toString();
-                    if (!label.isEmpty()) {
-                        show->actorProfileLibrary()->addSlot(label);
-                        if (summary)
-                            summary->profileSlots.append(label);
-                    }
-                    if (r.indexOf("id") >= 0)
-                        profileSlotMap.insert(r.value("id").toInt(), label);
-                }
-            }
-
-            // actors
+            // actors (authoritative cast list when present; usually empty in
+            // real show files, which carry the cast in profiles instead)
             if (q.exec("SELECT * FROM actors")) {
                 while (q.next()) {
                     const QSqlRecord r = q.record();
@@ -135,6 +149,50 @@ bool TmixImporter::import(const QString& path, Show* show, QString* error,
                     show->actorProfileLibrary()->addActor(a);
                     if (summary)
                         ++summary->actors;
+                }
+            }
+
+            // profiles: per-channel voice presets. Each channel's default row
+            // carries its Show Setup channel name (the cast name), so it fills
+            // the actor name for that channel; only additional presets become
+            // show-wide voice profile slots. Files without a channel column
+            // keep the old every-label-is-a-slot mapping.
+            QHash<int, QString> profileSlotMap;
+            {
+                const QSqlRecord layout = db.record("profiles");
+                const bool perChannel = layout.indexOf("channel") >= 0;
+                const bool hasDefaultFlag = layout.indexOf("default") >= 0;
+                const bool hasLabel = layout.indexOf("label") >= 0;
+                QSet<int> defaultSeen; // channels whose default row was handled
+                if (q.exec("SELECT * FROM profiles")) {
+                    while (q.next()) {
+                        const QSqlRecord r = q.record();
+                        QString label = hasLabel ? r.value("label").toString() : QString();
+                        if (label.isEmpty())
+                            label = r.value("name").toString();
+                        const int id = r.indexOf("id") >= 0 ? r.value("id").toInt() : -1;
+
+                        if (perChannel) {
+                            const int channel = r.value("channel").toInt();
+                            const bool isDefault = hasDefaultFlag
+                                                       ? r.value("default").toInt() != 0
+                                                       : !defaultSeen.contains(channel);
+                            if (isDefault) {
+                                defaultSeen.insert(channel);
+                                applyChannelName(show, channel, label.trimmed(), summary);
+                                if (id >= 0)
+                                    profileSlotMap.insert(id, ActorProfileLibrary::DEFAULT_SLOT);
+                                continue;
+                            }
+                        }
+                        if (!label.isEmpty()) {
+                            show->actorProfileLibrary()->addSlot(label);
+                            if (summary && !summary->profileSlots.contains(label))
+                                summary->profileSlots.append(label);
+                        }
+                        if (id >= 0)
+                            profileSlotMap.insert(id, label);
+                    }
                 }
             }
 

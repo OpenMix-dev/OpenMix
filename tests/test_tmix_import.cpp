@@ -110,6 +110,193 @@ class TestTmixImport : public QObject {
         QCOMPARE(summary.cues, 2);
     }
 
+    void testChannelNamesFromDefaultProfiles() {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath("names.tmix");
+
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "tmixnames");
+            db.setDatabaseName(path);
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            // real files ship an empty actors table; the cast lives in profiles
+            QVERIFY(q.exec("CREATE TABLE actors (id INTEGER PRIMARY KEY, channel INTEGER, "
+                           "name TEXT, `order` INTEGER, active INTEGER)"));
+            QVERIFY(q.exec("CREATE TABLE profiles (id INTEGER PRIMARY KEY, channel INTEGER, "
+                           "name TEXT, label TEXT, `default` INTEGER, data TEXT)"));
+            QVERIFY(q.exec("INSERT INTO profiles VALUES(1,3,'Alice','',1,'')"));
+            QVERIFY(q.exec("INSERT INTO profiles VALUES(2,3,'Umbrella','',0,'')"));
+            QVERIFY(q.exec("INSERT INTO profiles VALUES(3,4,'Bob','',1,'')"));
+            QVERIFY(q.exec("CREATE TABLE cues (number INTEGER, point INTEGER, name TEXT, "
+                           "channelProfiles TEXT)"));
+            QVERIFY(q.exec("INSERT INTO cues VALUES(1,0,'One','3=2,4=3')"));
+            db.close();
+        }
+        QSqlDatabase::removeDatabase("tmixnames");
+
+        Show show;
+        TmixImporter importer;
+        QString err;
+        TmixImportSummary summary;
+        QVERIFY2(importer.import(path, &show, &err, &summary), qPrintable(err));
+
+        const ActorProfileLibrary* lib = show.actorProfileLibrary();
+        QCOMPARE(lib->actors().size(), 2);
+        QVERIFY(lib->actorForChannel(3));
+        QCOMPARE(lib->actorForChannel(3)->name(), QString("Alice"));
+        QVERIFY(lib->actorForChannel(4));
+        QCOMPARE(lib->actorForChannel(4)->name(), QString("Bob"));
+        // only the non-default preset becomes a slot
+        QCOMPARE(lib->profileSlots(), QStringList({"Main", "Umbrella"}));
+        QCOMPARE(summary.actors, 2);
+        QCOMPARE(summary.channelNames, 2);
+        QCOMPARE(summary.profileSlots, QStringList({"Umbrella"}));
+        // cue references resolve: non-default id to its slot, default id to Main
+        QCOMPARE(show.cueList()->at(0).channelProfiles().value(3), QString("Umbrella"));
+        QCOMPARE(show.cueList()->at(0).channelProfiles().value(4), QString("Main"));
+    }
+
+    void testChannelNamesWithoutLabelColumn() {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath("oldnames.tmix");
+
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "tmixoldnames");
+            db.setDatabaseName(path);
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            // older files: profiles has no label column
+            QVERIFY(q.exec("CREATE TABLE profiles (id INTEGER PRIMARY KEY, channel INTEGER, "
+                           "name TEXT, `default` INTEGER, data TEXT)"));
+            QVERIFY(q.exec("INSERT INTO profiles VALUES(1,1,'Barry',1,'')"));
+            QVERIFY(q.exec("INSERT INTO profiles VALUES(2,2,'Trent',1,'')"));
+            db.close();
+        }
+        QSqlDatabase::removeDatabase("tmixoldnames");
+
+        Show show;
+        TmixImporter importer;
+        QString err;
+        TmixImportSummary summary;
+        QVERIFY2(importer.import(path, &show, &err, &summary), qPrintable(err));
+
+        const ActorProfileLibrary* lib = show.actorProfileLibrary();
+        QCOMPARE(lib->actors().size(), 2);
+        QCOMPARE(lib->actorForChannel(1)->name(), QString("Barry"));
+        QCOMPARE(lib->actorForChannel(2)->name(), QString("Trent"));
+        QCOMPARE(lib->profileSlots(), QStringList({"Main"}));
+        QVERIFY(summary.profileSlots.isEmpty());
+        QCOMPARE(summary.channelNames, 2);
+    }
+
+    void testActorsTableNameWins() {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath("actorswin.tmix");
+
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "tmixactorswin");
+            db.setDatabaseName(path);
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            QVERIFY(q.exec("CREATE TABLE actors (id INTEGER PRIMARY KEY, channel INTEGER, "
+                           "name TEXT, `order` INTEGER, active INTEGER)"));
+            QVERIFY(q.exec("INSERT INTO actors (channel,name,`order`,active) VALUES(3,'Alice',0,1)"));
+            QVERIFY(q.exec("INSERT INTO actors (channel,name,`order`,active) VALUES(5,'',1,1)"));
+            QVERIFY(q.exec("CREATE TABLE profiles (id INTEGER PRIMARY KEY, channel INTEGER, "
+                           "name TEXT, label TEXT, `default` INTEGER, data TEXT)"));
+            QVERIFY(q.exec("INSERT INTO profiles VALUES(1,3,'Wrong','',1,'')"));
+            QVERIFY(q.exec("INSERT INTO profiles VALUES(2,5,'Eve','',1,'')"));
+            QVERIFY(q.exec("CREATE TABLE cues (number INTEGER, point INTEGER, name TEXT, "
+                           "channelProfiles TEXT)"));
+            QVERIFY(q.exec("INSERT INTO cues VALUES(1,0,'One','3=1')"));
+            db.close();
+        }
+        QSqlDatabase::removeDatabase("tmixactorswin");
+
+        Show show;
+        TmixImporter importer;
+        QString err;
+        TmixImportSummary summary;
+        QVERIFY2(importer.import(path, &show, &err, &summary), qPrintable(err));
+
+        const ActorProfileLibrary* lib = show.actorProfileLibrary();
+        QCOMPARE(lib->actors().size(), 2); // filled in, not duplicated
+        QCOMPARE(lib->actorForChannel(3)->name(), QString("Alice"));
+        QCOMPARE(lib->actorForChannel(5)->name(), QString("Eve"));
+        QCOMPARE(summary.actors, 2);
+        QCOMPARE(summary.channelNames, 1);
+        QCOMPARE(show.cueList()->at(0).channelProfiles().value(3), QString("Main"));
+    }
+
+    void testFlatProfilesStillBecomeSlots() {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath("flat.tmix");
+
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "tmixflat");
+            db.setDatabaseName(path);
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            // no channel column: every label is a show-wide slot (old behavior)
+            QVERIFY(q.exec("CREATE TABLE profiles (id INTEGER PRIMARY KEY, label TEXT)"));
+            QVERIFY(q.exec("INSERT INTO profiles VALUES(1,'Loud')"));
+            QVERIFY(q.exec("INSERT INTO profiles VALUES(2,'Soft')"));
+            QVERIFY(q.exec("CREATE TABLE cues (number INTEGER, point INTEGER, name TEXT, "
+                           "channelProfiles TEXT)"));
+            QVERIFY(q.exec("INSERT INTO cues VALUES(1,0,'One','3=1')"));
+            db.close();
+        }
+        QSqlDatabase::removeDatabase("tmixflat");
+
+        Show show;
+        TmixImporter importer;
+        QString err;
+        TmixImportSummary summary;
+        QVERIFY2(importer.import(path, &show, &err, &summary), qPrintable(err));
+
+        QCOMPARE(show.actorProfileLibrary()->profileSlots(), QStringList({"Main", "Loud", "Soft"}));
+        QVERIFY(show.actorProfileLibrary()->actors().isEmpty());
+        QCOMPARE(summary.channelNames, 0);
+        QCOMPARE(show.cueList()->at(0).channelProfiles().value(3), QString("Loud"));
+    }
+
+    void testPerChannelProfilesWithoutDefaultFlag() {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath("nodefault.tmix");
+
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "tmixnodefault");
+            db.setDatabaseName(path);
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            // no default column: the first row per channel is the default
+            QVERIFY(q.exec("CREATE TABLE profiles (id INTEGER PRIMARY KEY, channel INTEGER, "
+                           "name TEXT)"));
+            QVERIFY(q.exec("INSERT INTO profiles VALUES(1,3,'Alice')"));
+            QVERIFY(q.exec("INSERT INTO profiles VALUES(2,3,'Umbrella')"));
+            QVERIFY(q.exec("INSERT INTO profiles VALUES(3,4,'Bob')"));
+            db.close();
+        }
+        QSqlDatabase::removeDatabase("tmixnodefault");
+
+        Show show;
+        TmixImporter importer;
+        QString err;
+        TmixImportSummary summary;
+        QVERIFY2(importer.import(path, &show, &err, &summary), qPrintable(err));
+
+        const ActorProfileLibrary* lib = show.actorProfileLibrary();
+        QCOMPARE(lib->actors().size(), 2);
+        QCOMPARE(lib->actorForChannel(3)->name(), QString("Alice"));
+        QCOMPARE(lib->actorForChannel(4)->name(), QString("Bob"));
+        QCOMPARE(lib->profileSlots(), QStringList({"Main", "Umbrella"}));
+    }
+
     void testImportMissingFileFails() {
         Show show;
         TmixImporter importer;

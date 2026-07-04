@@ -1075,25 +1075,36 @@ void MainWindow::importTmixShow() {
     updateTitle();
     updateStatusBar();
 
-    // explain how TheatreMix concepts landed in OpenMix
+    // explain how the imported show's concepts landed in OpenMix
+    QString namesLine;
+    if (summary.channelNames > 0) {
+        namesLine = tr("<li>The file's <b>channel names</b> (from its show setup) became "
+                       "OpenMix <b>actor names</b>; OpenMix writes these to the console's "
+                       "scribble strips. Edit them in Actor Setup (F9).</li>");
+    }
     QString rolesLine;
     if (summary.rolesInferred > 0) {
         rolesLine = tr("<li><b>%1 role(s)</b> were inferred from cue DCA labels; review them "
                        "in Actor Setup (F9).</li>")
                         .arg(summary.rolesInferred);
     }
+    QString slotsLine;
+    if (!summary.profileSlots.isEmpty()) {
+        slotsLine = tr("<li>Additional channel <b>profiles</b> (%1) became <b>voice "
+                       "profile slots</b>: show-wide voice categories shared by every actor, "
+                       "not per-mic names. Each actor stores their own EQ/dynamics per slot "
+                       "in Actor Setup.</li>")
+                        .arg(summary.profileSlots.join(", "));
+    }
     const QString html =
         tr("<p>Imported <b>%1 actors</b>, <b>%2 cues</b>, <b>%3 positions</b> and "
            "<b>%4 ensembles</b>.</p>"
-           "<p>How TheatreMix concepts map onto OpenMix:</p>"
+           "<p>How the imported show maps onto OpenMix:</p>"
            "<ul>"
-           "<li>TheatreMix <b>actors</b> are OpenMix actors. Each also has a new <b>Roles</b> "
+           "<li>Imported <b>actors</b> are OpenMix actors. Each also has a new <b>Roles</b> "
            "(characters) field; typing one of their roles or the actor name into a cue's "
            "DCA slot assigns their channel to that DCA.</li>"
-           "%5"
-           "<li>TheatreMix <b>profiles</b> (%6) became <b>voice profile slots</b>: show-wide "
-           "voice categories shared by every actor, not per-mic names. Each actor stores "
-           "their own EQ/dynamics per slot in Actor Setup.</li>"
+           "%5%6%7"
            "<li>Cue <b>DCA labels and channel lists</b> became per-cue DCA label overrides "
            "and cue-specific DCA mappings; see the DCA Mapping view (F5).</li>"
            "</ul>")
@@ -1101,10 +1112,10 @@ void MainWindow::importTmixShow() {
             .arg(summary.cues)
             .arg(summary.positions)
             .arg(summary.ensembles)
+            .arg(namesLine)
             .arg(rolesLine)
-            .arg(summary.profileSlots.isEmpty() ? tr("none found")
-                                                : summary.profileSlots.join(", "));
-    HelpDialog dialog(tr("Imported from TheatreMix"), html, this);
+            .arg(slotsLine);
+    HelpDialog dialog(tr("Show File Imported"), html, this);
     dialog.exec();
 }
 
@@ -1541,8 +1552,8 @@ void MainWindow::showQuickStart() {
         "<i>Edit &rarr; Lock Editing</i> prevents accidental edits during a performance.</li>"
         "</ol>"
         "<p>Already have a show file? <i>File &rarr; Import Show File&hellip;</i> reads a "
-        "<tt>.tmix</tt> database directly: TheatreMix actors become actors (roles are "
-        "inferred from cue DCA labels where unambiguous), TheatreMix profiles become "
+        "<tt>.tmix</tt> database directly: its channel names become actor names (roles are "
+        "inferred from cue DCA labels where unambiguous), additional channel profiles become "
         "show-wide voice profile slots, and cue DCA labels/channels become per-cue DCA "
         "overrides and mappings.</p>");
     HelpDialog dialog(tr("Quick Start"), html, this);
