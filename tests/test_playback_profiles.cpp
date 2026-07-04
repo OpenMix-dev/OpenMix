@@ -15,7 +15,8 @@ using namespace OpenMix;
 namespace {
 LoopbackProtocol* makeConnectedLoopback(QObject* parent) {
     auto* mixer = new LoopbackProtocol(MixerCapabilities::forConsole(ConsoleType::X32), parent);
-    mixer->connect("loopback", 0); // sets state Connected synchronously
+    [[maybe_unused]] const bool ok = mixer->connect("loopback", 0); // Connected synchronously
+    Q_ASSERT(ok);
     return mixer;
 }
 } // namespace

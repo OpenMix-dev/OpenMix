@@ -150,6 +150,14 @@ jobs:
           target: "desktop"
           arch: "clang_64"
 
+      # the app only uses SQLite; the Mimer driver's missing client library
+      # makes macdeployqt spew ERRORs, and ODBC/psql draw private-API warnings
+      - name: Prune unused Qt SQL drivers
+        run: |
+          rm -f "$QT_ROOT_DIR/plugins/sqldrivers/"libqsqlmimer*.dylib \
+                "$QT_ROOT_DIR/plugins/sqldrivers/"libqsqlodbc*.dylib \
+                "$QT_ROOT_DIR/plugins/sqldrivers/"libqsqlpsql*.dylib
+
       # brew liblo is arm64-only too; build it universal from source
       - name: Build liblo (universal)
         run: |
