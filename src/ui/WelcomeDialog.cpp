@@ -38,7 +38,7 @@ void WelcomeDialog::setupUi() {
     title->setFont(titleFont);
     mainLayout->addWidget(title);
 
-    QLabel* subtitle = new QLabel(tr("Open a recent show, or start a new one."), this);
+    QLabel* subtitle = new QLabel(tr("Open a recent show, start a new one, or import a show file."), this);
     subtitle->setEnabled(false); // muted
     mainLayout->addWidget(subtitle);
     mainLayout->addSpacing(16);
@@ -55,6 +55,12 @@ void WelcomeDialog::setupUi() {
     openButton->setMinimumHeight(40);
     connect(openButton, &QPushButton::clicked, this, &WelcomeDialog::chooseOpen);
     actions->addWidget(openButton);
+
+    QPushButton* importButton = new QPushButton(tr("Import Show..."), this);
+    importButton->setMinimumHeight(40);
+    importButton->setToolTip(tr("Import a .tmix show file"));
+    connect(importButton, &QPushButton::clicked, this, &WelcomeDialog::chooseImport);
+    actions->addWidget(importButton);
     mainLayout->addLayout(actions);
     mainLayout->addSpacing(16);
 
@@ -104,6 +110,11 @@ void WelcomeDialog::chooseNew() {
 
 void WelcomeDialog::chooseOpen() {
     m_choice = Choice::OpenShow;
+    accept();
+}
+
+void WelcomeDialog::chooseImport() {
+    m_choice = Choice::Import;
     accept();
 }
 

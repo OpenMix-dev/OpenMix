@@ -1240,6 +1240,9 @@ void MainWindow::showWelcomeDialog() {
         updateRecentProjectsMenu();
         break;
     }
+    case WelcomeDialog::Choice::Import:
+        importTmixShow();
+        break;
     case WelcomeDialog::Choice::None:
         break;
     }
