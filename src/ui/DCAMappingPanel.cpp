@@ -5,6 +5,7 @@
 #include "core/Actor.h"
 #include "core/ActorProfileLibrary.h"
 #include "core/Cue.h"
+#include "core/CueList.h"
 #include "core/DCAMapping.h"
 #include "core/ShortcutManager.h"
 #include "core/Show.h"
@@ -87,6 +88,11 @@ DCAMappingPanel::DCAMappingPanel(Application* app, QWidget* parent)
         // actor renames/role edits change the channel labels shown here
         connect(m_app->show()->actorProfileLibrary(), &ActorProfileLibrary::changed, this,
                 &DCAMappingPanel::onActorsChanged);
+
+        // a cleared cue list (new show / show load) destroys the cue this panel
+        // points at; drop back to show level before anything repaints
+        connect(m_app->show()->cueList(), &CueList::listCleared, this,
+                &DCAMappingPanel::clearCurrentCue);
     }
 
     refresh();

@@ -26,6 +26,8 @@ void PlaybackEngine::setCueList(CueList* cueList) {
     stop();
     if (m_cueList) {
         connect(m_cueList, &CueList::cueRemoved, this, &PlaybackEngine::onCueRemoved);
+        connect(m_cueList, &CueList::listCleared, this, &PlaybackEngine::onCueListReset);
+        connect(m_cueList, &CueList::listLoaded, this, &PlaybackEngine::onCueListReset);
         if (!m_cueList->isEmpty())
             setStandbyIndex(0);
     }
@@ -52,6 +54,15 @@ void PlaybackEngine::onCueRemoved(int index) {
     } else if (m_standbyIndex > index) {
         setStandbyIndex(m_standbyIndex - 1);
     }
+}
+
+void PlaybackEngine::onCueListReset() {
+    // the whole list was cleared or replaced (new show / show load): abandon
+    // in-flight fades and their stale per-channel sources, then re-arm from the
+    // top (stop() leaves standby at 0 when the new list has cues, -1 when empty)
+    m_fadeEngine.cancelAll();
+    m_appliedChannelLevels.clear();
+    stop();
 }
 
 void PlaybackEngine::setMixer(MixerProtocol* mixer) { m_mixer = mixer; }

@@ -1360,9 +1360,9 @@ void MainWindow::updateStatusBar() {
     int count = m_app->show()->cueList()->count();
     m_cueStatusLabel->setText(tr("%n cue(s)", "", count));
 
-    int currentIdx = m_app->playbackEngine()->currentCueIndex();
-    if (currentIdx >= 0) {
-        const Cue* cue = m_app->playbackEngine()->currentCue();
+    // key off the bounds-checked cue pointers, not the raw indices: during a
+    // bulk list clear the indices can be momentarily stale
+    if (const Cue* cue = m_app->playbackEngine()->currentCue()) {
         m_currentCueLabel->setText(tr("Current: %1 - %2")
                                        .arg(cue->number(), 0, 'f', 1)
                                        .arg(cue->name().isEmpty() ? tr("(unnamed)") : cue->name()));
@@ -1370,9 +1370,7 @@ void MainWindow::updateStatusBar() {
         m_currentCueLabel->setText(tr("Current: --"));
     }
 
-    int standbyIdx = m_app->playbackEngine()->standbyCueIndex();
-    if (standbyIdx >= 0) {
-        const Cue* cue = m_app->playbackEngine()->standbyCue();
+    if (const Cue* cue = m_app->playbackEngine()->standbyCue()) {
         m_nextCueLabel->setText(tr("Next: %1 - %2")
                                     .arg(cue->number(), 0, 'f', 1)
                                     .arg(cue->name().isEmpty() ? tr("(unnamed)") : cue->name()));
