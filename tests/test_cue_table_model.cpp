@@ -93,6 +93,20 @@ class TestCueTableModel : public QObject {
         QVERIFY(cue.dcaChannelMapping().value(2).contains(9));
     }
 
+    void setData_dcaCell_emitsCueUpdated_withRow() {
+        // the DCA mapping panel's live refresh keys off this signal
+        CueList list;
+        list.addCue(Cue(1.0, "One"));
+        list.addCue(Cue(2.0, "Two"));
+        CueTableModel model(&list);
+
+        QSignalSpy updated(&list, &CueList::cueUpdated);
+        QVERIFY(model.setData(model.index(1, dcaCol(model, 3)), "Hamlet", Qt::EditRole));
+        QCOMPARE(updated.count(), 1);
+        QCOMPARE(updated.at(0).at(0).toInt(), 1);
+        QCOMPARE(list.at(1).dcaOverride(3).label, std::optional<QString>("Hamlet"));
+    }
+
     void setData_nonResolvingText_storesLabelOnly() {
         CueList list;
         list.addCue(Cue(1.0, "One"));

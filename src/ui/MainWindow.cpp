@@ -898,15 +898,18 @@ void MainWindow::connectSignals() {
 
     connect(m_cueEditor, &CueEditor::cueModified, [this]() {
         m_cueListView->refreshCurrentCue();
-        // editor edits can change the cue's DCA mapping/labels; keep the DCA
-        // panel showing the same cue in step (skip when hidden: rebuild is
-        // per-keystroke while typing in the editor)
-        if (m_dcaMappingPopOut->isVisible()) {
-            CueList* cueList = m_app->show()->cueList();
-            const int index = m_cueListView->selectedCueIndex();
-            if (index >= 0 && index < cueList->count())
-                m_dcaMappingPanel->setCurrentCue(&(*cueList)[index]);
-        }
+    });
+
+    // any cue-content change (editor fields, inline table edits, undo/redo,
+    // paste/fill-down) repaints the DCA panel when it is showing that cue;
+    // skip when hidden: the rebuild is per-keystroke while typing in the editor
+    connect(m_app->show()->cueList(), &CueList::cueUpdated, this, [this](int index) {
+        if (!m_dcaMappingPopOut->isVisible())
+            return;
+        if (index < 0 || index != m_cueListView->selectedCueIndex())
+            return;
+        CueList* cueList = m_app->show()->cueList();
+        m_dcaMappingPanel->setCurrentCue(&(*cueList)[index]);
     });
 
     connect(m_app->playbackEngine(), &PlaybackEngine::goLockout, this, &MainWindow::onGoLockout);
