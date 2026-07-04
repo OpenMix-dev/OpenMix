@@ -39,8 +39,8 @@ class ActorSetupPanel : public QWidget {
   private slots:
     // actor list
     void onActorSelectionChanged();
-    void addActor();
-    void addActors(); // bulk add: paste one actor per line
+    void addActors(); // paste one actor per line; also the single-add path
+    void addRoles();  // append roles to every selected actor
     void removeActor();
     void moveActorUp();
     void moveActorDown();
@@ -80,6 +80,7 @@ class ActorSetupPanel : public QWidget {
     void updateButtonStates();
 
     [[nodiscard]] QString selectedActorId() const;
+    [[nodiscard]] QStringList selectedActorIds() const;
     [[nodiscard]] int channelCount() const;
     // lowest channel not in used, capped at channelCount(); inserts the result
     [[nodiscard]] int takeLowestFreeChannel(QSet<int>& used) const;
@@ -93,8 +94,8 @@ class ActorSetupPanel : public QWidget {
 
     // actor list
     QTreeWidget* m_actorTree = nullptr;
-    QPushButton* m_addActorBtn = nullptr;
     QPushButton* m_addActorsBtn = nullptr;
+    QPushButton* m_addRolesBtn = nullptr;
     QPushButton* m_removeActorBtn = nullptr;
     QPushButton* m_moveUpBtn = nullptr;
     QPushButton* m_moveDownBtn = nullptr;

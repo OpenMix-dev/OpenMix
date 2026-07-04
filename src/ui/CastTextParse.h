@@ -26,6 +26,17 @@ namespace OpenMix::CastTextParse {
     return roles;
 }
 
+// Append `added` roles onto `existing`, skipping case-insensitive duplicates.
+[[nodiscard]] inline QStringList mergeRoles(const QStringList& existing,
+                                            const QStringList& added) {
+    QStringList merged = existing;
+    for (const QString& role : added) {
+        if (!merged.contains(role, Qt::CaseInsensitive))
+            merged.append(role);
+    }
+    return merged;
+}
+
 struct CastLine {
     QString name;
     QStringList roles;
