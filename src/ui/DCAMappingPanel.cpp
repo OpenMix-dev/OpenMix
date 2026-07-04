@@ -341,6 +341,9 @@ void DCAMappingPanel::createChannelSection() {
         m_channelLayout->addWidget(nameContainer, row, colOffset);
 
         NoScrollComboBox* combo = new NoScrollComboBox(m_channelGroup);
+        // item texts grow cue labels later; keep the closed combo width stable
+        combo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+        combo->setMinimumContentsLength(14);
         combo->addItem(tr("None"), -1);
         for (int d = 1; d <= m_dcaCount; ++d) {
             combo->addItem(tr("DCA %1").arg(d), d);
@@ -407,6 +410,9 @@ void DCAMappingPanel::createBusSection() {
         m_busLayout->addWidget(nameContainer, row, colOffset);
 
         NoScrollComboBox* combo = new NoScrollComboBox(m_busGroup);
+        // item texts grow cue labels later; keep the closed combo width stable
+        combo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+        combo->setMinimumContentsLength(14);
         combo->addItem(tr("None"), -1);
         for (int d = 1; d <= m_dcaCount; ++d) {
             combo->addItem(tr("DCA %1").arg(d), d);
@@ -583,21 +589,22 @@ void DCAMappingPanel::updateComboItemStates() {
         }
     }
 
-    // update combo box items w/ assignment counts
+    // update combo box items w/ the cue's DCA labels and assignment counts
+    QStringList itemTexts;
+    for (int d = 1; d <= m_dcaCount; ++d) {
+        const int total = channelCounts[d] + busCounts[d];
+        const QString name = dcaDisplayName(d);
+        itemTexts << (total > 0 ? tr("%1 (%2)").arg(name).arg(total) : name);
+    }
+
     for (QComboBox* combo : m_channelCombos) {
-        for (int d = 1; d <= m_dcaCount; ++d) {
-            int total = channelCounts[d] + busCounts[d];
-            QString text = total > 0 ? tr("DCA %1 (%2)").arg(d).arg(total) : tr("DCA %1").arg(d);
-            combo->setItemText(d, text);
-        }
+        for (int d = 1; d <= m_dcaCount; ++d)
+            combo->setItemText(d, itemTexts[d - 1]);
     }
 
     for (QComboBox* combo : m_busCombos) {
-        for (int d = 1; d <= m_dcaCount; ++d) {
-            int total = channelCounts[d] + busCounts[d];
-            QString text = total > 0 ? tr("DCA %1 (%2)").arg(d).arg(total) : tr("DCA %1").arg(d);
-            combo->setItemText(d, text);
-        }
+        for (int d = 1; d <= m_dcaCount; ++d)
+            combo->setItemText(d, itemTexts[d - 1]);
     }
 }
 
@@ -972,6 +979,16 @@ QString DCAMappingPanel::channelDisplayName(int channel) const {
     return tr("Ch %1").arg(channel);
 }
 
+QString DCAMappingPanel::dcaDisplayName(int dca) const {
+    // the current cue's scribble label for this DCA, matching the overview
+    if (m_currentCue) {
+        const QString label = m_currentCue->dcaOverride(dca).label.value_or(QString());
+        if (!label.isEmpty())
+            return tr("DCA %1: %2").arg(dca).arg(label);
+    }
+    return tr("DCA %1").arg(dca);
+}
+
 void DCAMappingPanel::updateDcaOverview() {
     if (!m_mapping)
         return;
@@ -988,13 +1005,7 @@ void DCAMappingPanel::updateDcaOverview() {
         QLabel* title = m_dcaOverviewTitles[d - 1];
         QLabel* members = m_dcaOverviewMembers[d - 1];
 
-        QString titleText = tr("DCA %1").arg(d);
-        if (m_currentCue) {
-            const QString label = m_currentCue->dcaOverride(d).label.value_or(QString());
-            if (!label.isEmpty())
-                titleText += QString(": %1").arg(label);
-        }
-        title->setText(titleText);
+        title->setText(dcaDisplayName(d));
 
         QStringList parts;
         for (int ch : channelMap.value(d))

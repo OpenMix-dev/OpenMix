@@ -79,6 +79,7 @@ class DCAMappingPanel : public QWidget {
     void updateDcaOverview();
     QString busDisplayName(int bus) const;
     QString channelDisplayName(int channel) const;
+    QString dcaDisplayName(int dca) const;
 
     Application* m_app;
     DCAMapping* m_mapping;
