@@ -238,6 +238,18 @@ QLineEdit[placeholderText] {
     color: #6b7280;
 }
 
+/* inline editors inside item views must fit their row: the input box model
+   above (padding + min-height) otherwise overflows compact rows, leaving the
+   editor's focus border misaligned with the cell being edited */
+QTreeView QLineEdit,
+QTableView QLineEdit,
+QListView QLineEdit {
+    border: none;
+    border-radius: 0;
+    padding: 0 4px;
+    min-height: 0;
+}
+
 QComboBox::drop-down {
     border: none;
     width: 24px;
