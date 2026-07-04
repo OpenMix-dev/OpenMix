@@ -237,8 +237,14 @@ jobs:
       - name: Remove untrusted brew taps
         run: brew untap aws/tap 2>/dev/null || true
 
+      # fetched from the pinned upstream release (same version CMake bundles);
+      # the homebrew sparkle cask is deprecated and disabled after 2026-09-01
       - name: Install Sparkle tools
-        run: brew install --cask sparkle || brew install sparkle
+        run: |
+          curl -fsSL -o /tmp/sparkle.tar.xz \
+            https://github.com/sparkle-project/Sparkle/releases/download/2.6.4/Sparkle-2.6.4.tar.xz
+          mkdir -p /tmp/sparkle
+          tar -xf /tmp/sparkle.tar.xz -C /tmp/sparkle
 
       - name: Download artifacts
         uses: actions/download-artifact@v8
@@ -253,7 +259,8 @@ jobs:
           mkdir -p site/download/${TAG}
           cp OpenMix-macos/* OpenMix-windows/* OpenMix-linux/* site/download/${TAG}/ 2>/dev/null || true
 
-          SIGN=$(find /opt/homebrew /usr/local -name sign_update -type f 2>/dev/null | head -1)
+          SIGN=/tmp/sparkle/bin/sign_update
+          [ -x "$SIGN" ] || SIGN=""
           DMG=$(ls OpenMix-macos/*.dmg | head -1)
           if [ -n "$SPARKLE_KEY" ] && [ -n "$SIGN" ] && [ -n "$DMG" ]; then
             echo "$SPARKLE_KEY" > /tmp/ed_key
