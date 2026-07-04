@@ -241,7 +241,7 @@ class TestTmixImport : public QObject {
             db.setDatabaseName(path);
             QVERIFY(db.open());
             QSqlQuery q(db);
-            // no channel column: every label is a show-wide slot (old behavior)
+            // no channel column: every label is a show-wide slot
             QVERIFY(q.exec("CREATE TABLE profiles (id INTEGER PRIMARY KEY, label TEXT)"));
             QVERIFY(q.exec("INSERT INTO profiles VALUES(1,'Loud')"));
             QVERIFY(q.exec("INSERT INTO profiles VALUES(2,'Soft')"));

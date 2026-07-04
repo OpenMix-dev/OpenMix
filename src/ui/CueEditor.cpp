@@ -231,7 +231,6 @@ void CueEditor::setupUi() {
     outerLayout->setContentsMargins(0, 0, 0, 0);
     outerLayout->addWidget(scroll);
 
-    // connect signals
     connect(m_numberSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
             &CueEditor::onNumberChanged);
     connect(m_nameEdit, &QLineEdit::textChanged, this, &CueEditor::onNameChanged);

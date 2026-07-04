@@ -13,7 +13,6 @@ MacroPreviewWidget::MacroPreviewWidget(QWidget* parent) : QWidget(parent) {
     m_layout->setContentsMargins(0, 0, 0, 0);
     m_layout->setSpacing(4);
 
-    // header label
     m_headerLabel = new QLabel(this);
     m_headerLabel->setProperty("role", "header");
     m_layout->addWidget(m_headerLabel);
@@ -55,7 +54,6 @@ void MacroPreviewWidget::setMacroCue(const Cue* cue, const CueList* cueList) {
         return;
     }
 
-    // show the tree widget
     m_treeWidget->setVisible(true);
     m_emptyLabel->setVisible(false);
 

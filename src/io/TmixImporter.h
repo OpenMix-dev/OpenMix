@@ -14,8 +14,7 @@ struct TmixImportSummary {
     int positions = 0;
     int ensembles = 0;
     int rolesInferred = 0; // actor roles guessed from cue DCA labels
-    int channelNames = 0;  // actor names taken from the file's channel names
-                           // (each channel's default profile row)
+    int channelNames = 0; // actor names taken from default profile rows
     QStringList profileSlots;
 };
 

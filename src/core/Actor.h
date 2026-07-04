@@ -31,19 +31,13 @@ class Actor {
     // the stored role case-insensitively equal to text, or empty when none
     [[nodiscard]] QString matchedRole(const QString& text) const;
 
-    // label the channel with the primary role instead of the actor name
-    // (for channels that aren't tied to one person, e.g. shared mic packs)
     [[nodiscard]] bool useRoleName() const noexcept { return m_useRoleName; }
     void setUseRoleName(bool use) { m_useRoleName = use; }
 
-    // primary label for this actor's channel (console scribble strips and
-    // channel displays): the role when preferred and present, else the name
     [[nodiscard]] QString displayName() const {
         return (m_useRoleName && !m_roles.isEmpty()) ? m_roles.first() : m_name;
     }
-    // the complementary label shown in parentheses next to displayName():
-    // normally the role (the matched one when given), the actor name when the
-    // role is the display name; empty when redundant or absent
+    // the parenthesised label paired with displayName(); empty when redundant
     [[nodiscard]] QString secondaryName(const QString& matchedRole = QString()) const;
 
     [[nodiscard]] int channel() const noexcept { return m_channel; }
@@ -72,7 +66,7 @@ class Actor {
     int m_channel = 0;
     int m_order = 0;
     bool m_active = true;
-    bool m_useRoleName = false; // channel labelled by role instead of name
+    bool m_useRoleName = false;
     QMap<QString, ActorProfile> m_profiles; // slot -> profile
 };
 

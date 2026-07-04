@@ -57,9 +57,6 @@ void PlaybackEngine::onCueRemoved(int index) {
 }
 
 void PlaybackEngine::onCueListReset() {
-    // the whole list was cleared or replaced (new show / show load): abandon
-    // in-flight fades and their stale per-channel sources, then re-arm from the
-    // top (stop() leaves standby at 0 when the new list has cues, -1 when empty)
     m_fadeEngine.cancelAll();
     m_appliedChannelLevels.clear();
     stop();

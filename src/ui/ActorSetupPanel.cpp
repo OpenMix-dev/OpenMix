@@ -996,7 +996,7 @@ void ActorSetupPanel::onUseRoleNameToggled(bool on) {
     Actor copy = *a;
     copy.setUseRoleName(on);
     m_updatingUi = true;
-    m_library->updateActor(id, copy); // changed() relabels displays + console
+    m_library->updateActor(id, copy);
     m_updatingUi = false;
 }
 

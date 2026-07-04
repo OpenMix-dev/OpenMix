@@ -67,9 +67,8 @@ void clearShow(Show* show) {
         show->ensembleLibrary()->removeEnsemble(e.id());
 }
 
-// give the actor on `channel` this name: an existing named actor wins (the
-// actors table is authoritative), an unnamed one is filled in, otherwise a
-// new active actor is created
+// name the actor on `channel`: an existing named actor wins (the actors
+// table is authoritative), an unnamed one is filled in, else a new one is cast
 void applyChannelName(Show* show, int channel, const QString& name,
                       TmixImportSummary* summary) {
     if (channel <= 0 || name.isEmpty())
@@ -138,8 +137,8 @@ bool TmixImporter::import(const QString& path, Show* show, QString* error,
                 }
             }
 
-            // actors (authoritative cast list when present; usually empty in
-            // real show files, which carry the cast in profiles instead)
+            // actors: authoritative cast when present; usually empty, with the
+            // cast carried by the profiles table instead
             if (q.exec("SELECT * FROM actors")) {
                 while (q.next()) {
                     const QSqlRecord r = q.record();
@@ -152,18 +151,16 @@ bool TmixImporter::import(const QString& path, Show* show, QString* error,
                 }
             }
 
-            // profiles: per-channel voice presets. Each channel's default row
-            // carries its Show Setup channel name (the cast name), so it fills
-            // the actor name for that channel; only additional presets become
-            // show-wide voice profile slots. Files without a channel column
-            // keep the old every-label-is-a-slot mapping.
+            // profiles: a channel's default row carries its Show Setup name and
+            // fills the actor name; additional presets become voice slots, and
+            // flat files without a channel column treat every label as a slot
             QHash<int, QString> profileSlotMap;
             {
                 const QSqlRecord layout = db.record("profiles");
                 const bool perChannel = layout.indexOf("channel") >= 0;
                 const bool hasDefaultFlag = layout.indexOf("default") >= 0;
                 const bool hasLabel = layout.indexOf("label") >= 0;
-                QSet<int> defaultSeen; // channels whose default row was handled
+                QSet<int> defaultSeen;
                 if (q.exec("SELECT * FROM profiles")) {
                     while (q.next()) {
                         const QSqlRecord r = q.record();

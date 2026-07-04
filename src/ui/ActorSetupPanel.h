@@ -39,8 +39,8 @@ class ActorSetupPanel : public QWidget {
   private slots:
     // actor list
     void onActorSelectionChanged();
-    void addActors(); // paste one actor per line; also the single-add path
-    void addRoles();  // append roles to every selected actor
+    void addActors(); // paste one actor per line
+    void addRoles();  // append roles to all selected actors
     void removeActor();
     void moveActorUp();
     void moveActorDown();

@@ -23,7 +23,6 @@ KeyboardShortcutsDialog::KeyboardShortcutsDialog(ShortcutManager* manager, QWidg
 void KeyboardShortcutsDialog::setupUi() {
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
-    // filter bar
     QHBoxLayout* filterLayout = new QHBoxLayout();
     QLabel* filterLabel = new QLabel(tr("Filter:"), this);
     m_filterEdit = new QLineEdit(this);
@@ -61,7 +60,6 @@ void KeyboardShortcutsDialog::setupUi() {
     filterLayout->addWidget(m_filterEdit);
     mainLayout->addLayout(filterLayout);
 
-    // shortcuts tree
     m_shortcutsTree = new QTreeWidget(this);
     m_shortcutsTree->setHeaderLabels({tr("Action"), tr("Shortcut"), tr("Default")});
     m_shortcutsTree->setColumnCount(3);
@@ -77,7 +75,6 @@ void KeyboardShortcutsDialog::setupUi() {
 
     mainLayout->addWidget(m_shortcutsTree);
 
-    // shortcut editor section
     QGroupBox* editorGroup = new QGroupBox(tr("Edit Shortcut"), this);
     QVBoxLayout* editorLayout = new QVBoxLayout(editorGroup);
 
@@ -121,7 +118,6 @@ void KeyboardShortcutsDialog::setupUi() {
 
     mainLayout->addWidget(editorGroup);
 
-    // dialog buttons
     QHBoxLayout* buttonLayout = new QHBoxLayout();
 
     m_resetAllButton = new QPushButton(tr("Reset All to Defaults"), this);
@@ -169,7 +165,6 @@ void KeyboardShortcutsDialog::populateShortcutTree() {
             categories[category] = categoryItem;
         }
 
-        // create action item
         QTreeWidgetItem* item = new QTreeWidgetItem(categories[category]);
         item->setText(0, info.displayName);
         item->setData(0, Qt::UserRole, info.id);
@@ -254,15 +249,12 @@ void KeyboardShortcutsDialog::onShortcutEditingFinished() {
 
     QKeySequence newShortcut = m_shortcutEdit->keySequence();
 
-    // check for conflict
     if (checkForConflict(m_currentActionId, newShortcut)) {
         return; // conflict detected
     }
 
-    // store pending change
     m_pendingChanges[m_currentActionId] = newShortcut;
 
-    // update tree display
     QList<QTreeWidgetItem*> selected = m_shortcutsTree->selectedItems();
     if (!selected.isEmpty()) {
         updateShortcutDisplay(selected.first(), newShortcut);
@@ -367,7 +359,6 @@ void KeyboardShortcutsDialog::onResetAllClicked() {
         m_pendingChanges[info.id] = info.defaultShortcut;
     }
 
-    // refresh the tree
     populateShortcutTree();
 
     // clear selection and editor
@@ -407,7 +398,6 @@ void KeyboardShortcutsDialog::accept() {
         m_manager->setShortcut(id, shortcut);
     }
 
-    // save to settings
     m_manager->saveToSettings();
 
     QDialog::accept();

@@ -21,7 +21,6 @@ void ShortcutManager::registerAction(const QString& id, QAction* action,
 
     m_shortcuts[id] = info;
 
-    // apply the default shortcut to the action
     action->setShortcut(defaultShortcut);
 }
 

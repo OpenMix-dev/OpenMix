@@ -43,8 +43,7 @@ class NoScrollComboBox : public QComboBox {
   public:
     using QComboBox::QComboBox;
 
-    // shorter text painted when the combo is closed (the popup keeps the full
-    // item text); lets the grid avoid repeating names the row already shows
+    // shorter closed-state text; the popup keeps the full item text
     static constexpr int CompactTextRole = Qt::UserRole + 1;
 
   protected:
@@ -99,7 +98,6 @@ DCAMappingPanel::DCAMappingPanel(Application* app, QWidget* parent)
         // console-type selection changes the DCA/channel/bus counts shown here
         connect(m_app, &Application::dcaCountChanged, this, &DCAMappingPanel::refresh);
 
-        // get mapping from show
         m_mapping = m_app->show()->dcaMapping();
         if (m_mapping) {
             connect(m_mapping, &DCAMapping::mappingCleared, this, &DCAMappingPanel::refresh);
@@ -109,8 +107,7 @@ DCAMappingPanel::DCAMappingPanel(Application* app, QWidget* parent)
         connect(m_app->show()->actorProfileLibrary(), &ActorProfileLibrary::changed, this,
                 &DCAMappingPanel::onActorsChanged);
 
-        // a cleared cue list (new show / show load) destroys the cue this panel
-        // points at; drop back to show level before anything repaints
+        // a cleared cue list destroys the cue this panel points at
         connect(m_app->show()->cueList(), &CueList::listCleared, this,
                 &DCAMappingPanel::clearCurrentCue);
     }
@@ -361,7 +358,7 @@ void DCAMappingPanel::createChannelSection() {
         m_channelLayout->addWidget(nameContainer, row, colOffset);
 
         NoScrollComboBox* combo = new NoScrollComboBox(m_channelGroup);
-        // item texts grow cue labels later; keep the closed combo width stable
+        // item texts vary with cue labels; keep the closed combo width stable
         combo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
         combo->setMinimumContentsLength(14);
         combo->addItem(tr("None"), -1);
@@ -430,7 +427,7 @@ void DCAMappingPanel::createBusSection() {
         m_busLayout->addWidget(nameContainer, row, colOffset);
 
         NoScrollComboBox* combo = new NoScrollComboBox(m_busGroup);
-        // item texts grow cue labels later; keep the closed combo width stable
+        // item texts vary with cue labels; keep the closed combo width stable
         combo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
         combo->setMinimumContentsLength(14);
         combo->addItem(tr("None"), -1);
@@ -609,8 +606,6 @@ void DCAMappingPanel::updateComboItemStates() {
         }
     }
 
-    // popup items carry the cue's DCA labels and assignment counts; the closed
-    // combo paints the compact form so the grid doesn't repeat names
     QStringList itemTexts;
     QStringList compactTexts;
     for (int d = 1; d <= m_dcaCount; ++d) {
@@ -1010,7 +1005,6 @@ QString DCAMappingPanel::channelDisplayName(int channel) const {
 }
 
 QString DCAMappingPanel::dcaDisplayName(int dca) const {
-    // the current cue's scribble label for this DCA, matching the overview
     if (m_currentCue) {
         const QString label = m_currentCue->dcaOverride(dca).label.value_or(QString());
         if (!label.isEmpty())

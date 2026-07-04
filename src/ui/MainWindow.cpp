@@ -900,9 +900,8 @@ void MainWindow::connectSignals() {
         m_cueListView->refreshCurrentCue();
     });
 
-    // any cue-content change (editor fields, inline table edits, undo/redo,
-    // paste/fill-down) repaints the DCA panel when it is showing that cue;
-    // skip when hidden: the rebuild is per-keystroke while typing in the editor
+    // repaint the DCA panel when the cue it shows changes; skipped while
+    // hidden since the rebuild runs per-keystroke
     connect(m_app->show()->cueList(), &CueList::cueUpdated, this, [this](int index) {
         if (!m_dcaMappingPopOut->isVisible())
             return;
@@ -1078,7 +1077,6 @@ void MainWindow::importTmixShow() {
     updateTitle();
     updateStatusBar();
 
-    // explain how the imported show's concepts landed in OpenMix
     QString namesLine;
     if (summary.channelNames > 0) {
         namesLine = tr("<li>The file's <b>channel names</b> (from its show setup) became "

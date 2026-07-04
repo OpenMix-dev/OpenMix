@@ -19,9 +19,8 @@ namespace OpenMix {
 
 namespace {
 
-// the app stylesheet gives inputs padding and a minimum height that overflow
-// a compact table row, leaving the editor's border misaligned with the cell;
-// strip the box model so inline cell editors fit the cell exactly
+// the app stylesheet's input padding and minimum height overflow a compact
+// table row; strip the box model so inline cell editors fit the cell exactly
 void fitEditorToCell(QWidget* editor) {
     editor->setStyleSheet(QStringLiteral(
         "QLineEdit, QComboBox { border: none; border-radius: 0; padding: 0 4px; "

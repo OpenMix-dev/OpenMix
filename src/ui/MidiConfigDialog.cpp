@@ -52,7 +52,6 @@ void MidiConfigDialog::setupUi() {
                                    Theme::Spacing::L);
     mainLayout->setSpacing(Theme::Spacing::M);
 
-    // device section
     QGroupBox* deviceGroup = new QGroupBox(tr("MIDI Device"), this);
     QVBoxLayout* deviceLayout = new QVBoxLayout(deviceGroup);
     deviceLayout->setSpacing(Theme::Spacing::S);
@@ -93,7 +92,6 @@ void MidiConfigDialog::setupUi() {
 
     mainLayout->addWidget(deviceGroup);
 
-    // action mappings section
     QGroupBox* mappingsGroup = new QGroupBox(tr("Action Mappings"), this);
     QVBoxLayout* mappingsLayout = new QVBoxLayout(mappingsGroup);
     mappingsLayout->setSpacing(Theme::Spacing::S);
@@ -109,7 +107,6 @@ void MidiConfigDialog::setupUi() {
     m_mappingsTable->verticalHeader()->setVisible(false);
     m_mappingsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_mappingsTable->setMinimumHeight(140);
-    // size to the actual rows so empty tables don't open with a dead band
     m_mappingsTable->setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);
     mappingsLayout->addWidget(m_mappingsTable);
 
@@ -131,7 +128,6 @@ void MidiConfigDialog::setupUi() {
 
     mainLayout->addWidget(mappingsGroup);
 
-    // channel mute buttons section
     QGroupBox* mutesGroup = new QGroupBox(tr("Channel Mute Buttons"), this);
     QVBoxLayout* mutesLayout = new QVBoxLayout(mutesGroup);
     mutesLayout->setSpacing(Theme::Spacing::S);
@@ -152,7 +148,6 @@ void MidiConfigDialog::setupUi() {
     m_mutesTable->verticalHeader()->setVisible(false);
     m_mutesTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_mutesTable->setMinimumHeight(140);
-    // size to the actual rows so empty tables don't open with a dead band
     m_mutesTable->setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);
     mutesLayout->addWidget(m_mutesTable);
 
@@ -242,7 +237,6 @@ void MidiConfigDialog::addMappingRow(const MidiMapping& mapping) {
     int row = m_mappingsTable->rowCount();
     m_mappingsTable->insertRow(row);
 
-    // trigger column
     QTableWidgetItem* triggerItem = new QTableWidgetItem(mapping.trigger.toString());
     m_mappingsTable->setItem(row, 0, triggerItem);
 
@@ -260,7 +254,6 @@ void MidiConfigDialog::addMappingRow(const MidiMapping& mapping) {
             });
     m_mappingsTable->setCellWidget(row, 1, actionCombo);
 
-    // remove button
     auto* removeBtn = new QToolButton();
     removeBtn->setIcon(Icons::listRemove());
     removeBtn->setAutoRaise(true);
