@@ -22,20 +22,16 @@ WingProtocol::WingProtocol(const MixerCapabilities& caps, QObject* parent)
     QObject::connect(&m_transport, &OscTransport::messageReceived, this,
                      &WingProtocol::onMessageReceived);
 
-    // keep-alive timer
     QObject::connect(&m_keepAliveTimer, &QTimer::timeout, this, &WingProtocol::onKeepAliveTimeout);
 
-    // connection timeout timer
     m_connectionTimer.setSingleShot(true);
     QObject::connect(&m_connectionTimer, &QTimer::timeout, this,
                      &WingProtocol::onConnectionTimeout);
 
-    // request timeout check timer
     m_requestTimeoutTimer.setInterval(500);
     QObject::connect(&m_requestTimeoutTimer, &QTimer::timeout, this,
                      &WingProtocol::onRequestTimeoutCheck);
 
-    // reconnection timer
     m_reconnectTimer.setSingleShot(true);
     QObject::connect(&m_reconnectTimer, &QTimer::timeout, this, &WingProtocol::onReconnectAttempt);
 }

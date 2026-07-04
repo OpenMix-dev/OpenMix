@@ -73,6 +73,27 @@ class TestScribble : public QObject {
         QVERIFY(mixer.hasName(5, "Bob"));
     }
 
+    void refreshNames_pushesRoleWhenPreferred() {
+        ActorProfileLibrary lib;
+        Actor packed("WL01", 3);
+        packed.setRoles({"Valjean"});
+        packed.setUseRoleName(true);
+        lib.addActor(packed);
+        Actor bare("WL02", 5); // prefers role but has none: falls back to name
+        bare.setUseRoleName(true);
+        lib.addActor(bare);
+
+        RecordingMixer mixer;
+        ScribbleController ctl;
+        ctl.setActorLibrary(&lib);
+        ctl.setMixer(&mixer);
+
+        mixer.nameCalls.clear();
+        ctl.refreshNames();
+        QVERIFY(mixer.hasName(3, "Valjean"));
+        QVERIFY(mixer.hasName(5, "WL02"));
+    }
+
     void refreshNames_prefersLowestOrderActive() {
         ActorProfileLibrary lib;
         Actor lead("Lead", 4);

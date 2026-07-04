@@ -13,7 +13,7 @@ class WelcomeDialog : public QDialog {
     Q_OBJECT
 
   public:
-    enum class Choice { None, NewShow, OpenShow, OpenRecent };
+    enum class Choice { None, NewShow, OpenShow, OpenRecent, Import };
 
     explicit WelcomeDialog(QWidget* parent = nullptr);
 
@@ -26,6 +26,7 @@ class WelcomeDialog : public QDialog {
   private slots:
     void chooseNew();
     void chooseOpen();
+    void chooseImport();
     void chooseRecent();
 
   private:

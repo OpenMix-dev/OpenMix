@@ -76,7 +76,6 @@ void EnsemblePanel::setupUi() {
     mainLayout->setContentsMargins(8, 8, 8, 8);
     mainLayout->setSpacing(8);
 
-    // toolbar
     QHBoxLayout* toolbarLayout = new QHBoxLayout();
     m_addButton = new QPushButton(Icons::listAdd(), tr("Add Ensemble"), this);
     m_addButton->setToolTip(tr("Create a new ensemble"));
@@ -91,12 +90,10 @@ void EnsemblePanel::setupUi() {
     toolbarLayout->addStretch();
     mainLayout->addLayout(toolbarLayout);
 
-    // ensemble list
     m_list = new QListWidget(this);
     connect(m_list, &QListWidget::itemSelectionChanged, this, &EnsemblePanel::onSelectionChanged);
     mainLayout->addWidget(m_list, 1);
 
-    // editor
     QGroupBox* editorGroup = new QGroupBox(tr("Ensemble"), this);
     QFormLayout* form = new QFormLayout(editorGroup);
 

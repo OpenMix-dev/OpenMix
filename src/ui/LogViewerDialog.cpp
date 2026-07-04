@@ -32,11 +32,9 @@ void LogViewerDialog::setupUi() {
     mainLayout->setSpacing(12);
     mainLayout->setContentsMargins(16, 16, 16, 16);
 
-    // filter bar
     QHBoxLayout* filterLayout = new QHBoxLayout();
     filterLayout->setSpacing(12);
 
-    // level filter
     QLabel* levelLabel = new QLabel(tr("Level:"), this);
     m_levelCombo = new QComboBox(this);
     m_levelCombo->addItem(tr("Debug"), static_cast<int>(LogLevel::Debug));
@@ -49,7 +47,6 @@ void LogViewerDialog::setupUi() {
     connect(m_levelCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &LogViewerDialog::onLevelFilterChanged);
 
-    // source filter
     QLabel* sourceLabel = new QLabel(tr("Source:"), this);
     m_sourceCombo = new QComboBox(this);
     m_sourceCombo->addItem(tr("All Sources"), -1);
@@ -65,14 +62,12 @@ void LogViewerDialog::setupUi() {
     connect(m_sourceCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &LogViewerDialog::onSourceFilterChanged);
 
-    // search
     m_searchEdit = new QLineEdit(this);
     m_searchEdit->setPlaceholderText(tr("Search..."));
     m_searchEdit->setClearButtonEnabled(true);
     m_searchEdit->setMinimumWidth(200);
     connect(m_searchEdit, &QLineEdit::textChanged, this, &LogViewerDialog::onSearchTextChanged);
 
-    // auto scroll
     m_autoScrollCheck = new QCheckBox(tr("Auto-scroll"), this);
     m_autoScrollCheck->setChecked(true);
     connect(m_autoScrollCheck, &QCheckBox::checkStateChanged, this,
@@ -87,7 +82,6 @@ void LogViewerDialog::setupUi() {
 
     mainLayout->addLayout(filterLayout);
 
-    // log view
     m_logView = new QListView(this);
     m_logView->setModel(m_model);
     m_logView->setItemDelegate(m_delegate);
@@ -99,7 +93,6 @@ void LogViewerDialog::setupUi() {
 
     mainLayout->addWidget(m_logView, 1);
 
-    // button bar
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     buttonLayout->setSpacing(8);
 

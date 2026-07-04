@@ -39,8 +39,8 @@ class ActorSetupPanel : public QWidget {
   private slots:
     // actor list
     void onActorSelectionChanged();
-    void addActor();
-    void addActors(); // bulk add: paste one actor per line
+    void addActors(); // paste one actor per line
+    void addRoles();  // append roles to all selected actors
     void removeActor();
     void moveActorUp();
     void moveActorDown();
@@ -51,6 +51,7 @@ class ActorSetupPanel : public QWidget {
     void onRolesChanged(const QString& text);
     void onChannelChanged(int channel);
     void onActiveToggled(bool on);
+    void onUseRoleNameToggled(bool on);
     void onBackupToggled(bool on);
 
     // profile slots
@@ -79,6 +80,7 @@ class ActorSetupPanel : public QWidget {
     void updateButtonStates();
 
     [[nodiscard]] QString selectedActorId() const;
+    [[nodiscard]] QStringList selectedActorIds() const;
     [[nodiscard]] int channelCount() const;
     // lowest channel not in used, capped at channelCount(); inserts the result
     [[nodiscard]] int takeLowestFreeChannel(QSet<int>& used) const;
@@ -92,8 +94,8 @@ class ActorSetupPanel : public QWidget {
 
     // actor list
     QTreeWidget* m_actorTree = nullptr;
-    QPushButton* m_addActorBtn = nullptr;
     QPushButton* m_addActorsBtn = nullptr;
+    QPushButton* m_addRolesBtn = nullptr;
     QPushButton* m_removeActorBtn = nullptr;
     QPushButton* m_moveUpBtn = nullptr;
     QPushButton* m_moveDownBtn = nullptr;
@@ -112,6 +114,7 @@ class ActorSetupPanel : public QWidget {
     QLineEdit* m_rolesEdit = nullptr;
     QSpinBox* m_channelSpin = nullptr;
     QCheckBox* m_activeCheck = nullptr;
+    QCheckBox* m_useRoleCheck = nullptr;
     QCheckBox* m_backupCheck = nullptr;
 
     QComboBox* m_slotCombo = nullptr;

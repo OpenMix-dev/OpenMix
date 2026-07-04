@@ -134,6 +134,7 @@ class PlaybackEngine : public QObject {
   private slots:
     void onAutoFollowTimerTimeout();
     void onCueRemoved(int index);
+    void onCueListReset();
 
   private:
     void setState(PlaybackState state);

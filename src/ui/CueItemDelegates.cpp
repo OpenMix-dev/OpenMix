@@ -17,6 +17,18 @@
 
 namespace OpenMix {
 
+namespace {
+
+// the app stylesheet's input padding and minimum height overflow a compact
+// table row; strip the box model so inline cell editors fit the cell exactly
+void fitEditorToCell(QWidget* editor) {
+    editor->setStyleSheet(QStringLiteral(
+        "QLineEdit, QComboBox { border: none; border-radius: 0; padding: 0 4px; "
+        "min-height: 0; }"));
+}
+
+} // namespace
+
 CueNumberDelegate::CueNumberDelegate(CueList* cueList, QObject* parent)
     : QStyledItemDelegate(parent), m_cueList(cueList) {}
 
@@ -42,6 +54,7 @@ QWidget* CueNumberDelegate::createEditor(QWidget* parent, [[maybe_unused]] const
 
     QLineEdit* editor = new QLineEdit(parent);
     editor->setFrame(false);
+    fitEditorToCell(editor);
     editor->setFocusPolicy(Qt::StrongFocus);
     QDoubleValidator* validator = new QDoubleValidator(0.0, 9999.9, 1, editor);
     validator->setNotation(QDoubleValidator::StandardNotation);
@@ -193,6 +206,7 @@ QWidget* CueTypeDelegate::createEditor(QWidget* parent, [[maybe_unused]] const Q
 
     QComboBox* editor = new QComboBox(parent);
     editor->setFrame(false);
+    fitEditorToCell(editor);
     editor->setFocusPolicy(Qt::StrongFocus);
 
     // add all cue types
@@ -283,6 +297,7 @@ QWidget* DCAAssignDelegate::createEditor(QWidget* parent,
 
     QLineEdit* editor = new QLineEdit(parent);
     editor->setFrame(false);
+    fitEditorToCell(editor);
     editor->setFocusPolicy(Qt::StrongFocus);
     editor->setPlaceholderText(tr("Role, actor, or label"));
     if (m_library) {
@@ -354,6 +369,7 @@ QWidget* CueTextDelegate::createEditor(QWidget* parent, [[maybe_unused]] const Q
 
     QLineEdit* editor = new QLineEdit(parent);
     editor->setFrame(false);
+    fitEditorToCell(editor);
     editor->setFocusPolicy(Qt::StrongFocus);
     editor->installEventFilter(const_cast<CueTextDelegate*>(this));
 

@@ -68,7 +68,6 @@ void TimecodePanel::setupUi() {
     m_liveLabel->setFont(mono);
     mainLayout->addWidget(m_liveLabel);
 
-    // trigger table
     m_table = new QTableWidget(0, 3, this);
     m_table->setHorizontalHeaderLabels({tr("Timecode"), tr("Cue"), tr("Enabled")});
     m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
@@ -117,7 +116,6 @@ void TimecodePanel::setupUi() {
 
     mainLayout->addWidget(addGroup);
 
-    // remove
     QHBoxLayout* removeLayout = new QHBoxLayout();
     removeLayout->addStretch();
     m_removeButton = new QPushButton(Icons::listRemove(), tr("Remove Selected"), this);

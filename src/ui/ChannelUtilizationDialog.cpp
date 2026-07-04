@@ -45,7 +45,7 @@ ChannelUtilizationDialog::ChannelUtilizationDialog(Application* app, QWidget* pa
         QString actorName;
         if (actors) {
             if (const Actor* a = actors->actorForChannel(u.channel))
-                actorName = a->name();
+                actorName = a->displayName();
         }
         table->setItem(row, 1, new QTableWidgetItem(actorName));
 

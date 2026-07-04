@@ -52,7 +52,6 @@ CueListView::CueListView(Application* app, QWidget* parent) : QWidget(parent), m
     // connect model signals for undo integration
     connect(m_model, &CueTableModel::cueReordered, this, &CueListView::onCueReordered);
 
-    // install event filter
     m_tableView->installEventFilter(this);
     m_tableView->viewport()->installEventFilter(this);
 }
@@ -299,7 +298,6 @@ void CueListView::setStandbyCueHighlight(int index) {
 }
 
 void CueListView::refreshAll() {
-    // update filter options
     m_filterBar->updateFilterOptions();
 }
 
@@ -318,7 +316,6 @@ void CueListView::addNewCue() {
     double nextNum = cueList->nextCueNumber();
     Cue cue(nextNum);
 
-    // push to undo stack
     m_app->undoStack()->push(new AddCueCommand(cueList, cue));
 
     // manually add cue since undo command's first redo is skipped
@@ -342,7 +339,6 @@ void CueListView::deleteSelectedCue() {
 
     CueList* cueList = m_app->show()->cueList();
 
-    // push to undo stack
     m_app->undoStack()->push(new RemoveCueCommand(cueList, idx));
 
     // manually remove since undo command's first redo is skipped
@@ -364,7 +360,6 @@ void CueListView::duplicateSelectedCue() {
     duplicate.regenerateId();
     duplicate.setNumber(cueList->nextCueNumber());
 
-    // push to undo stack
     m_app->undoStack()->push(new AddCueCommand(cueList, duplicate));
 
     // manually add cue

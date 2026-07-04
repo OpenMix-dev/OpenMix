@@ -11,11 +11,11 @@ namespace OpenMix {
 // scales them to the console's wire format.
 struct EqBand {
     int band = 1;         // 1-based band index
-    bool on = true;       //
+    bool on = true;
     int type = 0;         // console EQ type enum (PEQ / shelf / ...), driver-mapped
     double freq = 1000.0; // Hz
     double gain = 0.0;    // dB
-    double q = 2.0;       //
+    double q = 2.0;
 
     QJsonObject toJson() const;
     [[nodiscard]] static EqBand fromJson(const QJsonObject& json);

@@ -898,15 +898,17 @@ void MainWindow::connectSignals() {
 
     connect(m_cueEditor, &CueEditor::cueModified, [this]() {
         m_cueListView->refreshCurrentCue();
-        // editor edits can change the cue's DCA mapping/labels; keep the DCA
-        // panel showing the same cue in step (skip when hidden: rebuild is
-        // per-keystroke while typing in the editor)
-        if (m_dcaMappingPopOut->isVisible()) {
-            CueList* cueList = m_app->show()->cueList();
-            const int index = m_cueListView->selectedCueIndex();
-            if (index >= 0 && index < cueList->count())
-                m_dcaMappingPanel->setCurrentCue(&(*cueList)[index]);
-        }
+    });
+
+    // repaint the DCA panel when the cue it shows changes; skipped while
+    // hidden since the rebuild runs per-keystroke
+    connect(m_app->show()->cueList(), &CueList::cueUpdated, this, [this](int index) {
+        if (!m_dcaMappingPopOut->isVisible())
+            return;
+        if (index < 0 || index != m_cueListView->selectedCueIndex())
+            return;
+        CueList* cueList = m_app->show()->cueList();
+        m_dcaMappingPanel->setCurrentCue(&(*cueList)[index]);
     });
 
     connect(m_app->playbackEngine(), &PlaybackEngine::goLockout, this, &MainWindow::onGoLockout);
@@ -1075,25 +1077,35 @@ void MainWindow::importTmixShow() {
     updateTitle();
     updateStatusBar();
 
-    // explain how TheatreMix concepts landed in OpenMix
+    QString namesLine;
+    if (summary.channelNames > 0) {
+        namesLine = tr("<li>The file's <b>channel names</b> (from its show setup) became "
+                       "OpenMix <b>actor names</b>; OpenMix writes these to the console's "
+                       "scribble strips. Edit them in Actor Setup (F9).</li>");
+    }
     QString rolesLine;
     if (summary.rolesInferred > 0) {
         rolesLine = tr("<li><b>%1 role(s)</b> were inferred from cue DCA labels; review them "
                        "in Actor Setup (F9).</li>")
                         .arg(summary.rolesInferred);
     }
+    QString slotsLine;
+    if (!summary.profileSlots.isEmpty()) {
+        slotsLine = tr("<li>Additional channel <b>profiles</b> (%1) became <b>voice "
+                       "profile slots</b>: show-wide voice categories shared by every actor, "
+                       "not per-mic names. Each actor stores their own EQ/dynamics per slot "
+                       "in Actor Setup.</li>")
+                        .arg(summary.profileSlots.join(", "));
+    }
     const QString html =
         tr("<p>Imported <b>%1 actors</b>, <b>%2 cues</b>, <b>%3 positions</b> and "
            "<b>%4 ensembles</b>.</p>"
-           "<p>How TheatreMix concepts map onto OpenMix:</p>"
+           "<p>How the imported show maps onto OpenMix:</p>"
            "<ul>"
-           "<li>TheatreMix <b>actors</b> are OpenMix actors. Each also has a new <b>Roles</b> "
+           "<li>Imported <b>actors</b> are OpenMix actors. Each also has a new <b>Roles</b> "
            "(characters) field; typing one of their roles or the actor name into a cue's "
            "DCA slot assigns their channel to that DCA.</li>"
-           "%5"
-           "<li>TheatreMix <b>profiles</b> (%6) became <b>voice profile slots</b>: show-wide "
-           "voice categories shared by every actor, not per-mic names. Each actor stores "
-           "their own EQ/dynamics per slot in Actor Setup.</li>"
+           "%5%6%7"
            "<li>Cue <b>DCA labels and channel lists</b> became per-cue DCA label overrides "
            "and cue-specific DCA mappings; see the DCA Mapping view (F5).</li>"
            "</ul>")
@@ -1101,10 +1113,10 @@ void MainWindow::importTmixShow() {
             .arg(summary.cues)
             .arg(summary.positions)
             .arg(summary.ensembles)
+            .arg(namesLine)
             .arg(rolesLine)
-            .arg(summary.profileSlots.isEmpty() ? tr("none found")
-                                                : summary.profileSlots.join(", "));
-    HelpDialog dialog(tr("Imported from TheatreMix"), html, this);
+            .arg(slotsLine);
+    HelpDialog dialog(tr("Show File Imported"), html, this);
     dialog.exec();
 }
 
@@ -1226,6 +1238,9 @@ void MainWindow::showWelcomeDialog() {
         updateRecentProjectsMenu();
         break;
     }
+    case WelcomeDialog::Choice::Import:
+        importTmixShow();
+        break;
     case WelcomeDialog::Choice::None:
         break;
     }
@@ -1360,9 +1375,9 @@ void MainWindow::updateStatusBar() {
     int count = m_app->show()->cueList()->count();
     m_cueStatusLabel->setText(tr("%n cue(s)", "", count));
 
-    int currentIdx = m_app->playbackEngine()->currentCueIndex();
-    if (currentIdx >= 0) {
-        const Cue* cue = m_app->playbackEngine()->currentCue();
+    // key off the bounds-checked cue pointers, not the raw indices: during a
+    // bulk list clear the indices can be momentarily stale
+    if (const Cue* cue = m_app->playbackEngine()->currentCue()) {
         m_currentCueLabel->setText(tr("Current: %1 - %2")
                                        .arg(cue->number(), 0, 'f', 1)
                                        .arg(cue->name().isEmpty() ? tr("(unnamed)") : cue->name()));
@@ -1370,9 +1385,7 @@ void MainWindow::updateStatusBar() {
         m_currentCueLabel->setText(tr("Current: --"));
     }
 
-    int standbyIdx = m_app->playbackEngine()->standbyCueIndex();
-    if (standbyIdx >= 0) {
-        const Cue* cue = m_app->playbackEngine()->standbyCue();
+    if (const Cue* cue = m_app->playbackEngine()->standbyCue()) {
         m_nextCueLabel->setText(tr("Next: %1 - %2")
                                     .arg(cue->number(), 0, 'f', 1)
                                     .arg(cue->name().isEmpty() ? tr("(unnamed)") : cue->name()));
@@ -1543,8 +1556,8 @@ void MainWindow::showQuickStart() {
         "<i>Edit &rarr; Lock Editing</i> prevents accidental edits during a performance.</li>"
         "</ol>"
         "<p>Already have a show file? <i>File &rarr; Import Show File&hellip;</i> reads a "
-        "<tt>.tmix</tt> database directly: TheatreMix actors become actors (roles are "
-        "inferred from cue DCA labels where unambiguous), TheatreMix profiles become "
+        "<tt>.tmix</tt> database directly: its channel names become actor names (roles are "
+        "inferred from cue DCA labels where unambiguous), additional channel profiles become "
         "show-wide voice profile slots, and cue DCA labels/channels become per-cue DCA "
         "overrides and mappings.</p>");
     HelpDialog dialog(tr("Quick Start"), html, this);

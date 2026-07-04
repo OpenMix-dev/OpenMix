@@ -397,6 +397,100 @@ class TestShowControl : public QObject {
         QCOMPARE(spy.count(), 2);
         QVERIFY(!engine.checkMode());
     }
+
+    // --- list reset (new show / show load) ---
+
+    void listClear_resetsPlaybackIndices() {
+        CueList cues;
+        cues.addCue(Cue(1.0, "A"));
+        cues.addCue(Cue(2.0, "B"));
+        cues.addCue(Cue(3.0, "C"));
+
+        RecordingMixer* mixer = makeConnectedMixer(this);
+        PlaybackEngine engine;
+        engine.setCueList(&cues); // standby -> 0
+        engine.setMixer(mixer);
+        engine.go(); // current 0, standby 1
+
+        QSignalSpy currentSpy(&engine, &PlaybackEngine::currentCueChanged);
+        QSignalSpy standbySpy(&engine, &PlaybackEngine::standbyCueChanged);
+
+        cues.clear();
+
+        QCOMPARE(engine.currentCueIndex(), -1);
+        QCOMPARE(engine.standbyCueIndex(), -1);
+        QCOMPARE(engine.currentCue(), nullptr);
+        QCOMPARE(engine.standbyCue(), nullptr);
+        QCOMPARE(engine.state(), PlaybackState::Stopped);
+        QCOMPARE(currentSpy.count(), 1);
+        QCOMPARE(currentSpy.at(0).at(0).toInt(), -1);
+        QCOMPARE(standbySpy.count(), 1);
+        QCOMPARE(standbySpy.at(0).at(0).toInt(), -1);
+
+        engine.go(); // no-op on an empty list
+        QCOMPARE(engine.currentCueIndex(), -1);
+        QCOMPARE(engine.standbyCueIndex(), -1);
+    }
+
+    void listLoad_rearmsStandbyAtFirstCue() {
+        CueList cues;
+        cues.addCue(Cue(1.0, "A"));
+        cues.addCue(Cue(2.0, "B"));
+        cues.addCue(Cue(3.0, "C"));
+
+        RecordingMixer* mixer = makeConnectedMixer(this);
+        PlaybackEngine engine;
+        engine.setCueList(&cues);
+        engine.setMixer(mixer);
+        engine.go();
+        engine.go(); // current 1, standby 2
+
+        CueList smaller;
+        smaller.addCue(Cue(9.0, "Z"));
+        cues.fromJson(smaller.toJson()); // the Open Show path
+
+        QCOMPARE(cues.count(), 1);
+        QCOMPARE(engine.currentCueIndex(), -1);
+        QCOMPARE(engine.standbyCueIndex(), 0);
+        QCOMPARE(engine.state(), PlaybackState::Stopped);
+    }
+
+    void listLoad_emptyShow_leavesNothingArmed() {
+        CueList cues;
+        cues.addCue(Cue(1.0, "A"));
+
+        PlaybackEngine engine;
+        engine.setCueList(&cues); // standby -> 0
+
+        cues.fromJson(QJsonArray());
+
+        QCOMPARE(engine.standbyCueIndex(), -1);
+        QCOMPARE(engine.standbyCue(), nullptr);
+    }
+
+    void listClear_cancelsRunningFades() {
+        CueList cues;
+        Cue a(1.0, "A");
+        a.setType(CueType::Snapshot);
+        a.setChannelLevel(5, 0.0);
+        Cue b(2.0, "B");
+        b.setType(CueType::Snapshot);
+        b.setChannelLevel(5, 1.0);
+        b.setFadeTime(1.0);
+        cues.addCue(a);
+        cues.addCue(b);
+
+        RecordingMixer* mixer = makeConnectedMixer(this);
+        PlaybackEngine engine;
+        engine.setCueList(&cues);
+        engine.setMixer(mixer);
+        engine.executeCue(0); // instant, seeds the applied level
+        engine.executeCue(1); // fades 0 -> 1
+        QVERIFY(engine.fadeEngine()->isActive());
+
+        cues.clear();
+        QVERIFY(!engine.fadeEngine()->isActive());
+    }
 };
 
 QTEST_MAIN(TestShowControl)

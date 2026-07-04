@@ -421,7 +421,7 @@ void ActorSetupPanel::setupUi() {
     m_actorTree->setColumnCount(4);
     m_actorTree->setHeaderLabels({tr("Actor"), tr("Role"), tr("Ch"), tr("Active")});
     m_actorTree->setRootIsDecorated(false);
-    m_actorTree->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_actorTree->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_actorTree->header()->setStretchLastSection(false);
     m_actorTree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_actorTree->header()->setSectionResizeMode(1, QHeaderView::Stretch);
@@ -437,24 +437,27 @@ void ActorSetupPanel::setupUi() {
     leftLayout->addWidget(m_actorTree, 1);
 
     auto* listButtons = new QHBoxLayout();
-    m_addActorBtn = new QPushButton(Icons::listAdd(), tr("Add"), left);
-    m_addActorsBtn = new QPushButton(Icons::listAdd(), tr("Add Multiple..."), left);
-    m_addActorsBtn->setToolTip(tr("Add several actors at once: paste a cast list, one per line"));
+    m_addActorsBtn = new QPushButton(Icons::listAdd(), tr("Add Actors..."), left);
+    m_addActorsBtn->setToolTip(tr("Add one or more actors: one per line, roles after a tab; "
+                                  "pasting Name and Role columns from a spreadsheet works"));
+    m_addRolesBtn = new QPushButton(Icons::listAdd(), tr("Add Roles..."), left);
+    m_addRolesBtn->setToolTip(tr("Append roles to the selected actor(s): commas or one per line"));
     m_removeActorBtn = new QPushButton(Icons::listRemove(), tr("Remove"), left);
+    m_removeActorBtn->setToolTip(tr("Remove the selected actor(s)"));
     m_moveUpBtn = new QPushButton(Icons::moveUp(), QString(), left);
     m_moveUpBtn->setToolTip(tr("Move actor up"));
     m_moveDownBtn = new QPushButton(Icons::moveDown(), QString(), left);
     m_moveDownBtn->setToolTip(tr("Move actor down"));
-    listButtons->addWidget(m_addActorBtn);
     listButtons->addWidget(m_addActorsBtn);
+    listButtons->addWidget(m_addRolesBtn);
     listButtons->addWidget(m_removeActorBtn);
     listButtons->addStretch();
     listButtons->addWidget(m_moveUpBtn);
     listButtons->addWidget(m_moveDownBtn);
     leftLayout->addLayout(listButtons);
 
-    connect(m_addActorBtn, &QPushButton::clicked, this, &ActorSetupPanel::addActor);
     connect(m_addActorsBtn, &QPushButton::clicked, this, &ActorSetupPanel::addActors);
+    connect(m_addRolesBtn, &QPushButton::clicked, this, &ActorSetupPanel::addRoles);
     connect(m_removeActorBtn, &QPushButton::clicked, this, &ActorSetupPanel::removeActor);
     connect(m_moveUpBtn, &QPushButton::clicked, this, &ActorSetupPanel::moveActorUp);
     connect(m_moveDownBtn, &QPushButton::clicked, this, &ActorSetupPanel::moveActorDown);
@@ -499,12 +502,17 @@ void ActorSetupPanel::setupUi() {
         tr("Typing any of these roles into a cue's DCA slot assigns this actor's channel"));
     m_channelSpin = new QSpinBox(identityBox);
     m_channelSpin->setRange(1, 96);
+    m_useRoleCheck = new QCheckBox(tr("Label channel with role name"), identityBox);
+    m_useRoleCheck->setToolTip(
+        tr("Console scribble strips and channel lists show the primary role instead of the "
+           "actor name; useful when the channel isn't tied to one person"));
     m_activeCheck = new QCheckBox(tr("Active"), identityBox);
     m_activeCheck->setToolTip(tr("Inactive actors yield their channel to the next understudy"));
     m_backupCheck = new QCheckBox(tr("Channel on backup / spare mic"), identityBox);
     m_backupCheck->setToolTip(tr("Resolve this channel to the backup voice instead of the main"));
     identityForm->addRow(tr("Name:"), m_nameEdit);
     identityForm->addRow(tr("Roles:"), m_rolesEdit);
+    identityForm->addRow(QString(), m_useRoleCheck);
     identityForm->addRow(tr("Channel:"), m_channelSpin);
     identityForm->addRow(QString(), m_activeCheck);
     identityForm->addRow(QString(), m_backupCheck);
@@ -515,6 +523,7 @@ void ActorSetupPanel::setupUi() {
     connect(m_channelSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
             &ActorSetupPanel::onChannelChanged);
     connect(m_activeCheck, &QCheckBox::toggled, this, &ActorSetupPanel::onActiveToggled);
+    connect(m_useRoleCheck, &QCheckBox::toggled, this, &ActorSetupPanel::onUseRoleNameToggled);
     connect(m_backupCheck, &QCheckBox::toggled, this, &ActorSetupPanel::onBackupToggled);
 
     auto* slotBox = new QGroupBox(tr("Voice Profile Slots (shared by all actors)"), m_editor);
@@ -589,6 +598,22 @@ int ActorSetupPanel::takeLowestFreeChannel(QSet<int>& used) const {
 QString ActorSetupPanel::selectedActorId() const {
     auto* item = m_actorTree->currentItem();
     return item ? item->data(0, Qt::UserRole).toString() : QString();
+}
+
+QStringList ActorSetupPanel::selectedActorIds() const {
+    QStringList ids;
+    const QList<QTreeWidgetItem*> items = m_actorTree->selectedItems();
+    for (const QTreeWidgetItem* item : items) {
+        const QString id = item->data(0, Qt::UserRole).toString();
+        if (!id.isEmpty())
+            ids.append(id);
+    }
+    if (ids.isEmpty()) {
+        const QString current = selectedActorId();
+        if (!current.isEmpty())
+            ids.append(current);
+    }
+    return ids;
 }
 
 void ActorSetupPanel::refresh() {
@@ -668,6 +693,7 @@ void ActorSetupPanel::loadActorIntoEditor() {
         m_rolesEdit->clear();
         m_channelSpin->setValue(1);
         m_activeCheck->setChecked(false);
+        m_useRoleCheck->setChecked(false);
         m_backupCheck->setChecked(false);
         m_mainVoice->setVoice(VoiceData());
         m_backupVoice->setVoice(VoiceData());
@@ -683,6 +709,7 @@ void ActorSetupPanel::loadActorIntoEditor() {
     m_rolesEdit->setText(a->rolesDisplay());
     m_channelSpin->setValue(a->channel());
     m_activeCheck->setChecked(a->active());
+    m_useRoleCheck->setChecked(a->useRoleName());
     m_backupCheck->setChecked(m_library->isBackup(a->channel()));
 
     const ActorProfile profile = a->profile(m_currentSlot);
@@ -697,7 +724,9 @@ void ActorSetupPanel::setEditorEnabled(bool on) {
 
 void ActorSetupPanel::updateButtonStates() {
     const bool hasSel = !selectedActorId().isEmpty();
-    m_removeActorBtn->setEnabled(hasSel);
+    const bool hasAnySel = !selectedActorIds().isEmpty();
+    m_removeActorBtn->setEnabled(hasAnySel);
+    m_addRolesBtn->setEnabled(hasAnySel);
     m_copyBtn->setEnabled(hasSel);
     m_pasteBtn->setEnabled(hasSel && !m_copiedProfiles.isEmpty());
     m_saveGroupBtn->setEnabled(m_library && m_library->actorCount() > 0);
@@ -708,39 +737,13 @@ void ActorSetupPanel::updateButtonStates() {
     m_moveDownBtn->setEnabled(idx >= 0 && idx < m_actorTree->topLevelItemCount() - 1);
 }
 
-void ActorSetupPanel::addActor() {
-    if (!m_library)
-        return;
-
-    // choose the lowest free channel and a unique-ish order at the end
-    QSet<int> used;
-    int maxOrder = 0;
-    for (const Actor& a : m_library->actors()) {
-        used.insert(a.channel());
-        maxOrder = std::max(maxOrder, a.order());
-    }
-
-    Actor actor(tr("New Actor"), takeLowestFreeChannel(used));
-    actor.setOrder(maxOrder + 1);
-    // seed an empty profile for the current slots so the slot combo is populated
-    const QStringList slotNames = m_library->profileSlots();
-    if (!slotNames.isEmpty())
-        actor.setProfile(slotNames.first(), ActorProfile());
-
-    const QString id = actor.id();
-    m_library->addActor(actor);
-    rebuildActorTree(id);
-    m_nameEdit->setFocus();
-    m_nameEdit->selectAll();
-}
-
 void ActorSetupPanel::addActors() {
     if (!m_library)
         return;
 
     bool ok = false;
     const QString text = QInputDialog::getMultiLineText(
-        this, tr("Add Multiple Actors"),
+        this, tr("Add Actors"),
         tr("One actor per line. Optionally add roles after a tab; pasting Name and "
            "Role columns from a spreadsheet works."),
         QString(), &ok);
@@ -776,18 +779,64 @@ void ActorSetupPanel::addActors() {
     rebuildActorTree(firstId);
 }
 
+void ActorSetupPanel::addRoles() {
+    if (!m_library)
+        return;
+    const QStringList ids = selectedActorIds();
+    if (ids.isEmpty())
+        return;
+
+    bool ok = false;
+    QString text = QInputDialog::getMultiLineText(
+        this, tr("Add Roles"),
+        tr("Add roles to %n selected actor(s): commas or one per line.", "", ids.size()),
+        QString(), &ok);
+    if (!ok)
+        return;
+
+    const QStringList roles = CastTextParse::parseRoles(text.replace(QLatin1Char('\n'), QLatin1Char(',')));
+    if (roles.isEmpty())
+        return;
+
+    m_updatingUi = true;
+    for (const QString& id : ids) {
+        const Actor* a = m_library->actorById(id);
+        if (!a)
+            continue;
+        Actor copy = *a;
+        copy.setRoles(CastTextParse::mergeRoles(a->roles(), roles));
+        m_library->updateActor(id, copy);
+    }
+    m_updatingUi = false;
+
+    rebuildActorTree(selectedActorId());
+}
+
 void ActorSetupPanel::removeActor() {
-    const QString id = selectedActorId();
-    if (id.isEmpty() || !m_library)
+    if (!m_library)
+        return;
+    const QStringList ids = selectedActorIds();
+    if (ids.isEmpty())
         return;
 
-    const Actor* a = m_library->actorById(id);
-    const QString name = a ? a->name() : QString();
-    if (QMessageBox::question(this, tr("Remove Actor"),
-                              tr("Remove actor \"%1\"?").arg(name)) != QMessageBox::Yes)
+    QStringList names;
+    for (const QString& id : ids) {
+        if (const Actor* a = m_library->actorById(id))
+            names << (a->name().isEmpty() ? tr("(unnamed)") : a->name());
+    }
+
+    const QString prompt =
+        ids.size() == 1
+            ? tr("Remove actor \"%1\"?").arg(names.value(0))
+            : tr("Remove %n actors?\n\n%1", "", ids.size()).arg(names.join(", "));
+    if (QMessageBox::question(this, tr("Remove Actors"), prompt) != QMessageBox::Yes)
         return;
 
-    m_library->removeActor(id);
+    m_updatingUi = true;
+    for (const QString& id : ids)
+        m_library->removeActor(id);
+    m_updatingUi = false;
+
     rebuildActorTree();
 }
 
@@ -934,6 +983,20 @@ void ActorSetupPanel::onActiveToggled(bool on) {
     m_library->updateActor(id, copy);
     if (auto* item = m_actorTree->currentItem())
         item->setText(3, on ? tr("Yes") : tr("No"));
+    m_updatingUi = false;
+}
+
+void ActorSetupPanel::onUseRoleNameToggled(bool on) {
+    if (m_updatingUi)
+        return;
+    const QString id = selectedActorId();
+    const Actor* a = m_library ? m_library->actorById(id) : nullptr;
+    if (!a)
+        return;
+    Actor copy = *a;
+    copy.setUseRoleName(on);
+    m_updatingUi = true;
+    m_library->updateActor(id, copy);
     m_updatingUi = false;
 }
 

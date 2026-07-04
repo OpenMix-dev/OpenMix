@@ -231,7 +231,6 @@ void CueEditor::setupUi() {
     outerLayout->setContentsMargins(0, 0, 0, 0);
     outerLayout->addWidget(scroll);
 
-    // connect signals
     connect(m_numberSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
             &CueEditor::onNumberChanged);
     connect(m_nameEdit, &QLineEdit::textChanged, this, &CueEditor::onNameChanged);
@@ -737,13 +736,11 @@ void CueEditor::updateDCAAssignInfo() {
         for (int ch : channels) {
             const Actor* actor = m_actorLibrary ? m_actorLibrary->actorForChannel(ch) : nullptr;
             if (actor) {
-                QString role = actor->matchedRole(dcaLabel);
-                if (role.isEmpty())
-                    role = actor->primaryRole();
-                if (!role.isEmpty())
-                    parts << tr("Ch %1 %2 (%3)").arg(ch).arg(actor->name(), role);
+                const QString secondary = actor->secondaryName(actor->matchedRole(dcaLabel));
+                if (!secondary.isEmpty())
+                    parts << tr("Ch %1 %2 (%3)").arg(ch).arg(actor->displayName(), secondary);
                 else
-                    parts << tr("Ch %1 %2").arg(ch).arg(actor->name());
+                    parts << tr("Ch %1 %2").arg(ch).arg(actor->displayName());
             } else {
                 parts << tr("Ch %1").arg(ch);
             }
@@ -780,9 +777,10 @@ void CueEditor::rebuildChannelTable() {
         chItem->setFlags(Qt::ItemIsEnabled);
         m_channelTable->setItem(row, 0, chItem);
 
-        QString display = a.name().isEmpty() ? tr("(unnamed)") : a.name();
-        if (!a.roles().isEmpty())
-            display = tr("%1 (%2)").arg(display, a.rolesDisplay());
+        QString display = a.displayName().isEmpty() ? tr("(unnamed)") : a.displayName();
+        const QString secondary = a.useRoleName() ? a.name() : a.rolesDisplay();
+        if (!secondary.isEmpty() && secondary.compare(display, Qt::CaseInsensitive) != 0)
+            display = tr("%1 (%2)").arg(display, secondary);
         auto* nameItem = new QTableWidgetItem(display);
         nameItem->setFlags(Qt::ItemIsEnabled);
         m_channelTable->setItem(row, 1, nameItem);

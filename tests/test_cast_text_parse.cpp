@@ -19,6 +19,27 @@ class TestCastTextParse : public QObject {
         QVERIFY(CastTextParse::parseRoles(" , ,, ").isEmpty());
     }
 
+    // --- mergeRoles ---------------------------------------------------------
+    void mergeRoles_appendsOnlyNewRoles() {
+        QCOMPARE(CastTextParse::mergeRoles({"Cosette"}, {"Ensemble", "Swing"}),
+                 QStringList({"Cosette", "Ensemble", "Swing"}));
+        // case-insensitive duplicates are skipped, existing order preserved
+        QCOMPARE(CastTextParse::mergeRoles({"Cosette", "Swing"}, {"cosette", "Ensemble"}),
+                 QStringList({"Cosette", "Swing", "Ensemble"}));
+        QCOMPARE(CastTextParse::mergeRoles({}, {"Ensemble"}), QStringList({"Ensemble"}));
+        QCOMPARE(CastTextParse::mergeRoles({"Cosette"}, {}), QStringList({"Cosette"}));
+        QVERIFY(CastTextParse::mergeRoles({}, {}).isEmpty());
+    }
+
+    void mergeRoles_newlineInputViaParseRoles() {
+        // the Add Roles dialog accepts commas or one role per line; newlines
+        // are normalised to commas before parseRoles
+        QString text = QStringLiteral("Ensemble, Swing\nFactory Girl\n\n swing ");
+        const QStringList roles =
+            CastTextParse::parseRoles(text.replace(QLatin1Char('\n'), QLatin1Char(',')));
+        QCOMPARE(roles, QStringList({"Ensemble", "Swing", "Factory Girl"}));
+    }
+
     // --- parseCastLines ----------------------------------------------------
     void castLines_plainNames() {
         const auto lines = CastTextParse::parseCastLines("Alice\nBob\nCarol");

@@ -89,6 +89,35 @@ class TestActorProfiles : public QObject {
         QCOMPARE(r.roles(), QStringList({"Cosette", "Singer #1"}));
     }
 
+    void actor_useRoleName_roundTripAndDisplayName() {
+        Actor a("WL01", 17);
+        a.setRoles({"Valjean"});
+        QCOMPARE(a.displayName(), QString("WL01"));
+        QCOMPARE(a.secondaryName(), QString("Valjean"));
+
+        a.setUseRoleName(true);
+        QCOMPARE(a.displayName(), QString("Valjean"));
+        QCOMPARE(a.secondaryName(), QString("WL01"));
+
+        Actor r = Actor::fromJson(a.toJson());
+        QVERIFY(r.useRoleName());
+        QCOMPARE(r.displayName(), QString("Valjean"));
+
+        // no roles to prefer: falls back to the actor name
+        Actor bare("Bob", 4);
+        bare.setUseRoleName(true);
+        QCOMPARE(bare.displayName(), QString("Bob"));
+        QVERIFY(bare.secondaryName().isEmpty());
+
+        // identical name and role never render as "Barry (Barry)"
+        Actor same("Barry", 1);
+        same.setRoles({"Barry"});
+        QVERIFY(same.secondaryName().isEmpty());
+
+        // default flag stays out of the file
+        QVERIFY(!Actor("Alice", 5).toJson().contains("useRoleName"));
+    }
+
     void actor_emptyRoles_omittedFromJson() {
         Actor a("Alice", 5);
         QVERIFY(!a.toJson().contains("roles"));

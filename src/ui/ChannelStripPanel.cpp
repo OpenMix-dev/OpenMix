@@ -55,7 +55,8 @@ void ChannelStripPanel::rebuild() {
         auto* tile = new QLabel(this);
         tile->setAlignment(Qt::AlignCenter);
         tile->setFixedSize(84, 44);
-        const QString name = actor.name().isEmpty() ? tr("ch %1").arg(channel) : actor.name();
+        const QString name =
+            actor.displayName().isEmpty() ? tr("ch %1").arg(channel) : actor.displayName();
         tile->setText(QString("<b>%1</b><br/><small>%2</small>").arg(channel).arg(name.toHtmlEscaped()));
         const int state = m_app->channelMonitor()
                               ? static_cast<int>(m_app->channelMonitor()->channelState(channel))

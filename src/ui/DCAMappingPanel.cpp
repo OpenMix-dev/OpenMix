@@ -5,6 +5,7 @@
 #include "core/Actor.h"
 #include "core/ActorProfileLibrary.h"
 #include "core/Cue.h"
+#include "core/CueList.h"
 #include "core/DCAMapping.h"
 #include "core/ShortcutManager.h"
 #include "core/Show.h"
@@ -16,6 +17,8 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QKeyEvent>
+#include <QStyleOptionComboBox>
+#include <QStylePainter>
 #include <QTimer>
 #include <QWheelEvent>
 #include <QFileDialog>
@@ -40,7 +43,24 @@ class NoScrollComboBox : public QComboBox {
   public:
     using QComboBox::QComboBox;
 
+    // shorter closed-state text; the popup keeps the full item text
+    static constexpr int CompactTextRole = Qt::UserRole + 1;
+
   protected:
+    void paintEvent(QPaintEvent* event) override {
+        const QVariant compact = currentData(CompactTextRole);
+        if (!compact.isValid()) {
+            QComboBox::paintEvent(event);
+            return;
+        }
+        QStylePainter painter(this);
+        QStyleOptionComboBox opt;
+        initStyleOption(&opt);
+        opt.currentText = compact.toString();
+        painter.drawComplexControl(QStyle::CC_ComboBox, opt);
+        painter.drawControl(QStyle::CE_ComboBoxLabel, opt);
+    }
+
     void wheelEvent(QWheelEvent* event) override { event->ignore(); }
 
     void showPopup() override {
@@ -78,7 +98,6 @@ DCAMappingPanel::DCAMappingPanel(Application* app, QWidget* parent)
         // console-type selection changes the DCA/channel/bus counts shown here
         connect(m_app, &Application::dcaCountChanged, this, &DCAMappingPanel::refresh);
 
-        // get mapping from show
         m_mapping = m_app->show()->dcaMapping();
         if (m_mapping) {
             connect(m_mapping, &DCAMapping::mappingCleared, this, &DCAMappingPanel::refresh);
@@ -87,6 +106,10 @@ DCAMappingPanel::DCAMappingPanel(Application* app, QWidget* parent)
         // actor renames/role edits change the channel labels shown here
         connect(m_app->show()->actorProfileLibrary(), &ActorProfileLibrary::changed, this,
                 &DCAMappingPanel::onActorsChanged);
+
+        // a cleared cue list destroys the cue this panel points at
+        connect(m_app->show()->cueList(), &CueList::listCleared, this,
+                &DCAMappingPanel::clearCurrentCue);
     }
 
     refresh();
@@ -335,6 +358,9 @@ void DCAMappingPanel::createChannelSection() {
         m_channelLayout->addWidget(nameContainer, row, colOffset);
 
         NoScrollComboBox* combo = new NoScrollComboBox(m_channelGroup);
+        // item texts vary with cue labels; keep the closed combo width stable
+        combo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+        combo->setMinimumContentsLength(14);
         combo->addItem(tr("None"), -1);
         for (int d = 1; d <= m_dcaCount; ++d) {
             combo->addItem(tr("DCA %1").arg(d), d);
@@ -401,6 +427,9 @@ void DCAMappingPanel::createBusSection() {
         m_busLayout->addWidget(nameContainer, row, colOffset);
 
         NoScrollComboBox* combo = new NoScrollComboBox(m_busGroup);
+        // item texts vary with cue labels; keep the closed combo width stable
+        combo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+        combo->setMinimumContentsLength(14);
         combo->addItem(tr("None"), -1);
         for (int d = 1; d <= m_dcaCount; ++d) {
             combo->addItem(tr("DCA %1").arg(d), d);
@@ -547,7 +576,7 @@ void DCAMappingPanel::updateComboItemStates() {
         const QString display = channelDisplayName(ch);
 
         if (dca > 0) {
-            label->setText(tr("%1 [%2]").arg(display).arg(dca));
+            label->setText(display);
             label->setStyleSheet(assignedStyle);
             label->setToolTip(tr("%1: assigned to DCA %2, locked from other DCAs; "
                                  "double-click to rename")
@@ -567,7 +596,7 @@ void DCAMappingPanel::updateComboItemStates() {
         QLabel* label = m_busLabels[bus - 1];
 
         if (dca > 0) {
-            label->setText(tr("%1 [%2]").arg(busDisplayName(bus)).arg(dca));
+            label->setText(busDisplayName(bus));
             label->setStyleSheet(assignedStyle);
             label->setToolTip(tr("Assigned to DCA %1; double-click to rename").arg(dca));
         } else {
@@ -577,20 +606,27 @@ void DCAMappingPanel::updateComboItemStates() {
         }
     }
 
-    // update combo box items w/ assignment counts
+    QStringList itemTexts;
+    QStringList compactTexts;
+    for (int d = 1; d <= m_dcaCount; ++d) {
+        const int total = channelCounts[d] + busCounts[d];
+        const QString name = dcaDisplayName(d);
+        const QString plain = tr("DCA %1").arg(d);
+        itemTexts << (total > 0 ? tr("%1 (%2)").arg(name).arg(total) : name);
+        compactTexts << (total > 0 ? tr("%1 (%2)").arg(plain).arg(total) : plain);
+    }
+
     for (QComboBox* combo : m_channelCombos) {
         for (int d = 1; d <= m_dcaCount; ++d) {
-            int total = channelCounts[d] + busCounts[d];
-            QString text = total > 0 ? tr("DCA %1 (%2)").arg(d).arg(total) : tr("DCA %1").arg(d);
-            combo->setItemText(d, text);
+            combo->setItemText(d, itemTexts[d - 1]);
+            combo->setItemData(d, compactTexts[d - 1], NoScrollComboBox::CompactTextRole);
         }
     }
 
     for (QComboBox* combo : m_busCombos) {
         for (int d = 1; d <= m_dcaCount; ++d) {
-            int total = channelCounts[d] + busCounts[d];
-            QString text = total > 0 ? tr("DCA %1 (%2)").arg(d).arg(total) : tr("DCA %1").arg(d);
-            combo->setItemText(d, text);
+            combo->setItemText(d, itemTexts[d - 1]);
+            combo->setItemData(d, compactTexts[d - 1], NoScrollComboBox::CompactTextRole);
         }
     }
 }
@@ -959,11 +995,41 @@ QString DCAMappingPanel::channelDisplayName(int channel) const {
     const ActorProfileLibrary* library =
         (m_app && m_app->show()) ? m_app->show()->actorProfileLibrary() : nullptr;
     const Actor* actor = library ? library->actorForChannel(channel) : nullptr;
-    if (actor && !actor->primaryRole().isEmpty())
-        return tr("Ch %1: %2 (%3)").arg(channel).arg(actor->name(), actor->primaryRole());
-    if (actor && !actor->name().isEmpty())
-        return tr("Ch %1: %2").arg(channel).arg(actor->name());
+    if (actor && !actor->displayName().isEmpty()) {
+        const QString secondary = actor->secondaryName();
+        if (!secondary.isEmpty())
+            return tr("Ch %1: %2 (%3)").arg(channel).arg(actor->displayName(), secondary);
+        return tr("Ch %1: %2").arg(channel).arg(actor->displayName());
+    }
     return tr("Ch %1").arg(channel);
+}
+
+QString DCAMappingPanel::dcaDisplayName(int dca) const {
+    if (m_currentCue) {
+        const QString label = m_currentCue->dcaOverride(dca).label.value_or(QString());
+        if (!label.isEmpty())
+            return tr("DCA %1: %2").arg(dca).arg(label);
+    }
+    return tr("DCA %1").arg(dca);
+}
+
+QString DCAMappingPanel::overviewMemberName(int channel, const QString& dcaLabel) const {
+    // drop the part of the channel's label that just repeats the DCA name
+    const ActorProfileLibrary* library =
+        (m_app && m_app->show()) ? m_app->show()->actorProfileLibrary() : nullptr;
+    const Actor* actor = library ? library->actorForChannel(channel) : nullptr;
+    if (!actor || actor->displayName().isEmpty() || dcaLabel.isEmpty())
+        return channelDisplayName(channel);
+
+    const QString primary = actor->displayName();
+    const QString secondary = actor->secondaryName(actor->matchedRole(dcaLabel));
+    if (primary.compare(dcaLabel, Qt::CaseInsensitive) == 0) {
+        return secondary.isEmpty() ? tr("Ch %1").arg(channel)
+                                   : tr("Ch %1 (%2)").arg(channel).arg(secondary);
+    }
+    if (!secondary.isEmpty() && secondary.compare(dcaLabel, Qt::CaseInsensitive) == 0)
+        return tr("Ch %1: %2").arg(channel).arg(primary);
+    return channelDisplayName(channel);
 }
 
 void DCAMappingPanel::updateDcaOverview() {
@@ -982,19 +1048,18 @@ void DCAMappingPanel::updateDcaOverview() {
         QLabel* title = m_dcaOverviewTitles[d - 1];
         QLabel* members = m_dcaOverviewMembers[d - 1];
 
-        QString titleText = tr("DCA %1").arg(d);
-        if (m_currentCue) {
-            const QString label = m_currentCue->dcaOverride(d).label.value_or(QString());
-            if (!label.isEmpty())
-                titleText += QString(": %1").arg(label);
-        }
-        title->setText(titleText);
+        title->setText(dcaDisplayName(d));
 
+        const QString dcaLabel =
+            m_currentCue ? m_currentCue->dcaOverride(d).label.value_or(QString()) : QString();
         QStringList parts;
         for (int ch : channelMap.value(d))
-            parts << channelDisplayName(ch);
-        for (int bus : busMap.value(d))
-            parts << busDisplayName(bus);
+            parts << overviewMemberName(ch, dcaLabel);
+        for (int bus : busMap.value(d)) {
+            const QString busName = busDisplayName(bus);
+            parts << (busName.compare(dcaLabel, Qt::CaseInsensitive) == 0 ? tr("Bus %1").arg(bus)
+                                                                          : busName);
+        }
         members->setText(parts.isEmpty() ? tr("(empty)") : parts.join(", "));
     }
 }
