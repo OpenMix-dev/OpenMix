@@ -357,5 +357,5 @@ jobs:
           fi
           # --ref is required: the Actions-scoped PAT cannot resolve the
           # default branch on its own
-          gh workflow run deploy.yml -R johnqherman/openmix.dev --ref master || \
+          gh workflow run deploy.yml -R OpenMix-dev/openmix.dev --ref master || \
             echo "::warning::site rebuild dispatch failed"
