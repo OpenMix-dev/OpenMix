@@ -96,7 +96,7 @@ void ScribbleController::refreshNames() {
         if (ch == m_cueChannel)
             continue; // reserved for the cue number
         if (const Actor* actor = m_library->actorForChannel(ch))
-            m_mixer->setChannelName(ch, actor->name());
+            m_mixer->setChannelName(ch, actor->displayName());
     }
 }
 

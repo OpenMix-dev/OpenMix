@@ -21,6 +21,17 @@ QString Actor::matchedRole(const QString& text) const {
     return {};
 }
 
+QString Actor::secondaryName(const QString& matchedRole) const {
+    QString secondary;
+    if (m_useRoleName && !m_roles.isEmpty())
+        secondary = m_name;
+    else
+        secondary = matchedRole.isEmpty() ? primaryRole() : matchedRole;
+    if (secondary.compare(displayName(), Qt::CaseInsensitive) == 0)
+        return {};
+    return secondary;
+}
+
 QJsonObject Actor::toJson() const {
     QJsonObject json;
     json["id"] = m_id;
@@ -33,6 +44,8 @@ QJsonObject Actor::toJson() const {
     json["channel"] = m_channel;
     json["order"] = m_order;
     json["active"] = m_active;
+    if (m_useRoleName)
+        json["useRoleName"] = true;
 
     if (!m_profiles.isEmpty()) {
         QJsonObject profilesObj;
@@ -68,6 +81,7 @@ Actor Actor::fromJson(const QJsonObject& json) {
     actor.m_channel = json["channel"].toInt();
     actor.m_order = json["order"].toInt();
     actor.m_active = json["active"].toBool(true);
+    actor.m_useRoleName = json["useRoleName"].toBool(false);
 
     const QJsonObject profilesObj = json["profiles"].toObject();
     for (auto it = profilesObj.constBegin(); it != profilesObj.constEnd(); ++it)

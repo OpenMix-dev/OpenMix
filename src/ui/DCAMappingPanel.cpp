@@ -972,10 +972,12 @@ QString DCAMappingPanel::channelDisplayName(int channel) const {
     const ActorProfileLibrary* library =
         (m_app && m_app->show()) ? m_app->show()->actorProfileLibrary() : nullptr;
     const Actor* actor = library ? library->actorForChannel(channel) : nullptr;
-    if (actor && !actor->primaryRole().isEmpty())
-        return tr("Ch %1: %2 (%3)").arg(channel).arg(actor->name(), actor->primaryRole());
-    if (actor && !actor->name().isEmpty())
-        return tr("Ch %1: %2").arg(channel).arg(actor->name());
+    if (actor && !actor->displayName().isEmpty()) {
+        const QString secondary = actor->secondaryName();
+        if (!secondary.isEmpty())
+            return tr("Ch %1: %2 (%3)").arg(channel).arg(actor->displayName(), secondary);
+        return tr("Ch %1: %2").arg(channel).arg(actor->displayName());
+    }
     return tr("Ch %1").arg(channel);
 }
 

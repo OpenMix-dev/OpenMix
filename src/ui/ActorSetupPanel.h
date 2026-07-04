@@ -51,6 +51,7 @@ class ActorSetupPanel : public QWidget {
     void onRolesChanged(const QString& text);
     void onChannelChanged(int channel);
     void onActiveToggled(bool on);
+    void onUseRoleNameToggled(bool on);
     void onBackupToggled(bool on);
 
     // profile slots
@@ -112,6 +113,7 @@ class ActorSetupPanel : public QWidget {
     QLineEdit* m_rolesEdit = nullptr;
     QSpinBox* m_channelSpin = nullptr;
     QCheckBox* m_activeCheck = nullptr;
+    QCheckBox* m_useRoleCheck = nullptr;
     QCheckBox* m_backupCheck = nullptr;
 
     QComboBox* m_slotCombo = nullptr;

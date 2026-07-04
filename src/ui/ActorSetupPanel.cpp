@@ -499,12 +499,17 @@ void ActorSetupPanel::setupUi() {
         tr("Typing any of these roles into a cue's DCA slot assigns this actor's channel"));
     m_channelSpin = new QSpinBox(identityBox);
     m_channelSpin->setRange(1, 96);
+    m_useRoleCheck = new QCheckBox(tr("Label channel with role name"), identityBox);
+    m_useRoleCheck->setToolTip(
+        tr("Console scribble strips and channel lists show the primary role instead of the "
+           "actor name; useful when the channel isn't tied to one person"));
     m_activeCheck = new QCheckBox(tr("Active"), identityBox);
     m_activeCheck->setToolTip(tr("Inactive actors yield their channel to the next understudy"));
     m_backupCheck = new QCheckBox(tr("Channel on backup / spare mic"), identityBox);
     m_backupCheck->setToolTip(tr("Resolve this channel to the backup voice instead of the main"));
     identityForm->addRow(tr("Name:"), m_nameEdit);
     identityForm->addRow(tr("Roles:"), m_rolesEdit);
+    identityForm->addRow(QString(), m_useRoleCheck);
     identityForm->addRow(tr("Channel:"), m_channelSpin);
     identityForm->addRow(QString(), m_activeCheck);
     identityForm->addRow(QString(), m_backupCheck);
@@ -515,6 +520,7 @@ void ActorSetupPanel::setupUi() {
     connect(m_channelSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
             &ActorSetupPanel::onChannelChanged);
     connect(m_activeCheck, &QCheckBox::toggled, this, &ActorSetupPanel::onActiveToggled);
+    connect(m_useRoleCheck, &QCheckBox::toggled, this, &ActorSetupPanel::onUseRoleNameToggled);
     connect(m_backupCheck, &QCheckBox::toggled, this, &ActorSetupPanel::onBackupToggled);
 
     auto* slotBox = new QGroupBox(tr("Voice Profile Slots (shared by all actors)"), m_editor);
@@ -668,6 +674,7 @@ void ActorSetupPanel::loadActorIntoEditor() {
         m_rolesEdit->clear();
         m_channelSpin->setValue(1);
         m_activeCheck->setChecked(false);
+        m_useRoleCheck->setChecked(false);
         m_backupCheck->setChecked(false);
         m_mainVoice->setVoice(VoiceData());
         m_backupVoice->setVoice(VoiceData());
@@ -683,6 +690,7 @@ void ActorSetupPanel::loadActorIntoEditor() {
     m_rolesEdit->setText(a->rolesDisplay());
     m_channelSpin->setValue(a->channel());
     m_activeCheck->setChecked(a->active());
+    m_useRoleCheck->setChecked(a->useRoleName());
     m_backupCheck->setChecked(m_library->isBackup(a->channel()));
 
     const ActorProfile profile = a->profile(m_currentSlot);
@@ -934,6 +942,20 @@ void ActorSetupPanel::onActiveToggled(bool on) {
     m_library->updateActor(id, copy);
     if (auto* item = m_actorTree->currentItem())
         item->setText(3, on ? tr("Yes") : tr("No"));
+    m_updatingUi = false;
+}
+
+void ActorSetupPanel::onUseRoleNameToggled(bool on) {
+    if (m_updatingUi)
+        return;
+    const QString id = selectedActorId();
+    const Actor* a = m_library ? m_library->actorById(id) : nullptr;
+    if (!a)
+        return;
+    Actor copy = *a;
+    copy.setUseRoleName(on);
+    m_updatingUi = true;
+    m_library->updateActor(id, copy); // changed() relabels displays + console
     m_updatingUi = false;
 }
 

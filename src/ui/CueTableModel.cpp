@@ -93,12 +93,11 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
                         m_actorLibrary ? m_actorLibrary->resolveActor(*ov.label) : nullptr;
                     if (actor) {
                         // prefer the role the label matched, else the primary
-                        QString actorRole = actor->matchedRole(*ov.label);
-                        if (actorRole.isEmpty())
-                            actorRole = actor->primaryRole();
-                        return actorRole.isEmpty()
-                                   ? actor->name()
-                                   : tr("%1 (%2)").arg(actor->name(), actorRole);
+                        const QString secondary =
+                            actor->secondaryName(actor->matchedRole(*ov.label));
+                        return secondary.isEmpty()
+                                   ? actor->displayName()
+                                   : tr("%1 (%2)").arg(actor->displayName(), secondary);
                     }
                     return *ov.label;
                 }
@@ -243,14 +242,13 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
                     const Actor* actor =
                         m_actorLibrary ? m_actorLibrary->actorForChannel(ch) : nullptr;
                     if (actor) {
-                        QString actorRole = actor->matchedRole(dcaLabel);
-                        if (actorRole.isEmpty())
-                            actorRole = actor->primaryRole();
-                        members << (actorRole.isEmpty()
-                                        ? tr("Ch %1 %2").arg(ch).arg(actor->name())
+                        const QString secondary =
+                            actor->secondaryName(actor->matchedRole(dcaLabel));
+                        members << (secondary.isEmpty()
+                                        ? tr("Ch %1 %2").arg(ch).arg(actor->displayName())
                                         : tr("Ch %1 %2 (%3)")
                                               .arg(ch)
-                                              .arg(actor->name(), actorRole));
+                                              .arg(actor->displayName(), secondary));
                     } else {
                         members << tr("Ch %1").arg(ch);
                     }
