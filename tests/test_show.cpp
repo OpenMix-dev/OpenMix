@@ -1,4 +1,5 @@
 #include "core/Show.h"
+#include <QJsonArray>
 #include <QSignalSpy>
 #include <QtTest/QtTest>
 
@@ -138,6 +139,41 @@ class TestShow : public QObject {
         QVERIFY(!show.isModified());
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.at(0).at(0).toBool(), false);
+    }
+
+    void inactiveDcas_roundTripAndSignals() {
+        Show show;
+        QSignalSpy changed(&show, &Show::activeDcasChanged);
+
+        show.setDcaActive(3, false);
+        show.setDcaActive(7, false);
+        show.setDcaActive(3, false); // no-op: already inactive
+        QCOMPARE(changed.count(), 2);
+        QVERIFY(show.isModified());
+        QVERIFY(!show.isDcaActive(3));
+        QVERIFY(show.isDcaActive(1));
+
+        Show other;
+        other.fromJson(show.toJson());
+        QCOMPARE(other.inactiveDcas(), QSet<int>({3, 7}));
+        QVERIFY(!other.isModified());
+
+        show.setDcaActive(3, true);
+        QCOMPARE(show.inactiveDcas(), QSet<int>({7}));
+    }
+
+    void inactiveDcas_missingKeyMeansAllActive() {
+        QJsonObject legacy;
+        legacy["version"] = "1.9";
+        legacy["name"] = "Legacy";
+        legacy["cues"] = QJsonArray();
+
+        Show show;
+        show.setDcaActive(2, false); // pre-existing state must clear on load
+        show.fromJson(legacy);
+
+        QVERIFY(show.inactiveDcas().isEmpty());
+        QVERIFY(show.isDcaActive(2));
     }
 };
 

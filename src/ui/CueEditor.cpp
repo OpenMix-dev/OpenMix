@@ -6,6 +6,7 @@
 #include "core/ActorProfileLibrary.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
+#include "core/Ensemble.h"
 #include "core/FadeCurve.h"
 #include "core/PlaybackEngine.h"
 #include "core/Position.h"
@@ -36,13 +37,18 @@
 
 namespace OpenMix {
 
+EnsembleLibrary* CueEditor::ensembleLibrary() const {
+    return (m_app && m_app->show()) ? m_app->show()->ensembleLibrary() : nullptr;
+}
+
 CueEditor::CueEditor(Application* app, QWidget* parent) : QWidget(parent), m_app(app) {
     if (m_app && m_app->show())
         m_actorLibrary = m_app->show()->actorProfileLibrary();
 
     m_actorCompletionModel = new QStringListModel(this);
     if (m_actorLibrary)
-        m_actorCompletionModel->setStringList(m_actorLibrary->completionCandidates());
+        m_actorCompletionModel->setStringList(
+            m_actorLibrary->completionCandidates(ensembleLibrary()));
 
     setupUi();
     setEnabled(false);
@@ -50,6 +56,9 @@ CueEditor::CueEditor(Application* app, QWidget* parent) : QWidget(parent), m_app
     if (m_actorLibrary) {
         connect(m_actorLibrary, &ActorProfileLibrary::changed, this,
                 &CueEditor::onActorLibraryChanged);
+    }
+    if (EnsembleLibrary* ensembles = ensembleLibrary()) {
+        connect(ensembles, &EnsembleLibrary::changed, this, &CueEditor::onActorLibraryChanged);
     }
 
     // reflect the engine's check-mode state (it is engine-wide, not per-cue)
@@ -60,8 +69,11 @@ CueEditor::CueEditor(Application* app, QWidget* parent) : QWidget(parent), m_app
         connect(engine, &PlaybackEngine::checkModeChanged, this,
                 &CueEditor::onEngineCheckModeChanged);
     }
-    if (m_app)
+    if (m_app) {
         connect(m_app, &Application::dcaCountChanged, this, &CueEditor::onDcaCountChanged);
+        connect(m_app, &Application::activeDcasChanged, this,
+                &CueEditor::applyActiveDcaVisibility);
+    }
     updateGangsUI();
 }
 
@@ -388,6 +400,7 @@ void CueEditor::rebuildDcaTargetChecks(int count) {
             onTargetedDCAsChanged();
         });
     }
+    applyActiveDcaVisibility();
 }
 
 void CueEditor::rebuildDcaOverrideStrips(int count) {
@@ -404,6 +417,18 @@ void CueEditor::rebuildDcaOverrideStrips(int count) {
         m_dcaOverridesContentLayout->insertWidget(m_dcaOverridesContentLayout->count() - 1, strip);
         m_dcaOverrideStrips.append(strip);
     }
+    applyActiveDcaVisibility();
+}
+
+// inactive DCAs disappear from targeting and overrides; hidden checks keep
+// their state (cue data is preserved, playback gating makes it inert)
+void CueEditor::applyActiveDcaVisibility() {
+    if (!m_app)
+        return;
+    for (int i = 0; i < m_dcaTargetChecks.size(); ++i)
+        m_dcaTargetChecks[i]->setVisible(m_app->isDcaActive(i + 1));
+    for (int i = 0; i < m_dcaOverrideStrips.size(); ++i)
+        m_dcaOverrideStrips[i]->setVisible(m_app->isDcaActive(i + 1));
 }
 
 void CueEditor::onDcaCountChanged(int count) {
@@ -694,13 +719,15 @@ void CueEditor::onDCALabelCommitted(int dca) {
     if (!cue || dca < 1 || dca > m_dcaOverrideStrips.size() || !m_actorLibrary)
         return;
 
-    // a matching role/actor name assigns their channel to this DCA for this
-    // cue; any other text stays a plain scribble label
-    const Actor* actor = m_actorLibrary->resolveActor(m_dcaOverrideStrips[dca - 1]->labelText());
-    if (!actor)
+    // a matching role/actor/ensemble name assigns all its channels to this DCA
+    // for this cue (replacing the DCA's previous members); any other text stays
+    // a plain scribble label
+    const QList<int> channels = m_actorLibrary->resolveChannels(
+        m_dcaOverrideStrips[dca - 1]->labelText(), ensembleLibrary());
+    if (channels.isEmpty())
         return;
 
-    cue->assignChannelToDCAMapping(actor->channel(), dca, m_app->show()->dcaMapping());
+    cue->assignChannelsToDCAMapping(channels, dca, m_app->show()->dcaMapping());
     m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
     updateDCAAssignInfo();
     emit cueModified();
@@ -999,7 +1026,8 @@ void CueEditor::onActorLibraryChanged() {
     // refresh the autocomplete names and the per-channel table for the cue
     // currently shown.
     if (m_actorLibrary)
-        m_actorCompletionModel->setStringList(m_actorLibrary->completionCandidates());
+        m_actorCompletionModel->setStringList(
+            m_actorLibrary->completionCandidates(ensembleLibrary()));
     if (m_currentIndex < 0)
         return;
     m_updatingUi = true;

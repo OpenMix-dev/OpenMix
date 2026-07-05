@@ -34,6 +34,7 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QStandardItemModel>
 #include <QVBoxLayout>
 #include <memory>
 
@@ -97,6 +98,13 @@ DCAMappingPanel::DCAMappingPanel(Application* app, QWidget* parent)
                 &DCAMappingPanel::onMixerDisconnected);
         // console-type selection changes the DCA/channel/bus counts shown here
         connect(m_app, &Application::dcaCountChanged, this, &DCAMappingPanel::refresh);
+        // light repaint, not refresh(): a full rebuild would tear down the
+        // checkbox that is mid-toggle
+        connect(m_app, &Application::activeDcasChanged, this, [this]() {
+            updateActiveDcaChecks();
+            updateComboItemStates();
+            updateDcaOverview();
+        });
 
         m_mapping = m_app->show()->dcaMapping();
         if (m_mapping) {
@@ -288,24 +296,53 @@ void DCAMappingPanel::createDcaOverviewSection() {
     }
     m_dcaOverviewTitles.clear();
     m_dcaOverviewMembers.clear();
+    m_dcaActiveChecks.clear();
 
     for (int d = 1; d <= m_dcaCount; ++d) {
         int row = (d - 1) % 4;
-        int col = ((d - 1) / 4) * 2;
+        int col = ((d - 1) / 4) * 3;
+
+        QCheckBox* active = new QCheckBox(m_dcaOverviewGroup);
+        active->setToolTip(tr("Uncheck to reserve this DCA for manual console control: "
+                              "OpenMix hides it from the cue list and never writes to it "
+                              "during playback"));
+        connect(active, &QCheckBox::toggled, this, [this, d](bool on) {
+            if (!m_updatingUi && m_app && m_app->show())
+                m_app->show()->setDcaActive(d, on);
+        });
+        m_dcaOverviewLayout->addWidget(active, row, col);
+        m_dcaActiveChecks.append(active);
 
         QLabel* title = new QLabel(tr("DCA %1").arg(d), m_dcaOverviewGroup);
         title->setStyleSheet(QString("font-weight: bold; color: %1;").arg(Theme::Colors::TextPrimary));
         title->setMinimumWidth(120);
-        m_dcaOverviewLayout->addWidget(title, row, col);
+        m_dcaOverviewLayout->addWidget(title, row, col + 1);
         m_dcaOverviewTitles.append(title);
 
         QLabel* members = new QLabel(m_dcaOverviewGroup);
         members->setWordWrap(true);
         members->setStyleSheet(QString("color: %1;").arg(Theme::Colors::TextSecondary));
-        m_dcaOverviewLayout->addWidget(members, row, col + 1);
-        m_dcaOverviewLayout->setColumnStretch(col + 1, 1);
+        m_dcaOverviewLayout->addWidget(members, row, col + 2);
+        m_dcaOverviewLayout->setColumnStretch(col + 2, 1);
         m_dcaOverviewMembers.append(members);
     }
+}
+
+void DCAMappingPanel::updateActiveDcaChecks() {
+    if (!m_app || !m_app->show())
+        return;
+    const bool wasUpdating = m_updatingUi;
+    m_updatingUi = true;
+    for (int d = 1; d <= m_dcaActiveChecks.size(); ++d) {
+        const bool active = m_app->show()->isDcaActive(d);
+        m_dcaActiveChecks[d - 1]->setChecked(active);
+        // grey the row so a reserved DCA reads as out of OpenMix's hands
+        if (d <= m_dcaOverviewTitles.size())
+            m_dcaOverviewTitles[d - 1]->setEnabled(active);
+        if (d <= m_dcaOverviewMembers.size())
+            m_dcaOverviewMembers[d - 1]->setEnabled(active);
+    }
+    m_updatingUi = wasUpdating;
 }
 
 void DCAMappingPanel::createChannelSection() {
@@ -372,6 +409,7 @@ void DCAMappingPanel::createChannelSection() {
                 int dca = m_channelCombos[ch - 1]->currentData().toInt();
                 onChannelDCAChanged(ch, dca);
                 updateComboItemStates();
+                updateDcaOverview();
             }
         });
         m_channelLayout->addWidget(combo, row, colOffset + 1);
@@ -441,6 +479,7 @@ void DCAMappingPanel::createBusSection() {
                 int dca = m_busCombos[bus - 1]->currentData().toInt();
                 onBusDCAChanged(bus, dca);
                 updateComboItemStates();
+                updateDcaOverview();
             }
         });
         m_busLayout->addWidget(combo, row, colOffset + 1);
@@ -524,6 +563,7 @@ void DCAMappingPanel::populateFromMapping() {
     m_updatingUi = false;
 
     updateComboItemStates();
+    updateActiveDcaChecks();
     updateDcaOverview();
 }
 
@@ -608,34 +648,61 @@ void DCAMappingPanel::updateComboItemStates() {
 
     QStringList itemTexts;
     QStringList compactTexts;
+    QList<bool> dcaActive;
     for (int d = 1; d <= m_dcaCount; ++d) {
+        const bool active = !m_app || !m_app->show() || m_app->show()->isDcaActive(d);
+        dcaActive << active;
         const int total = channelCounts[d] + busCounts[d];
-        const QString name = dcaDisplayName(d);
-        const QString plain = tr("DCA %1").arg(d);
+        QString name = dcaDisplayName(d);
+        QString plain = tr("DCA %1").arg(d);
+        if (!active) {
+            name = tr("%1 (off)").arg(name);
+            plain = tr("%1 (off)").arg(plain);
+        }
         itemTexts << (total > 0 ? tr("%1 (%2)").arg(name).arg(total) : name);
         compactTexts << (total > 0 ? tr("%1 (%2)").arg(plain).arg(total) : plain);
     }
 
-    for (QComboBox* combo : m_channelCombos) {
+    // inactive DCAs stay visible (existing assignments are preserved and shown)
+    // but can't be newly picked
+    auto applyItemStates = [&](QComboBox* combo) {
+        auto* model = qobject_cast<QStandardItemModel*>(combo->model());
         for (int d = 1; d <= m_dcaCount; ++d) {
             combo->setItemText(d, itemTexts[d - 1]);
             combo->setItemData(d, compactTexts[d - 1], NoScrollComboBox::CompactTextRole);
+            if (model) {
+                if (QStandardItem* item = model->item(d))
+                    item->setEnabled(dcaActive[d - 1]);
+            }
         }
-    }
+    };
 
-    for (QComboBox* combo : m_busCombos) {
-        for (int d = 1; d <= m_dcaCount; ++d) {
-            combo->setItemText(d, itemTexts[d - 1]);
-            combo->setItemData(d, compactTexts[d - 1], NoScrollComboBox::CompactTextRole);
-        }
-    }
+    for (QComboBox* combo : m_channelCombos)
+        applyItemStates(combo);
+
+    for (QComboBox* combo : m_busCombos)
+        applyItemStates(combo);
 }
 
 void DCAMappingPanel::refresh() {
     if (m_app && m_app->show()) {
         m_mapping = m_app->show()->dcaMapping();
     }
+    // a hidden panel misses cue edits (the cueUpdated hook is gated on
+    // visibility), so a full refresh re-derives the cue-mapping state instead
+    // of trusting what was last shown
+    syncCueMappingState();
+    updateContextHeader();
     updateDCAOptions();
+}
+
+void DCAMappingPanel::syncCueMappingState() {
+    m_showingCueMapping = m_currentCue && m_currentCue->hasCustomDCAMapping();
+    if (m_currentCue) {
+        m_useCueMappingCheck->blockSignals(true);
+        m_useCueMappingCheck->setChecked(m_showingCueMapping);
+        m_useCueMappingCheck->blockSignals(false);
+    }
 }
 
 void DCAMappingPanel::syncFromMixer() {
@@ -885,17 +952,7 @@ void DCAMappingPanel::onMixerDisconnected() {
 
 void DCAMappingPanel::setCurrentCue(Cue* cue) {
     m_currentCue = cue;
-
-    if (cue) {
-        // check if cue has custom mapping
-        m_showingCueMapping = cue->hasCustomDCAMapping();
-        m_useCueMappingCheck->blockSignals(true);
-        m_useCueMappingCheck->setChecked(m_showingCueMapping);
-        m_useCueMappingCheck->blockSignals(false);
-    } else {
-        m_showingCueMapping = false;
-    }
-
+    syncCueMappingState();
     updateContextHeader();
     populateFromMapping();
 }

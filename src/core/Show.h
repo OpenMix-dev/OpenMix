@@ -13,6 +13,7 @@
 #include <QList>
 #include <QObject>
 #include <QPair>
+#include <QSet>
 #include <QString>
 
 namespace OpenMix {
@@ -118,6 +119,15 @@ class Show : public QObject {
     [[nodiscard]] bool suppressBackupSwitch() const noexcept { return m_suppressBackupSwitch; }
     void setSuppressBackupSwitch(bool on) { m_suppressBackupSwitch = on; checkModifiedState(); }
 
+    // DCAs OpenMix does not control: hidden from the cue list, greyed in the
+    // mapping panel, and never written to on the console during playback.
+    // Stored inverse so old shows (no key) and newly-available DCAs default
+    // to active.
+    [[nodiscard]] QSet<int> inactiveDcas() const { return m_inactiveDcas; }
+    [[nodiscard]] bool isDcaActive(int dca) const { return !m_inactiveDcas.contains(dca); }
+    void setDcaActive(int dca, bool active);
+    void setInactiveDcas(const QSet<int>& dcas);
+
     QJsonObject toJson() const;
     void fromJson(const QJsonObject& json);
 
@@ -127,6 +137,7 @@ class Show : public QObject {
     void nameChanged(const QString& name);
     void modifiedChanged(bool modified);
     void mixerConfigChanged();
+    void activeDcasChanged();
 
   private:
     void connectCueListSignals();
@@ -150,6 +161,7 @@ class Show : public QObject {
     bool m_selectOnSpill = false;
     bool m_muteDcaUnassign = false;
     bool m_suppressBackupSwitch = false;
+    QSet<int> m_inactiveDcas;
 
     DCAMapping m_dcaMapping;
     ActorProfileLibrary m_actorProfileLibrary;

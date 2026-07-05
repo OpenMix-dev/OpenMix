@@ -47,6 +47,7 @@ class MixerFeedbackPanel : public QWidget {
     void onTabToPrevious(int dcaNumber);
 
   private:
+    void applyActiveDcaVisibility();
     bool isAnyLabelBeingEdited() const;
     DCAWidget* firstEditableDCA() const;
     DCAWidget* lastEditableDCA() const;

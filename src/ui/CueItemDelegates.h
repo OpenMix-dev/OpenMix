@@ -9,6 +9,7 @@ namespace OpenMix {
 
 class CueList;
 class ActorProfileLibrary;
+class EnsembleLibrary;
 
 class CueNumberDelegate : public QStyledItemDelegate {
     Q_OBJECT
@@ -76,7 +77,8 @@ class DCAAssignDelegate : public QStyledItemDelegate {
     Q_OBJECT
 
   public:
-    explicit DCAAssignDelegate(ActorProfileLibrary* library, QObject* parent = nullptr);
+    explicit DCAAssignDelegate(ActorProfileLibrary* library, EnsembleLibrary* ensembles = nullptr,
+                               QObject* parent = nullptr);
 
     void paint(QPainter* painter, const QStyleOptionViewItem& option,
                const QModelIndex& index) const override;
@@ -99,6 +101,7 @@ class DCAAssignDelegate : public QStyledItemDelegate {
 
   private:
     ActorProfileLibrary* m_library;
+    EnsembleLibrary* m_ensembles;
     mutable QModelIndex m_currentEditIndex;
 };
 

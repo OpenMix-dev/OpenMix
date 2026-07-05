@@ -2,6 +2,7 @@
 #include "core/ActorProfile.h"
 #include "core/ActorProfileLibrary.h"
 #include "core/Cue.h"
+#include "core/Ensemble.h"
 #include "core/Show.h"
 #include <QSignalSpy>
 #include <QtTest/QtTest>
@@ -252,6 +253,103 @@ class TestActorProfiles : public QObject {
         QVERIFY(lib.resolveActor("   ") == nullptr);
     }
 
+    void library_resolveChannels_roleMatchesAllActiveActors() {
+        ActorProfileLibrary lib;
+        auto addWithRole = [&lib](const QString& name, int ch, bool active) {
+            Actor a(name, ch);
+            a.setRoles({"Nuns"});
+            a.setActive(active);
+            lib.addActor(a);
+        };
+        addWithRole("Alice", 5, true);
+        addWithRole("Beth", 7, true);
+        addWithRole("Cara", 3, true);
+        addWithRole("Dora", 9, false); // inactive cover excluded
+
+        QCOMPARE(lib.resolveChannels("nuns"), QList<int>({3, 5, 7}));
+    }
+
+    void library_resolveChannels_ensembleName_returnsMemberChannels() {
+        ActorProfileLibrary lib;
+        lib.addActor(Actor("Alice", 5));
+        EnsembleLibrary ensembles;
+        Ensemble band("Band");
+        band.setChannels({10, 11});
+        ensembles.addEnsemble(band);
+
+        QCOMPARE(lib.resolveChannels("band", &ensembles), QList<int>({10, 11}));
+        // without the ensemble library the name resolves to nothing
+        QCOMPARE(lib.resolveChannels("band"), QList<int>());
+    }
+
+    void library_resolveChannels_rolePrecedesEnsemble() {
+        ActorProfileLibrary lib;
+        Actor kid("Kid Lead", 2);
+        kid.setRoles({"Kids"});
+        lib.addActor(kid);
+        EnsembleLibrary ensembles;
+        Ensemble kids("Kids");
+        kids.setChannels({20, 21});
+        ensembles.addEnsemble(kids);
+
+        QCOMPARE(lib.resolveChannels("Kids", &ensembles), QList<int>({2}));
+    }
+
+    void library_resolveChannels_ensemblePrecedesActorName() {
+        ActorProfileLibrary lib;
+        lib.addActor(Actor("Band", 4)); // actor literally named like the group
+        EnsembleLibrary ensembles;
+        Ensemble band("Band");
+        band.setChannels({15, 16});
+        ensembles.addEnsemble(band);
+
+        QCOMPARE(lib.resolveChannels("Band", &ensembles), QList<int>({15, 16}));
+    }
+
+    void library_resolveChannels_allInactive_fallsBackToSingleBest() {
+        ActorProfileLibrary lib;
+        Actor lead("Lead", 3);
+        lead.setRoles({"Evan"});
+        lead.setOrder(1);
+        lead.setActive(false);
+        Actor cover("Cover", 4);
+        cover.setRoles({"Evan"});
+        cover.setOrder(2);
+        cover.setActive(false);
+        lib.addActor(cover);
+        lib.addActor(lead);
+
+        // resolveActor's preference (lowest order among equally-inactive) holds
+        QCOMPARE(lib.resolveChannels("Evan"), QList<int>({3}));
+    }
+
+    void library_resolveChannels_skipsUnassignedChannel_andDedups() {
+        ActorProfileLibrary lib;
+        Actor unset("Unset", 0); // no channel assigned yet
+        unset.setRoles({"Chorus"});
+        lib.addActor(unset);
+        Actor a("Alto", 6);
+        a.setRoles({"Chorus"});
+        lib.addActor(a);
+        Actor b("Bass", 6); // shares the channel
+        b.setRoles({"Chorus"});
+        lib.addActor(b);
+
+        QCOMPARE(lib.resolveChannels("Chorus"), QList<int>({6}));
+        QCOMPARE(lib.resolveChannels(""), QList<int>());
+        QCOMPARE(lib.resolveChannels("   "), QList<int>());
+    }
+
+    void library_completionCandidates_includesEnsembleNames() {
+        ActorProfileLibrary lib;
+        lib.addActor(Actor("Alice", 5));
+        EnsembleLibrary ensembles;
+        ensembles.addEnsemble(Ensemble("Band"));
+        ensembles.addEnsemble(Ensemble("alice")); // ci-duplicate of the actor
+
+        QCOMPARE(lib.completionCandidates(&ensembles), QStringList({"Alice", "Band"}));
+    }
+
     void library_completionCandidates_dedupSkipsEmpty() {
         ActorProfileLibrary lib;
         Actor alice("Alice", 5);
@@ -325,7 +423,7 @@ class TestActorProfiles : public QObject {
         QVERIFY(spy.count() >= 1);
 
         const QJsonObject json = show.toJson();
-        QCOMPARE(json["version"].toString(), QString("1.9"));
+        QCOMPARE(json["version"].toString(), QString("1.10"));
 
         Show loaded;
         loaded.fromJson(json);

@@ -45,6 +45,8 @@ class CueListView : public QWidget {
     void duplicateSelectedCue(); // clone the selected cue to the end of the list
     void cloneCueAfter();        // clone the selected cue in place, just after it
     void copySelectedCue();
+    void copySmart();  // DCA cell current: copy assignments as TSV; else copySelectedCue
+    void pasteSmart(); // DCA cell current + text clipboard: TSV paste; else pasteCue
     void pasteCue();      // insert the clipboard cue as a new cue after selection
     void pasteCueMerge(); // merge clipboard content into the selected cue
     void pasteCueSwap();  // exchange content between clipboard and selected cue
@@ -91,6 +93,10 @@ class CueListView : public QWidget {
     QModelIndex nextEditableIndex(const QModelIndex& current, bool forward) const;
     void insertCueAt(int index, const Cue& cue); // undoable insert + select
     void selectSourceRow(int sourceRow);
+    // proxy index of the current cell iff it is a DCA assignment cell
+    QModelIndex currentDcaAssignmentIndex() const;
+    void copyDcaCells(const QModelIndex& proxyAnchor);  // TSV to system clipboard
+    bool pasteDcaCells(const QModelIndex& proxyAnchor); // TSV spread rightward, one undo step
 
     std::optional<Cue> m_clipboard; // copied cue for paste operations
 
@@ -105,6 +111,7 @@ class CueListView : public QWidget {
     int m_standbyCueIndex = -1;
     bool m_dcaFxColsVisible = false;  // per-DCA fx sub-columns shown
     bool m_dcaPosColsVisible = false; // per-DCA pos sub-columns shown
+    bool m_editingLocked = false;     // mirrors setEditingLocked, guards cell paste
 
     // delegates
     CueNumberDelegate* m_numberDelegate;

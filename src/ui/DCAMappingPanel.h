@@ -68,6 +68,8 @@ class DCAMappingPanel : public QWidget {
     bool eventFilter(QObject* obj, QEvent* event) override;
 
   private:
+    // re-derive m_showingCueMapping + checkbox from the current cue's state
+    void syncCueMappingState();
     void setupUi();
     void createChannelSection();
     void createBusSection();
@@ -77,6 +79,7 @@ class DCAMappingPanel : public QWidget {
     void updateComboItemStates();
     void updateContextHeader();
     void updateDcaOverview();
+    void updateActiveDcaChecks();
     QString busDisplayName(int bus) const;
     QString channelDisplayName(int channel) const;
     QString dcaDisplayName(int dca) const;
@@ -107,6 +110,7 @@ class DCAMappingPanel : public QWidget {
     QGridLayout* m_dcaOverviewLayout = nullptr;
     QVector<QLabel*> m_dcaOverviewTitles;
     QVector<QLabel*> m_dcaOverviewMembers;
+    QVector<QCheckBox*> m_dcaActiveChecks;
 
     QGroupBox* m_channelGroup;
     QGridLayout* m_channelLayout;

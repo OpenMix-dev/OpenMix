@@ -1,4 +1,5 @@
 #include "CueListView.h"
+#include "CastTextParse.h"
 #include "CueFilterBar.h"
 #include "CueFilterProxyModel.h"
 #include "CueItemDelegates.h"
@@ -15,6 +16,7 @@
 #include "protocol/MixerProtocol.h"
 
 #include <QApplication>
+#include <QClipboard>
 #include <QFocusEvent>
 #include "theme/Theme.h"
 
@@ -67,6 +69,8 @@ void CueListView::setupUi() {
     // create model & proxy
     m_model = new CueTableModel(m_app->show()->cueList(), this);
     m_model->setDcaMapping(m_app->show()->dcaMapping());
+    m_model->setActorLibrary(m_app->show()->actorProfileLibrary());
+    m_model->setEnsembleLibrary(m_app->show()->ensembleLibrary());
     m_model->setDcaCount(m_app->effectiveDcaCount());
     connect(m_app, &Application::dcaCountChanged, this,
             [this](int count) { m_model->setDcaCount(count); });
@@ -108,6 +112,10 @@ void CueListView::setupUi() {
     applyDcaSubColumnVisibility();
     connect(m_proxyModel, &QAbstractItemModel::modelReset, this,
             &CueListView::applyDcaSubColumnVisibility);
+    connect(m_app, &Application::activeDcasChanged, this, [this]() {
+        applyDcaSubColumnVisibility();
+        scheduleColumnRelayout();
+    });
 
     // columns auto-fit their contents; leftover space is shared, and columns only
     // shrink below their natural width when the viewport can't fit them all
@@ -200,7 +208,8 @@ void CueListView::setupDelegates() {
     m_numberDelegate = new CueNumberDelegate(cueList, this);
     m_typeDelegate = new CueTypeDelegate(this);
     m_textDelegate = new CueTextDelegate(this);
-    m_dcaAssignDelegate = new DCAAssignDelegate(m_app->show()->actorProfileLibrary(), this);
+    m_dcaAssignDelegate = new DCAAssignDelegate(m_app->show()->actorProfileLibrary(),
+                                                m_app->show()->ensembleLibrary(), this);
 
     // default delegate covers the dynamic per-DCA columns (strips the selection
     // block so the row's standby/current colour shows through; only the DCA
@@ -419,6 +428,83 @@ void CueListView::copySelectedCue() {
     m_clipboard = m_app->show()->cueList()->at(idx);
 }
 
+// the current cell decides what copy/paste means: on a DCA assignment cell the
+// shortcuts speak spreadsheet (system-clipboard TSV), everywhere else they keep
+// the whole-cue semantics
+void CueListView::copySmart() {
+    const QModelIndex anchor = currentDcaAssignmentIndex();
+    if (anchor.isValid())
+        copyDcaCells(anchor);
+    else
+        copySelectedCue();
+}
+
+void CueListView::pasteSmart() {
+    const QModelIndex anchor = currentDcaAssignmentIndex();
+    if (anchor.isValid() && pasteDcaCells(anchor))
+        return;
+    pasteCue();
+}
+
+QModelIndex CueListView::currentDcaAssignmentIndex() const {
+    const QModelIndex current = m_tableView->currentIndex();
+    if (!current.isValid())
+        return {};
+    const QModelIndex src = m_proxyModel->mapToSource(current);
+    return m_model->dcaSubColumn(src.column()) == 0 ? current : QModelIndex();
+}
+
+void CueListView::copyDcaCells(const QModelIndex& proxyAnchor) {
+    const QModelIndex src = m_proxyModel->mapToSource(proxyAnchor);
+    // EditRole = the raw typed labels, so a copy round-trips to a spreadsheet
+    QStringList values;
+    for (int c = src.column(); c < m_model->columnCount(); ++c) {
+        if (m_model->dcaSubColumn(c) != 0 || m_tableView->isColumnHidden(c))
+            continue;
+        values << m_model->index(src.row(), c).data(Qt::EditRole).toString();
+    }
+    while (!values.isEmpty() && values.last().isEmpty())
+        values.removeLast();
+    if (values.isEmpty())
+        return; // nothing to copy; don't clobber the clipboard
+    QApplication::clipboard()->setText(values.join(QLatin1Char('\t')));
+}
+
+bool CueListView::pasteDcaCells(const QModelIndex& proxyAnchor) {
+    if (m_editingLocked || !proxyAnchor.isValid())
+        return false;
+    const QStringList values =
+        CastTextParse::parseTsvRow(QApplication::clipboard()->text());
+    if (values.isEmpty())
+        return false;
+
+    const QModelIndex src = m_proxyModel->mapToSource(proxyAnchor);
+    CueList* cueList = m_app->show()->cueList();
+    const int row = src.row();
+    if (row < 0 || row >= cueList->count() || m_model->dcaSubColumn(src.column()) != 0)
+        return false;
+
+    // spread rightward over visible assignment cells; fx/pos sub-columns and
+    // inactive DCAs (hidden columns) are skipped, extra values are dropped
+    QList<int> targets;
+    for (int c = src.column(); c < m_model->columnCount() && targets.size() < values.size(); ++c) {
+        if (m_model->dcaSubColumn(c) == 0 && !m_tableView->isColumnHidden(c))
+            targets << m_model->dcaOfColumn(c);
+    }
+    if (targets.isEmpty())
+        return false;
+
+    Cue oldCue = cueList->at(row);
+    Cue newCue = oldCue;
+    for (int i = 0; i < targets.size(); ++i)
+        m_model->applyDcaAssignment(newCue, targets[i], values[i]);
+
+    m_app->undoStack()->push(new EditCueCommand(cueList, row, oldCue, newCue));
+    cueList->updateCue(row, newCue);
+    emit cueSelected(row); // same refresh cascade a typed DCA-cell commit fires
+    return true;
+}
+
 void CueListView::pasteCue() {
     if (!m_clipboard)
         return;
@@ -544,23 +630,27 @@ void CueListView::setDcaSubColumnsVisible(int sub, bool visible) {
         m_dcaFxColsVisible = visible;
     else if (sub == 2)
         m_dcaPosColsVisible = visible;
-    for (int c = CueTableModel::ColCount; c < m_model->columnCount(); ++c)
-        if (m_model->dcaSubColumn(c) == sub)
-            m_tableView->setColumnHidden(c, !visible);
+    applyDcaSubColumnVisibility();
     scheduleColumnRelayout();
 }
 
+// single visibility authority for the dynamic DCA columns: an inactive DCA's
+// whole triplet is hidden, and fx/pos additionally follow their menu toggles
 void CueListView::applyDcaSubColumnVisibility() {
     for (int c = CueTableModel::ColCount; c < m_model->columnCount(); ++c) {
         const int sub = m_model->dcaSubColumn(c);
+        const bool active = m_app->isDcaActive(m_model->dcaOfColumn(c));
+        bool visible = active;
         if (sub == 1)
-            m_tableView->setColumnHidden(c, !m_dcaFxColsVisible);
+            visible = active && m_dcaFxColsVisible;
         else if (sub == 2)
-            m_tableView->setColumnHidden(c, !m_dcaPosColsVisible);
+            visible = active && m_dcaPosColsVisible;
+        m_tableView->setColumnHidden(c, !visible);
     }
 }
 
 void CueListView::setEditingLocked(bool locked) {
+    m_editingLocked = locked;
     m_tableView->setEditTriggers(locked ? QAbstractItemView::NoEditTriggers
                                         : QAbstractItemView::DoubleClicked |
                                               QAbstractItemView::EditKeyPressed |
@@ -599,6 +689,20 @@ void CueListView::showContextMenu(const QPoint& pos) {
     QAction* paste = menu.addAction(tr("Paste"));
     paste->setEnabled(hasClipboardCue());
     connect(paste, &QAction::triggered, this, &CueListView::pasteCue);
+
+    // DCA assignment cells get spreadsheet-style TSV copy/paste. Use the
+    // clicked index, not currentIndex(): selectRow above moved the current cell
+    const bool onDcaCell =
+        at.isValid() && m_model->dcaSubColumn(m_proxyModel->mapToSource(at).column()) == 0;
+    if (onDcaCell) {
+        menu.addSeparator();
+        QAction* copyDca = menu.addAction(tr("Copy DCA Assignments"));
+        connect(copyDca, &QAction::triggered, this, [this, at]() { copyDcaCells(at); });
+        QAction* pasteDca = menu.addAction(tr("Paste DCA Assignments"));
+        pasteDca->setEnabled(!m_editingLocked &&
+                             !QApplication::clipboard()->text().isEmpty());
+        connect(pasteDca, &QAction::triggered, this, [this, at]() { pasteDcaCells(at); });
+    }
 
     if (row >= 0) {
         menu.addSeparator();

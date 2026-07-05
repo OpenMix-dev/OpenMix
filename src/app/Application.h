@@ -3,6 +3,7 @@
 #include "protocol/MixerCapabilities.h"
 #include <QObject>
 #include <QPointer>
+#include <QSet>
 #include <QUndoStack>
 
 namespace OpenMix {
@@ -97,6 +98,10 @@ class Application : public QObject {
     [[nodiscard]] MixerCapabilities effectiveCapabilities() const;
     [[nodiscard]] int effectiveDcaCount() const { return effectiveCapabilities().dcaCount; }
 
+    // the show's active-DCA subset (see Show::inactiveDcas)
+    [[nodiscard]] QSet<int> inactiveDcas() const;
+    [[nodiscard]] bool isDcaActive(int dca) const;
+
     // main window
     void setMainWindow(MainWindow* window);
     [[nodiscard]] MainWindow* mainWindow();
@@ -117,6 +122,7 @@ class Application : public QObject {
     void mixerDisconnected();
     void recordFadersActiveChanged(bool active);
     void dcaCountChanged(int count);
+    void activeDcasChanged();
 
   private:
     void setupMixerConnection(const QString& type, const QString& host, int port);

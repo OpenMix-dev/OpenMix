@@ -1,6 +1,8 @@
 #include "Show.h"
 #include <QJsonArray>
 
+#include <algorithm>
+
 namespace OpenMix {
 
 QJsonObject MixerConfig::toJson() const {
@@ -103,6 +105,26 @@ void Show::connectCueZeroSignals() {
     connect(&m_cueZero, &CueZero::changed, this, &Show::checkModifiedState);
 }
 
+void Show::setDcaActive(int dca, bool active) {
+    const bool wasActive = !m_inactiveDcas.contains(dca);
+    if (active == wasActive)
+        return;
+    if (active)
+        m_inactiveDcas.remove(dca);
+    else
+        m_inactiveDcas.insert(dca);
+    emit activeDcasChanged();
+    checkModifiedState();
+}
+
+void Show::setInactiveDcas(const QSet<int>& dcas) {
+    if (dcas == m_inactiveDcas)
+        return;
+    m_inactiveDcas = dcas;
+    emit activeDcasChanged();
+    checkModifiedState();
+}
+
 void Show::setChannelGangs(const QList<QPair<int, int>>& gangs) {
     m_channelGangs = gangs;
     // keep per-gang metadata aligned by index, preserving existing entries
@@ -147,6 +169,7 @@ void Show::newShow() {
     m_selectOnSpill = false;
     m_muteDcaUnassign = false;
     m_suppressBackupSwitch = false;
+    m_inactiveDcas.clear();
     m_channelGangMeta.clear();
     m_mixerConfig = MixerConfig();
     m_mixerConfig.type = "x32";
@@ -168,7 +191,7 @@ void Show::newShow() {
 
 QJsonObject Show::toJson() const {
     QJsonObject json;
-    json["version"] = "1.9"; // 1.9: multiple roles per actor
+    json["version"] = "1.10"; // 1.10: inactive-DCA set
     json["name"] = m_name;
     json["author"] = m_author;
     json["designer"] = m_designer;
@@ -179,6 +202,15 @@ QJsonObject Show::toJson() const {
     json["selectOnSpill"] = m_selectOnSpill;
     json["muteDcaUnassign"] = m_muteDcaUnassign;
     json["suppressBackupSwitch"] = m_suppressBackupSwitch;
+
+    if (!m_inactiveDcas.isEmpty()) {
+        QList<int> inactive = m_inactiveDcas.values();
+        std::sort(inactive.begin(), inactive.end()); // stable file diffs
+        QJsonArray inactiveArr;
+        for (int dca : inactive)
+            inactiveArr.append(dca);
+        json["inactiveDcas"] = inactiveArr;
+    }
     json["cues"] = m_cueList.toJson();
     json["dcaMapping"] = m_dcaMapping.toJson();
     json["actors"] = m_actorProfileLibrary.toJson();
@@ -229,6 +261,11 @@ void Show::fromJson(const QJsonObject& json) {
     m_selectOnSpill = json["selectOnSpill"].toBool(false);
     m_muteDcaUnassign = json["muteDcaUnassign"].toBool(false);
     m_suppressBackupSwitch = json["suppressBackupSwitch"].toBool(false);
+
+    // inactive-DCA set (added in show version 1.10); missing key = all active
+    m_inactiveDcas.clear();
+    for (const QJsonValue& val : json["inactiveDcas"].toArray())
+        m_inactiveDcas.insert(val.toInt());
 
     if (json.contains("dcaMapping")) {
         m_dcaMapping.loadFromJson(json["dcaMapping"].toObject());

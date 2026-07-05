@@ -118,6 +118,11 @@ class Cue {
     // any other DCA); seeds the custom mapping from the show mapping first if
     // the cue has none
     void assignChannelToDCAMapping(int channel, int dca, const class DCAMapping* seedFrom);
+    // replace this DCA's channel list in the cue's custom mapping with exactly
+    // `channels` (each also removed from any other DCA); seeds from the show
+    // mapping first when the cue has none
+    void assignChannelsToDCAMapping(const QList<int>& channels, int dca,
+                                    const class DCAMapping* seedFrom);
 
     [[nodiscard]] bool isMacro() const noexcept { return m_type == CueType::Macro; }
     [[nodiscard]] QStringList childCueIds() const { return m_childCueIds; }

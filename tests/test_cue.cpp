@@ -318,6 +318,54 @@ class TestCue : public QObject {
         Cue r = Cue::fromJson(cue.toJson());
         QCOMPARE(r.dcaChannelMapping().value(4), QList<int>({7}));
     }
+
+    void testAssignChannelsToDCAMapping_seedsAndReplacesTargetDca() {
+        DCAMapping show;
+        show.assignChannelToDCA(1, 1);
+        show.assignChannelToDCA(2, 1);
+        show.assignChannelToDCA(9, 2);
+
+        Cue cue(1.0, "Opening");
+        cue.assignChannelsToDCAMapping({5, 6}, 1, &show);
+
+        QVERIFY(cue.hasCustomDCAMapping());
+        // the label declares DCA 1's membership: seeded {1,2} replaced by {5,6}
+        QCOMPARE(cue.dcaChannelMapping().value(1), QList<int>({5, 6}));
+        QCOMPARE(cue.dcaChannelMapping().value(2), QList<int>({9}));
+        // show mapping untouched
+        QCOMPARE(show.channelsForDCA(1), QList<int>({1, 2}));
+    }
+
+    void testAssignChannelsToDCAMapping_movesChannelsOffOtherDCAs() {
+        Cue cue;
+        QMap<int, QList<int>> mapping;
+        mapping[1] = {5};
+        mapping[2] = {6, 7};
+        cue.setDCAChannelMapping(mapping);
+
+        cue.assignChannelsToDCAMapping({5, 6}, 3, nullptr);
+
+        QVERIFY(cue.dcaChannelMapping().value(1).isEmpty());
+        QCOMPARE(cue.dcaChannelMapping().value(2), QList<int>({7}));
+        QCOMPARE(cue.dcaChannelMapping().value(3), QList<int>({5, 6}));
+    }
+
+    void testAssignChannelsToDCAMapping_retypeSwaps() {
+        Cue cue;
+        cue.assignChannelsToDCAMapping({5, 6}, 1, nullptr);
+        cue.assignChannelsToDCAMapping({8}, 1, nullptr);
+
+        QCOMPARE(cue.dcaChannelMapping().value(1), QList<int>({8}));
+        for (const QList<int>& channels : cue.dcaChannelMapping()) {
+            QVERIFY(!channels.contains(5));
+            QVERIFY(!channels.contains(6));
+        }
+
+        // multi-channel list round-trips through JSON
+        cue.assignChannelsToDCAMapping({3, 4}, 2, nullptr);
+        Cue r = Cue::fromJson(cue.toJson());
+        QCOMPARE(r.dcaChannelMapping().value(2), QList<int>({3, 4}));
+    }
 };
 
 QTEST_MAIN(TestCue)
