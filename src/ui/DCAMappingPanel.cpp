@@ -372,6 +372,7 @@ void DCAMappingPanel::createChannelSection() {
                 int dca = m_channelCombos[ch - 1]->currentData().toInt();
                 onChannelDCAChanged(ch, dca);
                 updateComboItemStates();
+                updateDcaOverview();
             }
         });
         m_channelLayout->addWidget(combo, row, colOffset + 1);
@@ -441,6 +442,7 @@ void DCAMappingPanel::createBusSection() {
                 int dca = m_busCombos[bus - 1]->currentData().toInt();
                 onBusDCAChanged(bus, dca);
                 updateComboItemStates();
+                updateDcaOverview();
             }
         });
         m_busLayout->addWidget(combo, row, colOffset + 1);
