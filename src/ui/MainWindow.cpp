@@ -55,6 +55,7 @@
 #include <QFile>
 #include <QAbstractSpinBox>
 #include <QApplication>
+#include <QClipboard>
 #include <QComboBox>
 #include <QInputDialog>
 #include <QLineEdit>
@@ -94,6 +95,9 @@ MainWindow::MainWindow(Application* app, QWidget* parent) : QMainWindow(parent),
     createBubbleBar();
     connectSignals();
     loadSettings();
+    // copying in a spreadsheet arms the paste action's DCA-cell branch
+    connect(QApplication::clipboard(), &QClipboard::dataChanged, this,
+            &MainWindow::updateActions);
     updateActions();
     updateTitle();
 
@@ -196,14 +200,18 @@ void MainWindow::createActions() {
 
     m_copyCueAction = new QAction(tr("&Copy Cue"), this);
     m_copyCueAction->setShortcut(QKeySequence::Copy);
-    m_copyCueAction->setToolTip(tr("Copy the selected cue (Ctrl+C)"));
+    m_copyCueAction->setToolTip(
+        tr("Copy the selected cue; on a DCA cell, copy its assignments as "
+           "spreadsheet text (Ctrl+C)"));
     connect(m_copyCueAction, &QAction::triggered, this,
-            [this]() { m_cueListView->copySelectedCue(); updateActions(); });
+            [this]() { m_cueListView->copySmart(); updateActions(); });
 
     m_pasteCueAction = new QAction(tr("&Paste Cue"), this);
     m_pasteCueAction->setShortcut(QKeySequence::Paste);
-    m_pasteCueAction->setToolTip(tr("Paste the copied cue as a new cue (Ctrl+V)"));
-    connect(m_pasteCueAction, &QAction::triggered, this, [this]() { m_cueListView->pasteCue(); });
+    m_pasteCueAction->setToolTip(
+        tr("Paste the copied cue as a new cue; on a DCA cell, paste tab-separated "
+           "names across the DCA cells (Ctrl+V)"));
+    connect(m_pasteCueAction, &QAction::triggered, this, [this]() { m_cueListView->pasteSmart(); });
 
     m_pasteMergeAction = new QAction(tr("Paste &Merge"), this);
     m_pasteMergeAction->setToolTip(tr("Merge the copied cue's content into the selected cue"));
@@ -1361,7 +1369,10 @@ void MainWindow::updateActions() {
     m_cloneCueAction->setEnabled(editable && hasSelection);
     m_cloneToEndAction->setEnabled(editable && hasSelection);
     m_copyCueAction->setEnabled(hasSelection);
-    m_pasteCueAction->setEnabled(editable && m_cueListView->hasClipboardCue());
+    // stays armed for either branch of pasteSmart: an internal copied cue or
+    // spreadsheet text destined for DCA cells (pasteSmart no-ops gracefully)
+    m_pasteCueAction->setEnabled(editable && (m_cueListView->hasClipboardCue() ||
+                                              !QApplication::clipboard()->text().isEmpty()));
     m_pasteMergeAction->setEnabled(editable && hasSelection && m_cueListView->hasClipboardCue());
     m_pasteSwapAction->setEnabled(editable && hasSelection && m_cueListView->hasClipboardCue());
     m_fillDownAction->setEnabled(editable && hasSelection);

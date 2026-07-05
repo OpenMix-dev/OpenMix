@@ -79,6 +79,28 @@ class TestCastTextParse : public QObject {
         QCOMPARE(lines[0].roles, QStringList({"Cosette"}));
         QCOMPARE(lines[1].name, QString("Bob"));
     }
+
+    void tsvRow_splitsFirstLineOnTabs() {
+        QCOMPARE(CastTextParse::parseTsvRow("Evan\tHeidi\tCynthia\tConnor\n"),
+                 QStringList({"Evan", "Heidi", "Cynthia", "Connor"}));
+    }
+
+    void tsvRow_ignoresLaterRows_absorbsCr() {
+        QCOMPARE(CastTextParse::parseTsvRow("a\tb\r\nc\td"), QStringList({"a", "b"}));
+    }
+
+    void tsvRow_singleValueAndBlank() {
+        QCOMPARE(CastTextParse::parseTsvRow("Evan"), QStringList({"Evan"}));
+        QCOMPARE(CastTextParse::parseTsvRow(""), QStringList());
+        QCOMPARE(CastTextParse::parseTsvRow("   "), QStringList());
+        QCOMPARE(CastTextParse::parseTsvRow("  \r\n"), QStringList());
+    }
+
+    void tsvRow_preservesInteriorEmptyCells() {
+        QCOMPARE(CastTextParse::parseTsvRow("a\t\tb"), QStringList({"a", "", "b"}));
+        // a tabbed row of empties is a real (clearing) paste, not a blank
+        QCOMPARE(CastTextParse::parseTsvRow("\t"), QStringList({"", ""}));
+    }
 };
 
 QTEST_MAIN(TestCastTextParse)

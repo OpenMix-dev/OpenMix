@@ -37,6 +37,21 @@ namespace OpenMix::CastTextParse {
     return merged;
 }
 
+// First row of a spreadsheet-style clipboard grid: split the first line on
+// tabs, trimming each cell (absorbs \r from \r\n). Empty cells are preserved
+// (a paste overwrites the target cell); a blank/whitespace-only single cell
+// returns an empty list. Later rows are ignored.
+[[nodiscard]] inline QStringList parseTsvRow(const QString& text) {
+    const int lineEnd = text.indexOf(QLatin1Char('\n'));
+    const QString firstLine = lineEnd < 0 ? text : text.left(lineEnd);
+    QStringList cells = firstLine.split(QLatin1Char('\t'));
+    for (QString& cell : cells)
+        cell = cell.trimmed();
+    if (cells.size() == 1 && cells.first().isEmpty())
+        return {};
+    return cells;
+}
+
 struct CastLine {
     QString name;
     QStringList roles;
