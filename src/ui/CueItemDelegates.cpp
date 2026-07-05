@@ -20,11 +20,30 @@ namespace OpenMix {
 namespace {
 
 // the app stylesheet's input padding and minimum height overflow a compact
-// table row; strip the box model so inline cell editors fit the cell exactly
+// table row; strip the box model so inline cell editors fit the cell exactly.
+// the explicit background keeps the editor opaque even when the cascaded app
+// stylesheet is absent (fallback sheet) — the view repaints the cell text
+// beneath the editor, and a translucent editor shows both texts superimposed
 void fitEditorToCell(QWidget* editor) {
-    editor->setStyleSheet(QStringLiteral(
-        "QLineEdit, QComboBox { border: none; border-radius: 0; padding: 0 4px; "
-        "min-height: 0; }"));
+    editor->setStyleSheet(QStringLiteral("QLineEdit, QComboBox { border: none; "
+                                         "border-radius: 0; padding: 0 4px; "
+                                         "min-height: 0; background-color: %1; }")
+                              .arg(QLatin1String(Theme::Colors::BgInput)));
+}
+
+// true when the view has an inline editor open on this index. The view keeps
+// repainting the cell underneath its editor; painting glyphs there produces
+// doubled text whenever the editor isn't fully opaque, so callers fill only
+// the row background (the editor covers the full cell rect) and skip the rest.
+bool skipPaintForOpenEditor(QPainter* painter, const QStyleOptionViewItem& option,
+                            const QModelIndex& index) {
+    const auto* view = qobject_cast<const QAbstractItemView*>(option.widget);
+    if (!view || !view->indexWidget(index))
+        return false;
+    const QVariant bgData = index.data(Qt::BackgroundRole);
+    if (bgData.isValid())
+        painter->fillRect(option.rect, bgData.value<QBrush>());
+    return true;
 }
 
 } // namespace
@@ -34,6 +53,9 @@ CueNumberDelegate::CueNumberDelegate(CueList* cueList, QObject* parent)
 
 void CueNumberDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                               const QModelIndex& index) const {
+    if (skipPaintForOpenEditor(painter, option, index))
+        return;
+
     QStyleOptionViewItem opt = option;
     opt.state &= ~QStyle::State_HasFocus;
 
@@ -138,6 +160,9 @@ CueTypeDelegate::CueTypeDelegate(QObject* parent) : QStyledItemDelegate(parent) 
 
 void CueTypeDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                             const QModelIndex& index) const {
+    if (skipPaintForOpenEditor(painter, option, index))
+        return;
+
     QStyleOptionViewItem opt = option;
     opt.state &= ~QStyle::State_HasFocus;
 
@@ -278,6 +303,9 @@ DCAAssignDelegate::DCAAssignDelegate(ActorProfileLibrary* library, QObject* pare
 void DCAAssignDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                               const QModelIndex& index) const {
     QStyleOptionViewItem opt = option;
+    if (skipPaintForOpenEditor(painter, option, index))
+        return;
+
     opt.state &= ~QStyle::State_HasFocus;
 
     QVariant bgData = index.data(Qt::BackgroundRole);
@@ -350,6 +378,9 @@ CueTextDelegate::CueTextDelegate(QObject* parent) : QStyledItemDelegate(parent) 
 void CueTextDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                             const QModelIndex& index) const {
     QStyleOptionViewItem opt = option;
+    if (skipPaintForOpenEditor(painter, option, index))
+        return;
+
     opt.state &= ~QStyle::State_HasFocus;
 
     QVariant bgData = index.data(Qt::BackgroundRole);
