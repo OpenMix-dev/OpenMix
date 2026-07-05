@@ -69,8 +69,11 @@ CueEditor::CueEditor(Application* app, QWidget* parent) : QWidget(parent), m_app
         connect(engine, &PlaybackEngine::checkModeChanged, this,
                 &CueEditor::onEngineCheckModeChanged);
     }
-    if (m_app)
+    if (m_app) {
         connect(m_app, &Application::dcaCountChanged, this, &CueEditor::onDcaCountChanged);
+        connect(m_app, &Application::activeDcasChanged, this,
+                &CueEditor::applyActiveDcaVisibility);
+    }
     updateGangsUI();
 }
 
@@ -397,6 +400,7 @@ void CueEditor::rebuildDcaTargetChecks(int count) {
             onTargetedDCAsChanged();
         });
     }
+    applyActiveDcaVisibility();
 }
 
 void CueEditor::rebuildDcaOverrideStrips(int count) {
@@ -413,6 +417,18 @@ void CueEditor::rebuildDcaOverrideStrips(int count) {
         m_dcaOverridesContentLayout->insertWidget(m_dcaOverridesContentLayout->count() - 1, strip);
         m_dcaOverrideStrips.append(strip);
     }
+    applyActiveDcaVisibility();
+}
+
+// inactive DCAs disappear from targeting and overrides; hidden checks keep
+// their state (cue data is preserved, playback gating makes it inert)
+void CueEditor::applyActiveDcaVisibility() {
+    if (!m_app)
+        return;
+    for (int i = 0; i < m_dcaTargetChecks.size(); ++i)
+        m_dcaTargetChecks[i]->setVisible(m_app->isDcaActive(i + 1));
+    for (int i = 0; i < m_dcaOverrideStrips.size(); ++i)
+        m_dcaOverrideStrips[i]->setVisible(m_app->isDcaActive(i + 1));
 }
 
 void CueEditor::onDcaCountChanged(int count) {

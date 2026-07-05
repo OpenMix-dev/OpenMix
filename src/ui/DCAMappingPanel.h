@@ -79,6 +79,7 @@ class DCAMappingPanel : public QWidget {
     void updateComboItemStates();
     void updateContextHeader();
     void updateDcaOverview();
+    void updateActiveDcaChecks();
     QString busDisplayName(int bus) const;
     QString channelDisplayName(int channel) const;
     QString dcaDisplayName(int dca) const;
@@ -109,6 +110,7 @@ class DCAMappingPanel : public QWidget {
     QGridLayout* m_dcaOverviewLayout = nullptr;
     QVector<QLabel*> m_dcaOverviewTitles;
     QVector<QLabel*> m_dcaOverviewMembers;
+    QVector<QCheckBox*> m_dcaActiveChecks;
 
     QGroupBox* m_channelGroup;
     QGridLayout* m_channelLayout;

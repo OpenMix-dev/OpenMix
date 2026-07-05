@@ -113,6 +113,7 @@ void Application::initialize() {
     m_playbackEngine->setChannelGangs(m_show->channelGangs());
     m_playbackEngine->setDimDcaFaders(m_show->dimDcaFaders());
     m_playbackEngine->setMuteDcaUnassign(m_show->muteDcaUnassign());
+    m_playbackEngine->setInactiveDcas(m_show->inactiveDcas());
 
     // re-seed gangs + console-behavior toggles whenever a project is loaded
     // (fromJson re-emits nameChanged)
@@ -120,6 +121,14 @@ void Application::initialize() {
         m_playbackEngine->setChannelGangs(m_show->channelGangs());
         m_playbackEngine->setDimDcaFaders(m_show->dimDcaFaders());
         m_playbackEngine->setMuteDcaUnassign(m_show->muteDcaUnassign());
+        m_playbackEngine->setInactiveDcas(m_show->inactiveDcas());
+        emit activeDcasChanged();
+    });
+
+    // live edits from the mapping panel
+    connect(m_show, &Show::activeDcasChanged, this, [this]() {
+        m_playbackEngine->setInactiveDcas(m_show->inactiveDcas());
+        emit activeDcasChanged();
     });
 
     // effective DCA count follows the selected console type, project loads,
@@ -398,6 +407,10 @@ MixerCapabilities Application::effectiveCapabilities() const {
         return m_mixer->capabilities();
     return MixerCapabilities::forProtocolId(m_show->mixerConfig().type);
 }
+
+QSet<int> Application::inactiveDcas() const { return m_show->inactiveDcas(); }
+
+bool Application::isDcaActive(int dca) const { return m_show->isDcaActive(dca); }
 
 void Application::refreshDcaCount() {
     const int count = effectiveDcaCount();

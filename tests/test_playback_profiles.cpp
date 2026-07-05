@@ -3,6 +3,7 @@
 #include "core/ActorProfileLibrary.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
+#include "core/DCAMapping.h"
 #include "core/FadeEngine.h"
 #include "core/PlaybackEngine.h"
 #include "protocol/LoopbackProtocol.h"
@@ -157,6 +158,68 @@ class TestPlaybackProfiles : public QObject {
         engine.fadeEngine()->advance(2000.0); // run the fade to completion
         QVERIFY(mixer->recordedCalls().contains("fader:ch=5:level=1"));
         QVERIFY(!engine.fadeEngine()->isActive());
+    }
+
+    void inactiveDca_overridesNeverReachConsole() {
+        CueList cues;
+        Cue cue(1.0, "Top");
+        cue.setType(CueType::Snapshot);
+        DCAOverride active;
+        active.mute = true;
+        active.label = "Leads";
+        cue.setDCAOverride(1, active);
+        DCAOverride reserved;
+        reserved.mute = true;
+        reserved.label = "Band";
+        cue.setDCAOverride(2, reserved);
+        cues.addCue(cue);
+
+        LoopbackProtocol* mixer = makeConnectedLoopback(this);
+        // loopback pre-seeds console state; capture the reserved DCA's values
+        // so "untouched" means "unchanged", not "absent"
+        const QVariant seededMute = mixer->getParameter("/dca/2/mute");
+        const QVariant seededName = mixer->getParameter("/dca/2/config/name");
+
+        PlaybackEngine engine;
+        engine.setCueList(&cues);
+        engine.setMixer(mixer);
+        engine.setInactiveDcas({2});
+        engine.executeCue(0);
+
+        // active DCA written, reserved DCA untouched
+        QCOMPARE(mixer->getParameter("/dca/1/mute").toInt(), 1);
+        QCOMPARE(mixer->getParameter("/dca/1/config/name").toString(), QString("Leads"));
+        QCOMPARE(mixer->getParameter("/dca/2/mute"), seededMute);
+        QCOMPARE(mixer->getParameter("/dca/2/config/name"), seededName);
+    }
+
+    void inactiveDca_mappedChannelParamsFiltered() {
+        DCAMapping mapping;
+        mapping.assignChannelToDCA(5, 2); // ch 5 rides the reserved DCA
+        mapping.assignChannelToDCA(6, 1);
+
+        CueList cues;
+        Cue cue(1.0, "Top");
+        cue.setType(CueType::Snapshot);
+        cue.setParameter("/ch/05/mix/fader", 0.7);
+        cue.setParameter("/ch/06/mix/fader", 0.3);
+        cue.setParameter("/main/st/mix/fader", 0.9); // global param always sends
+        cues.addCue(cue);
+
+        LoopbackProtocol* mixer = makeConnectedLoopback(this);
+        // loopback pre-seeds channel state; "filtered" = value unchanged
+        const QVariant seededCh5 = mixer->getParameter("/ch/05/mix/fader");
+
+        PlaybackEngine engine;
+        engine.setCueList(&cues);
+        engine.setDCAMapping(&mapping);
+        engine.setMixer(mixer);
+        engine.setInactiveDcas({2});
+        engine.executeCue(0);
+
+        QCOMPARE(mixer->getParameter("/ch/05/mix/fader"), seededCh5);
+        QCOMPARE(mixer->getParameter("/ch/06/mix/fader").toDouble(), 0.3);
+        QCOMPARE(mixer->getParameter("/main/st/mix/fader").toDouble(), 0.9);
     }
 
     void verifyCue_emitsLanded_whenParamsMatch() {

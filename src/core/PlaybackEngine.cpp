@@ -288,8 +288,9 @@ void PlaybackEngine::executeCueInternal(const Cue& cue) {
         ~DepthGuard() { --depth; }
     } depthGuard{m_fireDepth};
 
-    // resolve which DCAs to target
-    QSet<int> targetDCAs = cue.targetsAllDCAs() ? allDCAs() : cue.targetedDCAs();
+    // resolve which DCAs to target; inactive DCAs are reserved for manual
+    // console control and never written to
+    QSet<int> targetDCAs = (cue.targetsAllDCAs() ? allDCAs() : cue.targetedDCAs()) - m_inactiveDcas;
 
     switch (cue.type()) {
     case CueType::Snapshot: {
@@ -352,6 +353,10 @@ void PlaybackEngine::applyDCAOverrides(const Cue& cue, const QSet<int>& targetDC
 
     for (int dca : targetDCAs) {
         if (dca < 1 || dca > caps.dcaCount)
+            continue;
+        // callers already subtract inactive DCAs; keep the guard local too so
+        // no future call site can write to a reserved DCA
+        if (m_inactiveDcas.contains(dca))
             continue;
 
         DCAOverride override = cue.dcaOverride(dca);
@@ -532,7 +537,8 @@ void PlaybackEngine::verifyCue(int index, const Cue& cue) {
         return;
 
     // verify the generic snapshot params (sent instantly via recallSnapshot).
-    const QSet<int> targetDCAs = cue.targetsAllDCAs() ? allDCAs() : cue.targetedDCAs();
+    const QSet<int> targetDCAs =
+        (cue.targetsAllDCAs() ? allDCAs() : cue.targetedDCAs()) - m_inactiveDcas;
     const QJsonObject params = filterParametersForDCAs(cue, targetDCAs);
 
     // only numeric params (faders/levels/toggles) are verifiable by value;
@@ -597,8 +603,20 @@ QList<int> PlaybackEngine::getBusesForDCA(const Cue& cue, int dca) const {
 
 QJsonObject PlaybackEngine::filterParametersForDCAs(const Cue& cue,
                                                     const QSet<int>& targetDCAs) const {
+    // any captured /dca/N/... param of an inactive DCA must never reach the
+    // console, regardless of mapping state
+    static QRegularExpression dcaAnyRegex("^/dca/(\\d+)/");
+    auto inactiveDcaParam = [this](const QString& path) {
+        const QRegularExpressionMatch m = dcaAnyRegex.match(path);
+        return m.hasMatch() && m_inactiveDcas.contains(m.captured(1).toInt());
+    };
+
+    // without a mapping there is nothing to relate channels to DCAs, so no
+    // channel filtering happens. An empty target set with a mapping is real
+    // (e.g. every targeted DCA is inactive) and falls through to the filter
+    // below, which then drops every mapped channel/bus.
     bool hasMapping = cue.hasCustomDCAMapping() || m_dcaMapping;
-    if (!hasMapping || targetDCAs.isEmpty()) {
+    if (!hasMapping) {
         QJsonObject filtered;
         static QRegularExpression dcaFaderRegex("^/dca/\\d+/fader$");
 
@@ -606,7 +624,7 @@ QJsonObject PlaybackEngine::filterParametersForDCAs(const Cue& cue,
         // holds a back-pointer to the object, so iterating the temporary dangles.
         const QJsonObject params = cue.parameters();
         for (auto it = params.begin(); it != params.end(); ++it) {
-            if (!dcaFaderRegex.match(it.key()).hasMatch()) {
+            if (!dcaFaderRegex.match(it.key()).hasMatch() && !inactiveDcaParam(it.key())) {
                 filtered[it.key()] = it.value();
             }
         }
@@ -639,7 +657,7 @@ QJsonObject PlaybackEngine::filterParametersForDCAs(const Cue& cue,
     for (auto it = params.begin(); it != params.end(); ++it) {
         const QString& path = it.key();
 
-        if (dcaFaderRegex.match(path).hasMatch()) {
+        if (dcaFaderRegex.match(path).hasMatch() || inactiveDcaParam(path)) {
             continue;
         }
 
@@ -764,7 +782,20 @@ void PlaybackEngine::executeStopCue(const Cue& cue) {
 
     case StopBehavior::StopAndApply:
         if (m_mixer && !cue.parameters().isEmpty()) {
-            m_mixer->recallSnapshot(cue);
+            // this path recalls the raw snapshot; strip captured params of
+            // inactive DCAs so reserved DCAs stay untouched
+            static QRegularExpression dcaAnyRegex("^/dca/(\\d+)/");
+            QJsonObject params;
+            const QJsonObject original = cue.parameters();
+            for (auto it = original.begin(); it != original.end(); ++it) {
+                const QRegularExpressionMatch m = dcaAnyRegex.match(it.key());
+                if (m.hasMatch() && m_inactiveDcas.contains(m.captured(1).toInt()))
+                    continue;
+                params[it.key()] = it.value();
+            }
+            Cue filteredCue = cue;
+            filteredCue.setParameters(params);
+            m_mixer->recallSnapshot(filteredCue);
         }
         setState(PlaybackState::Running);
         emit cueCompleted(m_currentIndex);

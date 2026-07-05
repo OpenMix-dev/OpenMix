@@ -110,6 +110,10 @@ void CueListView::setupUi() {
     applyDcaSubColumnVisibility();
     connect(m_proxyModel, &QAbstractItemModel::modelReset, this,
             &CueListView::applyDcaSubColumnVisibility);
+    connect(m_app, &Application::activeDcasChanged, this, [this]() {
+        applyDcaSubColumnVisibility();
+        scheduleColumnRelayout();
+    });
 
     // columns auto-fit their contents; leftover space is shared, and columns only
     // shrink below their natural width when the viewport can't fit them all
@@ -547,19 +551,22 @@ void CueListView::setDcaSubColumnsVisible(int sub, bool visible) {
         m_dcaFxColsVisible = visible;
     else if (sub == 2)
         m_dcaPosColsVisible = visible;
-    for (int c = CueTableModel::ColCount; c < m_model->columnCount(); ++c)
-        if (m_model->dcaSubColumn(c) == sub)
-            m_tableView->setColumnHidden(c, !visible);
+    applyDcaSubColumnVisibility();
     scheduleColumnRelayout();
 }
 
+// single visibility authority for the dynamic DCA columns: an inactive DCA's
+// whole triplet is hidden, and fx/pos additionally follow their menu toggles
 void CueListView::applyDcaSubColumnVisibility() {
     for (int c = CueTableModel::ColCount; c < m_model->columnCount(); ++c) {
         const int sub = m_model->dcaSubColumn(c);
+        const bool active = m_app->isDcaActive(m_model->dcaOfColumn(c));
+        bool visible = active;
         if (sub == 1)
-            m_tableView->setColumnHidden(c, !m_dcaFxColsVisible);
+            visible = active && m_dcaFxColsVisible;
         else if (sub == 2)
-            m_tableView->setColumnHidden(c, !m_dcaPosColsVisible);
+            visible = active && m_dcaPosColsVisible;
+        m_tableView->setColumnHidden(c, !visible);
     }
 }
 

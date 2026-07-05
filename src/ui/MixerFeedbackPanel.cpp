@@ -30,6 +30,8 @@ MixerFeedbackPanel::MixerFeedbackPanel(Application* app, QWidget* parent)
         connect(m_app, &Application::mixerDisconnected, this,
                 &MixerFeedbackPanel::onMixerDisconnected);
         connect(m_app, &Application::dcaCountChanged, this, &MixerFeedbackPanel::setDCACount);
+        connect(m_app, &Application::activeDcasChanged, this,
+                &MixerFeedbackPanel::applyActiveDcaVisibility);
         setDCACount(m_app->effectiveDcaCount());
 
         if (m_app->mixer() && m_app->mixer()->isConnected()) {
@@ -146,6 +148,17 @@ void MixerFeedbackPanel::setDCACount(int count) {
         if (m_app && m_app->mixer() && m_app->mixer()->isConnected())
             refresh();
     }
+
+    applyActiveDcaVisibility();
+}
+
+void MixerFeedbackPanel::applyActiveDcaVisibility() {
+    if (!m_app)
+        return;
+    // direct visibility, not setVisibleDCAs: its empty-list-means-all
+    // convention would show everything when every DCA is inactive
+    for (DCAWidget* dca : m_dcaWidgets)
+        dca->setVisible(m_app->isDcaActive(dca->dcaNumber()));
 }
 
 void MixerFeedbackPanel::setVisibleDCAs(const QVector<int>& dcaNumbers) {

@@ -75,6 +75,7 @@ class CueEditor : public QWidget {
 
   private:
     [[nodiscard]] EnsembleLibrary* ensembleLibrary() const;
+    void applyActiveDcaVisibility();
     void setupUi();
     void createDCATargetingSection();
     void rebuildDcaTargetChecks(int count);

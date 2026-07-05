@@ -423,7 +423,7 @@ class TestActorProfiles : public QObject {
         QVERIFY(spy.count() >= 1);
 
         const QJsonObject json = show.toJson();
-        QCOMPARE(json["version"].toString(), QString("1.9"));
+        QCOMPARE(json["version"].toString(), QString("1.10"));
 
         Show loaded;
         loaded.fromJson(json);
