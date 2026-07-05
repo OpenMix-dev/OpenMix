@@ -11,7 +11,7 @@ class TestMixerCapabilities : public QObject {
         // the console-selection feature keys the whole app's DCA count off these
         QCOMPARE(MixerCapabilities::forProtocolId("x32").dcaCount, 8);
         QCOMPARE(MixerCapabilities::forProtocolId("m32").dcaCount, 8);
-        QCOMPARE(MixerCapabilities::forProtocolId("wing").dcaCount, 24);
+        QCOMPARE(MixerCapabilities::forProtocolId("wing").dcaCount, 16);
         QCOMPARE(MixerCapabilities::forProtocolId("sq7").dcaCount, 8);
         QCOMPARE(MixerCapabilities::forProtocolId("gld80").dcaCount, 8);
         QCOMPARE(MixerCapabilities::forProtocolId("avantis").dcaCount, 16);
@@ -31,7 +31,7 @@ class TestMixerCapabilities : public QObject {
     }
 
     void lookupIsCaseInsensitive() {
-        QCOMPARE(MixerCapabilities::forProtocolId("WING").dcaCount, 24);
+        QCOMPARE(MixerCapabilities::forProtocolId("WING").dcaCount, 16);
         QCOMPARE(MixerCapabilities::forProtocolId("Cl5").dcaCount, 16);
     }
 

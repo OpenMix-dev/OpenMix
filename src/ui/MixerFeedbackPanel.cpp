@@ -114,7 +114,7 @@ void MixerFeedbackPanel::connectDCASignals(DCAWidget* dca) {
 }
 
 void MixerFeedbackPanel::setDCACount(int count) {
-    count = std::clamp(count, 1, 24); // support up to 24 DCAs (WING max)
+    count = std::clamp(count, 1, 24); // support up to 24 DCAs (DM7/SD7 max)
 
     if (!m_dcaLayout)
         return;

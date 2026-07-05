@@ -53,7 +53,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.displayName = "Behringer WING";
         caps.protocolId = "wing";
         caps.defaultPort = 2223;
-        caps.dcaCount = 24;
+        caps.dcaCount = 16;
         caps.inputChannels = 48;
         caps.mixBuses = 16;
         caps.matrixOutputs = 8;
