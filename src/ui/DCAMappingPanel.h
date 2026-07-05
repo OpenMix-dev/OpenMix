@@ -68,6 +68,8 @@ class DCAMappingPanel : public QWidget {
     bool eventFilter(QObject* obj, QEvent* event) override;
 
   private:
+    // re-derive m_showingCueMapping + checkbox from the current cue's state
+    void syncCueMappingState();
     void setupUi();
     void createChannelSection();
     void createBusSection();

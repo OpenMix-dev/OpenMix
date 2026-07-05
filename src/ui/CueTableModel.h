@@ -9,6 +9,7 @@ class CueList;
 class Cue;
 class DCAMapping;
 class ActorProfileLibrary;
+class EnsembleLibrary;
 
 class CueTableModel : public QAbstractTableModel {
     Q_OBJECT
@@ -52,6 +53,14 @@ class CueTableModel : public QAbstractTableModel {
     // cast library: resolves DCA assignment cells to "Actor (Role)" for display
     // and routes typed labels to channel assignments on edit
     void setActorLibrary(ActorProfileLibrary* library) { m_actorLibrary = library; }
+    // ensembles: named channel groups resolvable from DCA assignment cells
+    void setEnsembleLibrary(EnsembleLibrary* library) { m_ensembleLibrary = library; }
+
+    // apply one DCA-assignment edit to a cue copy: set/clear the label override
+    // (preserving any mute) and resolve a typed role/actor/ensemble name to
+    // channel assignments in the cue's DCA mapping — the single commit path
+    // for inline typing and TSV paste
+    void applyDcaAssignment(Cue& cue, int dca, const QString& text) const;
 
     explicit CueTableModel(CueList* cueList, QObject* parent = nullptr);
 
@@ -107,6 +116,7 @@ class CueTableModel : public QAbstractTableModel {
     int m_dcaCount = 8;
     DCAMapping* m_dcaMapping = nullptr;
     ActorProfileLibrary* m_actorLibrary = nullptr;
+    EnsembleLibrary* m_ensembleLibrary = nullptr;
 
     static const QString s_mimeType;
 };

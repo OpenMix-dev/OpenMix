@@ -89,6 +89,11 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
                     // the actor in that role
                     if (role == Qt::EditRole)
                         return *ov.label;
+                    // multi-channel labels (shared roles, ensembles) read as
+                    // the group name, not one arbitrary member
+                    if (m_actorLibrary &&
+                        m_actorLibrary->resolveChannels(*ov.label, m_ensembleLibrary).size() > 1)
+                        return *ov.label;
                     const Actor* actor =
                         m_actorLibrary ? m_actorLibrary->resolveActor(*ov.label) : nullptr;
                     if (actor) {
@@ -255,7 +260,8 @@ QVariant CueTableModel::data(const QModelIndex& index, int role) const {
                 }
                 lines << tr("Members: %1").arg(members.join(", "));
             }
-            lines << tr("Type a role or actor name to auto-assign their channel to this DCA");
+            lines << tr("Type a role, actor, or ensemble name to auto-assign "
+                        "their channels to this DCA");
             return lines.join("\n");
         }
 
@@ -344,6 +350,21 @@ Qt::ItemFlags CueTableModel::flags(const QModelIndex& index) const {
     return flags;
 }
 
+void CueTableModel::applyDcaAssignment(Cue& cue, int dca, const QString& text) const {
+    DCAOverride ov = cue.dcaOverride(dca);
+    const QString trimmed = text.trimmed();
+    ov.label = trimmed.isEmpty() ? std::nullopt : std::optional<QString>(trimmed);
+    cue.setDCAOverride(dca, ov);
+
+    // a resolving label declares the DCA's membership for this cue; scribble
+    // labels and cleared cells leave the mapping untouched
+    if (m_actorLibrary && !trimmed.isEmpty()) {
+        const QList<int> channels = m_actorLibrary->resolveChannels(trimmed, m_ensembleLibrary);
+        if (!channels.isEmpty())
+            cue.assignChannelsToDCAMapping(channels, dca, m_dcaMapping);
+    }
+}
+
 bool CueTableModel::setData(const QModelIndex& index, const QVariant& value, int role) {
     if (!index.isValid() || role != Qt::EditRole || !m_cueList) {
         return false;
@@ -358,20 +379,13 @@ bool CueTableModel::setData(const QModelIndex& index, const QVariant& value, int
     Cue cue = m_cueList->at(row);
     QVariant oldValue;
 
-    // DCA assignment cells: set the label override (preserving any mute) and
-    // resolve a typed role/actor name to a channel assignment — the same
-    // commit path the assign dialog used
+    // DCA assignment cells: set the label override and resolve a typed
+    // role/actor/ensemble name to channel assignments — the same commit path
+    // the assign dialog used
     if (dcaSubColumn(col) == 0) {
         const int dca = dcaOfColumn(col);
-        DCAOverride ov = cue.dcaOverride(dca);
-        oldValue = ov.label.value_or(QString());
-        const QString text = value.toString().trimmed();
-        ov.label = text.isEmpty() ? std::nullopt : std::optional<QString>(text);
-        cue.setDCAOverride(dca, ov);
-        if (m_actorLibrary && !text.isEmpty()) {
-            if (const Actor* actor = m_actorLibrary->resolveActor(text))
-                cue.assignChannelToDCAMapping(actor->channel(), dca, m_dcaMapping);
-        }
+        oldValue = cue.dcaOverride(dca).label.value_or(QString());
+        applyDcaAssignment(cue, dca, value.toString());
         emit cueEditRequested(row, col, oldValue, value);
         m_cueList->updateCue(row, cue);
         return true;

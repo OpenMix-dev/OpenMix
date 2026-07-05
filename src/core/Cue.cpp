@@ -199,6 +199,19 @@ void Cue::assignChannelToDCAMapping(int channel, int dca, const DCAMapping* seed
     setDCAChannelMapping(channelMap);
 }
 
+void Cue::assignChannelsToDCAMapping(const QList<int>& channels, int dca,
+                                     const DCAMapping* seedFrom) {
+    if (!hasCustomDCAMapping() && seedFrom)
+        copyDCAMappingFrom(seedFrom);
+
+    QMap<int, QList<int>> channelMap = dcaChannelMapping();
+    for (QList<int>& list : channelMap) // one DCA per channel
+        for (int ch : channels)
+            list.removeAll(ch);
+    channelMap[dca] = channels; // the label declares the DCA's membership
+    setDCAChannelMapping(channelMap);
+}
+
 void Cue::mergeContentFrom(const Cue& other) {
     // scalar content overwritten from the other cue
     m_type = other.m_type;

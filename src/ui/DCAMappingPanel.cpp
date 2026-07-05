@@ -637,7 +637,21 @@ void DCAMappingPanel::refresh() {
     if (m_app && m_app->show()) {
         m_mapping = m_app->show()->dcaMapping();
     }
+    // a hidden panel misses cue edits (the cueUpdated hook is gated on
+    // visibility), so a full refresh re-derives the cue-mapping state instead
+    // of trusting what was last shown
+    syncCueMappingState();
+    updateContextHeader();
     updateDCAOptions();
+}
+
+void DCAMappingPanel::syncCueMappingState() {
+    m_showingCueMapping = m_currentCue && m_currentCue->hasCustomDCAMapping();
+    if (m_currentCue) {
+        m_useCueMappingCheck->blockSignals(true);
+        m_useCueMappingCheck->setChecked(m_showingCueMapping);
+        m_useCueMappingCheck->blockSignals(false);
+    }
 }
 
 void DCAMappingPanel::syncFromMixer() {
@@ -887,17 +901,7 @@ void DCAMappingPanel::onMixerDisconnected() {
 
 void DCAMappingPanel::setCurrentCue(Cue* cue) {
     m_currentCue = cue;
-
-    if (cue) {
-        // check if cue has custom mapping
-        m_showingCueMapping = cue->hasCustomDCAMapping();
-        m_useCueMappingCheck->blockSignals(true);
-        m_useCueMappingCheck->setChecked(m_showingCueMapping);
-        m_useCueMappingCheck->blockSignals(false);
-    } else {
-        m_showingCueMapping = false;
-    }
-
+    syncCueMappingState();
     updateContextHeader();
     populateFromMapping();
 }

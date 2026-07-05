@@ -67,6 +67,8 @@ void CueListView::setupUi() {
     // create model & proxy
     m_model = new CueTableModel(m_app->show()->cueList(), this);
     m_model->setDcaMapping(m_app->show()->dcaMapping());
+    m_model->setActorLibrary(m_app->show()->actorProfileLibrary());
+    m_model->setEnsembleLibrary(m_app->show()->ensembleLibrary());
     m_model->setDcaCount(m_app->effectiveDcaCount());
     connect(m_app, &Application::dcaCountChanged, this,
             [this](int count) { m_model->setDcaCount(count); });
@@ -200,7 +202,8 @@ void CueListView::setupDelegates() {
     m_numberDelegate = new CueNumberDelegate(cueList, this);
     m_typeDelegate = new CueTypeDelegate(this);
     m_textDelegate = new CueTextDelegate(this);
-    m_dcaAssignDelegate = new DCAAssignDelegate(m_app->show()->actorProfileLibrary(), this);
+    m_dcaAssignDelegate = new DCAAssignDelegate(m_app->show()->actorProfileLibrary(),
+                                                m_app->show()->ensembleLibrary(), this);
 
     // default delegate covers the dynamic per-DCA columns (strips the selection
     // block so the row's standby/current colour shows through; only the DCA

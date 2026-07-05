@@ -11,6 +11,8 @@
 
 namespace OpenMix {
 
+class EnsembleLibrary;
+
 // Owns the show's cast: actors (each assigned to a channel), the set of profile
 // slots, and which channels are currently on their backup/spare voice. Resolves
 // the concrete voice to apply for a given channel + slot. Lives on the Show.
@@ -38,8 +40,17 @@ class ActorProfileLibrary : public QObject {
     // actor's roles first, then actor name; among duplicates prefer active,
     // then lowest order
     [[nodiscard]] const Actor* resolveActor(const QString& text) const;
-    // roles + actor names for autocomplete (non-empty, deduplicated, sorted)
-    [[nodiscard]] QStringList completionCandidates() const;
+    // resolve free text to the input channels it names, in tiers:
+    //   1. every ACTIVE actor holding the role (case-insensitive)
+    //   2. else the identically-named ensemble's member channels
+    //   3. else every ACTIVE actor with that name
+    //   4. else the single resolveActor() fallback (covers inactive understudies)
+    // sorted, deduplicated, excludes unassigned channels (< 1)
+    [[nodiscard]] QList<int> resolveChannels(const QString& text,
+                                             const EnsembleLibrary* ensembles = nullptr) const;
+    // roles + actor names (+ ensemble names) for autocomplete (non-empty,
+    // deduplicated, sorted)
+    [[nodiscard]] QStringList completionCandidates(const EnsembleLibrary* ensembles = nullptr) const;
     void addActor(const Actor& actor);
     void updateActor(const QString& id, const Actor& actor);
     void removeActor(const QString& id);

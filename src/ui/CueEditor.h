@@ -22,6 +22,7 @@ namespace OpenMix {
 
 class Application;
 class ActorProfileLibrary;
+class EnsembleLibrary;
 class Cue;
 class CollapsibleSection;
 class DCAOverrideStrip;
@@ -73,6 +74,7 @@ class CueEditor : public QWidget {
     void onDcaCountChanged(int count);
 
   private:
+    [[nodiscard]] EnsembleLibrary* ensembleLibrary() const;
     void setupUi();
     void createDCATargetingSection();
     void rebuildDcaTargetChecks(int count);

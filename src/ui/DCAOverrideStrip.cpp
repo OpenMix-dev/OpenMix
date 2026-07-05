@@ -32,8 +32,8 @@ DCAOverrideStrip::DCAOverrideStrip(int dcaNumber, QAbstractItemModel* completion
     m_labelEdit = new QLineEdit(this);
     m_labelEdit->setPlaceholderText(tr("(no label change)"));
     m_labelEdit->setToolTip(
-        tr("Typing a role or actor name assigns their channel to this DCA for this cue; "
-           "empty leaves the console label untouched"));
+        tr("Typing a role, actor, or ensemble name assigns their channels to this DCA "
+           "for this cue; empty leaves the console label untouched"));
     m_labelEdit->setClearButtonEnabled(true);
     m_labelEdit->setMaxLength(32);
     if (completionModel) {

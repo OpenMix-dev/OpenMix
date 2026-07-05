@@ -3,6 +3,7 @@
 #include "core/Cue.h"
 #include "core/CueList.h"
 #include "core/DCAMapping.h"
+#include "core/Ensemble.h"
 #include "ui/CueTableModel.h"
 #include <QSignalSpy>
 #include <QtTest/QtTest>
@@ -130,6 +131,103 @@ class TestCueTableModel : public QObject {
         QVERIFY(model.setData(model.index(0, dcaCol(model, 1)), "", Qt::EditRole));
         QVERIFY(!list.at(0).dcaOverride(1).label.has_value());
         QCOMPARE(list.at(0).dcaOverride(1).mute, std::optional<bool>(true));
+    }
+
+    void setData_roleWithMultipleActiveActors_assignsAllChannels() {
+        CueList list;
+        list.addCue(Cue(1.0, "One"));
+        DCAMapping mapping;
+
+        ActorProfileLibrary library;
+        auto addWithRole = [&library](const QString& name, int ch, bool active) {
+            Actor a(name, ch);
+            a.setRoles({"Nuns"});
+            a.setActive(active);
+            library.addActor(a);
+        };
+        addWithRole("Alice", 5, true);
+        addWithRole("Beth", 6, true);
+        addWithRole("Cara", 7, false); // inactive cover excluded
+
+        CueTableModel model(&list);
+        model.setDcaMapping(&mapping);
+        model.setActorLibrary(&library);
+
+        QVERIFY(model.setData(model.index(0, dcaCol(model, 1)), "Nuns", Qt::EditRole));
+        QCOMPARE(list.at(0).dcaChannelMapping().value(1), QList<int>({5, 6}));
+    }
+
+    void setData_ensembleName_assignsMemberChannels() {
+        CueList list;
+        list.addCue(Cue(1.0, "One"));
+        DCAMapping mapping;
+        ActorProfileLibrary library;
+        EnsembleLibrary ensembles;
+        Ensemble band("Band");
+        band.setChannels({10, 11});
+        ensembles.addEnsemble(band);
+
+        CueTableModel model(&list);
+        model.setDcaMapping(&mapping);
+        model.setActorLibrary(&library);
+        model.setEnsembleLibrary(&ensembles);
+
+        QVERIFY(model.setData(model.index(0, dcaCol(model, 2)), "Band", Qt::EditRole));
+        QCOMPARE(list.at(0).dcaChannelMapping().value(2), QList<int>({10, 11}));
+    }
+
+    void setData_retype_swapsDcaChannels() {
+        CueList list;
+        list.addCue(Cue(1.0, "One"));
+        DCAMapping mapping;
+
+        ActorProfileLibrary library;
+        Actor alice("Alice", 5);
+        alice.setRoles({"Cosette"});
+        library.addActor(alice);
+        Actor bob("Bob", 6);
+        bob.setRoles({"Marius"});
+        library.addActor(bob);
+
+        CueTableModel model(&list);
+        model.setDcaMapping(&mapping);
+        model.setActorLibrary(&library);
+
+        const QModelIndex cell = model.index(0, dcaCol(model, 1));
+        QVERIFY(model.setData(cell, "Cosette", Qt::EditRole));
+        QVERIFY(model.setData(cell, "Marius", Qt::EditRole));
+
+        // retyping swaps the DCA's membership; Alice's channel is released
+        QCOMPARE(list.at(0).dcaChannelMapping().value(1), QList<int>({6}));
+
+        // a later scribble label leaves the mapping untouched
+        QVERIFY(model.setData(cell, "walla!", Qt::EditRole));
+        QCOMPARE(list.at(0).dcaChannelMapping().value(1), QList<int>({6}));
+        QCOMPARE(list.at(0).dcaOverride(1).label, std::optional<QString>("walla!"));
+    }
+
+    void display_multiChannelLabel_staysVerbatim() {
+        CueList list;
+        Cue cue(1.0, "One");
+        DCAOverride ov;
+        ov.label = "Nuns";
+        cue.setDCAOverride(1, ov);
+        list.addCue(cue);
+
+        ActorProfileLibrary library;
+        Actor alice("Alice", 5);
+        alice.setRoles({"Nuns"});
+        library.addActor(alice);
+        Actor beth("Beth", 6);
+        beth.setRoles({"Nuns"});
+        library.addActor(beth);
+
+        CueTableModel model(&list);
+        model.setActorLibrary(&library);
+
+        // group labels read as the group, not one arbitrary member
+        QCOMPARE(model.data(model.index(0, dcaCol(model, 1)), Qt::DisplayRole).toString(),
+                 QString("Nuns"));
     }
 
     void display_resolvesActorInRole_editReturnsRawLabel() {

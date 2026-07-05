@@ -297,15 +297,16 @@ bool CueTypeDelegate::eventFilter(QObject* object, QEvent* event) {
     return QStyledItemDelegate::eventFilter(object, event);
 }
 
-DCAAssignDelegate::DCAAssignDelegate(ActorProfileLibrary* library, QObject* parent)
-    : QStyledItemDelegate(parent), m_library(library) {}
+DCAAssignDelegate::DCAAssignDelegate(ActorProfileLibrary* library, EnsembleLibrary* ensembles,
+                                     QObject* parent)
+    : QStyledItemDelegate(parent), m_library(library), m_ensembles(ensembles) {}
 
 void DCAAssignDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                               const QModelIndex& index) const {
-    QStyleOptionViewItem opt = option;
     if (skipPaintForOpenEditor(painter, option, index))
         return;
 
+    QStyleOptionViewItem opt = option;
     opt.state &= ~QStyle::State_HasFocus;
 
     QVariant bgData = index.data(Qt::BackgroundRole);
@@ -330,7 +331,7 @@ QWidget* DCAAssignDelegate::createEditor(QWidget* parent,
     editor->setPlaceholderText(tr("Role, actor, or label"));
     if (m_library) {
         // fresh completer per edit so the candidates are always current
-        auto* completer = new QCompleter(m_library->completionCandidates(), editor);
+        auto* completer = new QCompleter(m_library->completionCandidates(m_ensembles), editor);
         completer->setCaseSensitivity(Qt::CaseInsensitive);
         completer->setCompletionMode(QCompleter::PopupCompletion);
         editor->setCompleter(completer);
@@ -377,10 +378,10 @@ CueTextDelegate::CueTextDelegate(QObject* parent) : QStyledItemDelegate(parent) 
 
 void CueTextDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                             const QModelIndex& index) const {
-    QStyleOptionViewItem opt = option;
     if (skipPaintForOpenEditor(painter, option, index))
         return;
 
+    QStyleOptionViewItem opt = option;
     opt.state &= ~QStyle::State_HasFocus;
 
     QVariant bgData = index.data(Qt::BackgroundRole);

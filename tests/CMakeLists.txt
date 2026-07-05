@@ -143,6 +143,7 @@ add_executable(test_cue_table_model
     ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
     ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
     ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Ensemble.cpp
 )
 target_link_libraries(test_cue_table_model PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
 target_include_directories(test_cue_table_model PRIVATE ${CMAKE_SOURCE_DIR}/src)

@@ -1,6 +1,9 @@
 #include "ActorProfileLibrary.h"
+#include "Ensemble.h"
 
 #include <QJsonArray>
+
+#include <algorithm>
 
 namespace OpenMix {
 
@@ -75,14 +78,59 @@ const Actor* ActorProfileLibrary::resolveActor(const QString& text) const {
     return byRole ? byRole : byName;
 }
 
-QStringList ActorProfileLibrary::completionCandidates() const {
-    QStringList candidates;
-    for (const Actor& a : m_actors) {
-        const QStringList texts = a.roles() + QStringList{a.name()};
-        for (const QString& text : texts) {
-            if (!text.isEmpty() && !candidates.contains(text, Qt::CaseInsensitive))
-                candidates.append(text);
+QList<int> ActorProfileLibrary::resolveChannels(const QString& text,
+                                                const EnsembleLibrary* ensembles) const {
+    const QString needle = text.trimmed();
+    if (needle.isEmpty())
+        return {};
+
+    QList<int> channels;
+    auto collectActive = [&](auto&& matches) {
+        for (const Actor& a : m_actors) {
+            if (a.active() && a.channel() >= 1 && matches(a))
+                channels.append(a.channel());
         }
+    };
+
+    collectActive([&](const Actor& a) { return !a.matchedRole(needle).isEmpty(); });
+
+    if (channels.isEmpty() && ensembles) {
+        for (const Ensemble& e : ensembles->ensembles()) {
+            if (needle.compare(e.name(), Qt::CaseInsensitive) == 0) {
+                channels = e.channels(); // already sorted/unique/positive
+                break;
+            }
+        }
+    }
+
+    if (channels.isEmpty())
+        collectActive(
+            [&](const Actor& a) { return needle.compare(a.name(), Qt::CaseInsensitive) == 0; });
+
+    if (channels.isEmpty()) {
+        if (const Actor* fallback = resolveActor(needle); fallback && fallback->channel() >= 1)
+            channels.append(fallback->channel());
+    }
+
+    std::sort(channels.begin(), channels.end());
+    channels.erase(std::unique(channels.begin(), channels.end()), channels.end());
+    return channels;
+}
+
+QStringList ActorProfileLibrary::completionCandidates(const EnsembleLibrary* ensembles) const {
+    QStringList candidates;
+    auto add = [&candidates](const QString& text) {
+        if (!text.isEmpty() && !candidates.contains(text, Qt::CaseInsensitive))
+            candidates.append(text);
+    };
+    for (const Actor& a : m_actors) {
+        for (const QString& role : a.roles())
+            add(role);
+        add(a.name());
+    }
+    if (ensembles) {
+        for (const Ensemble& e : ensembles->ensembles())
+            add(e.name());
     }
     candidates.sort(Qt::CaseInsensitive);
     return candidates;
