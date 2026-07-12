@@ -1,5 +1,6 @@
 #include "OscTransport.h"
 #include <QNetworkDatagram>
+#include <cstdlib>
 #include <cstring>
 
 namespace OpenMix {
@@ -18,16 +19,18 @@ bool OscTransport::connect(const QString& host, int port) {
     m_host = host;
     m_port = port;
 
-    m_oscAddress =
-        lo_address_new(host.toUtf8().constData(), QString::number(port).toUtf8().constData());
-    if (!m_oscAddress) {
-        emit connectionError("Failed to create OSC address");
+    m_target = QHostAddress(host);
+    bool isIPv4 = false;
+    const quint32 v4 = m_target.toIPv4Address(&isIPv4);
+    if (isIPv4) {
+        m_target = QHostAddress(v4);
+    }
+    if (m_target.isNull()) {
+        emit connectionError("Invalid mixer address");
         return false;
     }
 
-    if (!m_socket.bind(QHostAddress::Any, 0)) {
-        lo_address_free(m_oscAddress);
-        m_oscAddress = nullptr;
+    if (!m_socket.bind(QHostAddress::AnyIPv4, 0)) {
         emit connectionError("Failed to bind UDP socket");
         return false;
     }
@@ -38,42 +41,55 @@ bool OscTransport::connect(const QString& host, int port) {
 }
 
 void OscTransport::disconnect() {
-    if (m_oscAddress) {
-        lo_address_free(m_oscAddress);
-        m_oscAddress = nullptr;
-    }
-
     m_socket.close();
     m_connected = false;
     emit disconnected();
 }
 
 void OscTransport::send(const QString& path) {
-    if (!m_oscAddress)
-        return;
-    lo_send(m_oscAddress, path.toUtf8().constData(), nullptr);
+    lo_message msg = lo_message_new();
+    sendMessage(path, msg);
+    lo_message_free(msg);
 }
 
 void OscTransport::send(const QString& path, float value) {
-    if (!m_oscAddress)
-        return;
-    lo_send(m_oscAddress, path.toUtf8().constData(), "f", value);
+    lo_message msg = lo_message_new();
+    lo_message_add_float(msg, value);
+    sendMessage(path, msg);
+    lo_message_free(msg);
 }
 
 void OscTransport::send(const QString& path, int value) {
-    if (!m_oscAddress)
-        return;
-    lo_send(m_oscAddress, path.toUtf8().constData(), "i", value);
+    lo_message msg = lo_message_new();
+    lo_message_add_int32(msg, value);
+    sendMessage(path, msg);
+    lo_message_free(msg);
 }
 
 void OscTransport::send(const QString& path, const QString& value) {
-    if (!m_oscAddress)
+    lo_message msg = lo_message_new();
+    lo_message_add_string(msg, value.toUtf8().constData());
+    sendMessage(path, msg);
+    lo_message_free(msg);
+}
+
+void OscTransport::sendMessage(const QString& path, lo_message msg) {
+    if (!m_connected || !msg)
         return;
-    lo_send(m_oscAddress, path.toUtf8().constData(), "s", value.toUtf8().constData());
+
+    const QByteArray pathBytes = path.toUtf8();
+    size_t length = 0;
+    void* buffer = lo_message_serialise(msg, pathBytes.constData(), nullptr, &length);
+    if (!buffer)
+        return;
+
+    m_socket.writeDatagram(static_cast<const char*>(buffer), static_cast<qint64>(length), m_target,
+                           static_cast<quint16>(m_port));
+    std::free(buffer);
 }
 
 void OscTransport::send(const QString& path, const QVariant& value) {
-    if (!m_oscAddress)
+    if (!m_connected)
         return;
 
     switch (value.typeId()) {

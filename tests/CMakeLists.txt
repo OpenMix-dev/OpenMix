@@ -198,6 +198,14 @@ target_link_libraries(test_osc_remote PRIVATE Qt6::Core Qt6::Test openmix_liblo)
 target_include_directories(test_osc_remote PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME OscRemoteTest COMMAND test_osc_remote)
 
+add_executable(test_osc_transport
+    test_osc_transport.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/transport/OscTransport.cpp
+)
+target_link_libraries(test_osc_transport PRIVATE Qt6::Core Qt6::Network Qt6::Test openmix_liblo)
+target_include_directories(test_osc_transport PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME OscTransportTest COMMAND test_osc_transport)
+
 add_executable(test_qlab_client
     test_qlab_client.cpp
     ${CMAKE_SOURCE_DIR}/src/app/QLabClient.cpp
