@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QHostAddress>
 #include <QObject>
 #include <QTimer>
 #include <QUdpSocket>
@@ -39,11 +40,12 @@ class OscTransport : public QObject {
     void onReadyRead();
 
   private:
+    void sendMessage(const QString& path, lo_message msg);
     void parseOscMessage(const QByteArray& data);
     QVariant parseOscArgument(const QByteArray& data, int& offset, char type);
 
-    lo_address m_oscAddress = nullptr;
     QUdpSocket m_socket;
+    QHostAddress m_target;
     QString m_host;
     int m_port = 0;
     bool m_connected = false;

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(OpenMix
-    VERSION 1.0.4
+    VERSION 1.0.5
     DESCRIPTION "Stage mixing software for live theatre that lets engineers program, automate, and run cues seamlessly across 30+ digital mixing consoles"
     LANGUAGES CXX
 )
@@ -507,7 +507,7 @@ else()
     set(CPACK_GENERATOR "DEB;RPM;TGZ")
     set(CPACK_DEBIAN_PACKAGE_SECTION "sound")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-    set(CPACK_RPM_PACKAGE_LICENSE "MIT")
+    set(CPACK_RPM_PACKAGE_LICENSE "GPLv3")
     set(CPACK_RPM_PACKAGE_GROUP "Applications/Multimedia")
 endif()
 
