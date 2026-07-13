@@ -9,6 +9,7 @@
 #include "protocol/MixerProtocol.h"
 #include <QDateTime>
 #include <QRegularExpression>
+#include <algorithm>
 #include <cmath>
 #include <memory>
 
@@ -62,7 +63,12 @@ void PlaybackEngine::onCueListReset() {
     stop();
 }
 
-void PlaybackEngine::setMixer(MixerProtocol* mixer) { m_mixer = mixer; }
+void PlaybackEngine::setMixer(MixerProtocol* mixer) {
+    m_mixer = mixer;
+    m_appliedChDcaMasks.clear();
+    m_appliedBusDcaMasks.clear();
+    m_engineOwnedDcas.clear();
+}
 
 void PlaybackEngine::setDCAMapping(DCAMapping* mapping) { m_dcaMapping = mapping; }
 
@@ -317,7 +323,7 @@ void PlaybackEngine::executeCueInternal(const Cue& cue) {
         // recall console snippets (partial scene recalls)
         recallSnippets(cue);
 
-        // apply DCA overrides (mute & label only)
+        applyDCAAssignments(cue, targetDCAs);
         applyDCAOverrides(cue, targetDCAs);
 
         setState(PlaybackState::Running);
@@ -363,14 +369,13 @@ void PlaybackEngine::applyDCAOverrides(const Cue& cue, const QSet<int>& targetDC
 
         if (override.mute.has_value()) {
             const bool muting = override.mute.value();
-            QString path = QString("/dca/%1/mute").arg(dca);
-            m_mixer->sendParameter(path, muting ? 1 : 0);
+            m_mixer->setDcaMute(dca, muting);
 
             // optional console behaviors, only on the muting edge
             if (muting && m_dimDcaFaders)
-                m_mixer->sendParameter(QString("/dca/%1/fader").arg(dca), 0.0);
+                m_mixer->setDcaFader(dca, 0.0);
             if (muting && m_muteDcaUnassign)
-                m_mixer->sendParameter(QString("/dca/%1/assign").arg(dca), 0);
+                clearDcaFromMembers(dca);
         }
 
         if (override.label.has_value()) {
@@ -379,10 +384,112 @@ void PlaybackEngine::applyDCAOverrides(const Cue& cue, const QSet<int>& targetDC
             if (label.length() > caps.maxDCANameLength) {
                 label = label.left(caps.maxDCANameLength);
             }
-            QString path = QString("/dca/%1/config/name").arg(dca);
-            m_mixer->sendParameter(path, label);
+            m_mixer->setDcaName(dca, label);
         }
     }
+}
+
+void PlaybackEngine::applyDCAAssignments(const Cue& cue, const QSet<int>& targetDCAs) {
+    if (!m_mixer || !m_mixer->isConnected())
+        return;
+
+    const bool hasMapping = cue.hasCustomDCAMapping() || m_dcaMapping;
+    if (!hasMapping)
+        return;
+
+    const MixerCapabilities& caps = m_mixer->capabilities();
+
+    QSet<int> mappedDcas;
+    for (int d = 1; d <= caps.dcaCount; ++d) {
+        if (!getChannelsForDCA(cue, d).isEmpty() || !getBusesForDCA(cue, d).isEmpty())
+            mappedDcas.insert(d);
+    }
+
+    QSet<int> controlled;
+    quint32 controlledBits = 0;
+    for (int d : targetDCAs) {
+        if (d < 1 || d > caps.dcaCount || m_inactiveDcas.contains(d))
+            continue;
+        if (mappedDcas.contains(d) || m_engineOwnedDcas.contains(d)) {
+            controlled.insert(d);
+            controlledBits |= (1u << (d - 1));
+        }
+    }
+    if (controlled.isEmpty())
+        return;
+
+    const int channelCount = std::min(caps.inputChannels, 32);
+    const int busCount = std::min(caps.mixBuses, 16);
+
+    QHash<int, quint32> chAssign;
+    QHash<int, quint32> busAssign;
+    for (int d : controlled) {
+        const quint32 bit = (1u << (d - 1));
+        for (int ch : getChannelsForDCA(cue, d)) {
+            if (ch >= 1 && ch <= channelCount)
+                chAssign[ch] |= bit;
+        }
+        for (int bus : getBusesForDCA(cue, d)) {
+            if (bus >= 1 && bus <= busCount)
+                busAssign[bus] |= bit;
+        }
+    }
+
+    for (int ch = 1; ch <= channelCount; ++ch)
+        writeDcaMask(ch, chAssign.value(ch, 0u), controlledBits, /*isBus=*/false);
+    for (int bus = 1; bus <= busCount; ++bus)
+        writeDcaMask(bus, busAssign.value(bus, 0u), controlledBits, /*isBus=*/true);
+
+    m_engineOwnedDcas.unite(controlled);
+}
+
+void PlaybackEngine::writeDcaMask(int entity, quint32 assignedBits, quint32 controlledBits,
+                                  bool isBus) {
+    if (!m_mixer)
+        return;
+
+    QHash<int, quint32>& shadow = isBus ? m_appliedBusDcaMasks : m_appliedChDcaMasks;
+
+    quint32 base = 0;
+    bool baseKnown = false;
+    const std::optional<quint32> live =
+        isBus ? m_mixer->readBusDcaMask(entity) : m_mixer->readChannelDcaMask(entity);
+    if (live.has_value()) {
+        base = live.value();
+        baseKnown = true;
+    } else if (shadow.contains(entity)) {
+        base = shadow.value(entity);
+        baseKnown = true;
+    }
+    if (!baseKnown)
+        return;
+
+    const quint32 newMask = (base & ~controlledBits) | assignedBits;
+    shadow[entity] = newMask;
+    if (newMask == base)
+        return;
+
+    if (isBus)
+        m_mixer->setBusDcaMask(entity, newMask);
+    else
+        m_mixer->setChannelDcaMask(entity, newMask);
+}
+
+void PlaybackEngine::clearDcaFromMembers(int dca) {
+    if (!m_mixer || !m_mixer->isConnected() || dca < 1)
+        return;
+    const MixerCapabilities& caps = m_mixer->capabilities();
+    if (dca > caps.dcaCount || m_inactiveDcas.contains(dca))
+        return;
+
+    const quint32 bit = (1u << (dca - 1));
+    const int channelCount = std::min(caps.inputChannels, 32);
+    const int busCount = std::min(caps.mixBuses, 16);
+    for (int ch = 1; ch <= channelCount; ++ch)
+        writeDcaMask(ch, 0u, bit, /*isBus=*/false);
+    for (int bus = 1; bus <= busCount; ++bus)
+        writeDcaMask(bus, 0u, bit, /*isBus=*/true);
+    m_engineOwnedDcas.insert(dca);
 }
 
 void PlaybackEngine::expandChannelProfiles(const Cue& cue) {

@@ -20,6 +20,8 @@ constexpr int MAX_X32_MIX_BUSES = 16;
 // exact lookup tables can refine the constants without changing call sites.
 QString x32Channel(int channel) { return QString("/ch/%1").arg(channel, 2, 10, QChar('0')); }
 
+QString x32Bus(int bus) { return QString("/bus/%1").arg(bus, 2, 10, QChar('0')); }
+
 float clampUnit(double v) { return static_cast<float>(std::clamp(v, 0.0, 1.0)); }
 
 float linNorm(double v, double lo, double hi) { return clampUnit((v - lo) / (hi - lo)); }
@@ -89,6 +91,7 @@ void X32Protocol::rebuildSnapshotParams() {
         QString chPrefix = QString("/ch/%1").arg(i, 2, 10, QChar('0'));
         m_snapshotParams.append(chPrefix + "/mix/fader");
         m_snapshotParams.append(chPrefix + "/mix/on");
+        m_snapshotParams.append(chPrefix + "/grp/dca");
 
         // EQ parameters
         if (m_capabilities.supportsChannelEQ) {
@@ -119,6 +122,7 @@ void X32Protocol::rebuildSnapshotParams() {
         QString busPrefix = QString("/bus/%1").arg(i, 2, 10, QChar('0'));
         m_snapshotParams.append(busPrefix + "/mix/fader");
         m_snapshotParams.append(busPrefix + "/mix/on");
+        m_snapshotParams.append(busPrefix + "/grp/dca");
 
         // bus EQ parameters
         if (m_capabilities.supportsChannelEQ) {
@@ -332,6 +336,42 @@ void X32Protocol::setChannelName(int channel, const QString& name) {
 void X32Protocol::setChannelColor(int channel, int color) {
     // /config/color is a palette index (0..15)
     sendParameter(x32Channel(channel) + "/config/color", color);
+}
+
+void X32Protocol::setDcaMute(int dca, bool muted) {
+    // X32 has no /dca/N/mute; use /dca/N/on (1 = unmuted, 0 = muted)
+    sendParameter(QString("/dca/%1/on").arg(dca), muted ? 0 : 1);
+}
+
+void X32Protocol::setDcaFader(int dca, double level) {
+    sendParameter(QString("/dca/%1/fader").arg(dca), clampUnit(level));
+}
+
+void X32Protocol::setDcaName(int dca, const QString& name) {
+    sendParameter(QString("/dca/%1/config/name").arg(dca), name);
+}
+
+void X32Protocol::setChannelDcaMask(int channel, quint32 mask) {
+    // /ch/NN/grp/dca: int bitmask, bit d-1 = member of DCA d
+    sendParameter(x32Channel(channel) + "/grp/dca", static_cast<int>(mask));
+}
+
+void X32Protocol::setBusDcaMask(int bus, quint32 mask) {
+    sendParameter(x32Bus(bus) + "/grp/dca", static_cast<int>(mask));
+}
+
+std::optional<quint32> X32Protocol::readChannelDcaMask(int channel) {
+    const QVariant value = getParameter(x32Channel(channel) + "/grp/dca");
+    if (!value.isValid())
+        return std::nullopt;
+    return static_cast<quint32>(value.toInt());
+}
+
+std::optional<quint32> X32Protocol::readBusDcaMask(int bus) {
+    const QVariant value = getParameter(x32Bus(bus) + "/grp/dca");
+    if (!value.isValid())
+        return std::nullopt;
+    return static_cast<quint32>(value.toInt());
 }
 
 void X32Protocol::refresh() {
@@ -549,8 +589,18 @@ void X32Protocol::handleXinfoResponse([[maybe_unused]] const QVariant& value) {
         m_transport.send("/xremote");
         // subscribe to input-channel meters (bank 1); renewed on keep-alive
         m_transport.send(QString("/meters"), QString("/meters/1"));
+        requestDcaMembership();
         emit connected();
     }
+}
+
+void X32Protocol::requestDcaMembership() {
+    if (m_connectionState != ConnectionState::Connected)
+        return;
+    for (int i = 1; i <= m_capabilities.inputChannels && i <= MAX_X32_INPUT_CHANNELS; ++i)
+        requestParameter(x32Channel(i) + "/grp/dca");
+    for (int i = 1; i <= m_capabilities.mixBuses && i <= MAX_X32_MIX_BUSES; ++i)
+        requestParameter(x32Bus(i) + "/grp/dca");
 }
 
 void X32Protocol::startReconnection() {

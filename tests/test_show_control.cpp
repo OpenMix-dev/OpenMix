@@ -3,8 +3,10 @@
 #include "core/PlaybackEngine.h"
 #include "core/Show.h"
 #include "protocol/MixerProtocol.h"
+#include <QHash>
 #include <QSignalSpy>
 #include <QtTest/QtTest>
+#include <optional>
 
 using namespace OpenMix;
 
@@ -52,10 +54,31 @@ class RecordingMixer : public MixerProtocol {
         calls << QString("mute:ch=%1:%2").arg(channel).arg(muted ? 1 : 0);
     }
 
+    void setChannelDcaMask(int channel, quint32 mask) override {
+        chMasks[channel] = mask;
+        calls << QString("dcamask:ch=%1:mask=%2").arg(channel).arg(mask);
+    }
+    void setBusDcaMask(int bus, quint32 mask) override {
+        busMasks[bus] = mask;
+        calls << QString("dcamask:bus=%1:mask=%2").arg(bus).arg(mask);
+    }
+    std::optional<quint32> readChannelDcaMask(int channel) override {
+        if (chMasks.contains(channel))
+            return chMasks.value(channel);
+        return std::nullopt;
+    }
+    std::optional<quint32> readBusDcaMask(int bus) override {
+        if (busMasks.contains(bus))
+            return busMasks.value(bus);
+        return std::nullopt;
+    }
+
     void refresh() override {}
     int latencyMs() const override { return 0; }
 
     QStringList calls;
+    QHash<int, quint32> chMasks;
+    QHash<int, quint32> busMasks;
 
   private:
     bool m_connected = false;
@@ -261,7 +284,7 @@ class TestShowControl : public QObject {
 
     // --- DCA console-behavior toggles on fire ---
 
-    void fire_muteDcaUnassign_sendsUnassign() {
+    void fire_muteDcaUnassign_clearsMembership() {
         CueList cues;
         Cue cue(1.0, "A");
         cue.setType(CueType::Snapshot);
@@ -272,6 +295,7 @@ class TestShowControl : public QObject {
         cues.addCue(cue);
 
         RecordingMixer* mixer = makeConnectedMixer(this);
+        mixer->chMasks[5] = 0x2; // ch5 rides DCA2 (bit 1)
         PlaybackEngine engine;
         engine.setCueList(&cues);
         engine.setMixer(mixer);
@@ -279,7 +303,7 @@ class TestShowControl : public QObject {
         engine.executeCue(0);
 
         QVERIFY2(mixer->calls.contains("send:/dca/2/mute=1"), qPrintable(mixer->calls.join(" | ")));
-        QVERIFY(mixer->calls.contains("send:/dca/2/assign=0"));
+        QVERIFY(mixer->calls.contains("dcamask:ch=5:mask=0"));
     }
 
     void fire_dimDcaFaders_sendsFaderDim() {
@@ -313,6 +337,7 @@ class TestShowControl : public QObject {
         cues.addCue(cue);
 
         RecordingMixer* mixer = makeConnectedMixer(this);
+        mixer->chMasks[5] = 0x2; // ch5 rides DCA2
         PlaybackEngine engine;
         engine.setCueList(&cues);
         engine.setMixer(mixer);
@@ -320,7 +345,7 @@ class TestShowControl : public QObject {
 
         // only the plain mute is sent; no unassign/dim side effects
         QVERIFY(mixer->calls.contains("send:/dca/2/mute=1"));
-        QVERIFY(!mixer->calls.contains("send:/dca/2/assign=0"));
+        QVERIFY(!mixer->calls.contains("dcamask:ch=5:mask=0"));
         QVERIFY(!mixer->calls.contains("send:/dca/2/fader=0"));
     }
 

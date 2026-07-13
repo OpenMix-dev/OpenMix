@@ -105,6 +105,33 @@ target_include_directories(test_playback_profiles PRIVATE
 )
 add_test(NAME PlaybackProfilesTest COMMAND test_playback_profiles)
 
+add_executable(test_playback_dca_assign
+    test_playback_dca_assign.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueValidator.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackGuard.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackLogger.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/FadeEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/LoopbackProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+)
+target_link_libraries(test_playback_dca_assign PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+target_include_directories(test_playback_dca_assign PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
+add_test(NAME PlaybackDcaAssignTest COMMAND test_playback_dca_assign)
+
 add_executable(test_fade_engine
     test_fade_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/core/FadeEngine.cpp

@@ -147,6 +147,9 @@ class PlaybackEngine : public QObject {
     // first index after 'from' whose cue is not skipped, or -1 at end of list
     [[nodiscard]] int nextEnabledIndex(int from) const;
     void executeCueInternal(const Cue& cue);
+    void applyDCAAssignments(const Cue& cue, const QSet<int>& targetDCAs);
+    void writeDcaMask(int entity, quint32 assignedBits, quint32 controlledBits, bool isBus);
+    void clearDcaFromMembers(int dca);
     void applyDCAOverrides(const Cue& cue, const QSet<int>& targetDCAs);
     void executeMacroCue(const Cue& cue);
     void executeGoToCue(const Cue& cue);
@@ -179,6 +182,9 @@ class PlaybackEngine : public QObject {
 
     FadeEngine m_fadeEngine;
     QMap<int, double> m_appliedChannelLevels; // last-applied fader per channel (fade source)
+    QHash<int, quint32> m_appliedChDcaMasks;
+    QHash<int, quint32> m_appliedBusDcaMasks;
+    QSet<int> m_engineOwnedDcas;
     QList<QPair<int, int>> m_channelGangs;    // ganged input-channel pairs
     QHash<int, int> m_gangPartners;           // channel -> ganged partner (both directions)
     bool m_checkMode = false;                 // soundcheck: GO holds on current cue
