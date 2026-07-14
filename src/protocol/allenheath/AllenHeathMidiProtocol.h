@@ -26,8 +26,8 @@ struct NRPNState {
     }
 };
 
-// base class for Allen & Heath MIDI-over-TCP protocols (SQ, GLD)
-// uses MIDI messages (including SysEx & NRPN) wrapped in TCP
+// base class for Allen & Heath MIDI-over-TCP protocols (SQ, Qu, GLD)
+// uses MIDI messages (NRPN levels/mutes, Bank+Program scene recall) over TCP
 class AllenHeathMidiProtocol : public MixerProtocol {
     Q_OBJECT
 
@@ -44,7 +44,9 @@ class AllenHeathMidiProtocol : public MixerProtocol {
     // connection management
     [[nodiscard]] bool connect(const QString& host, int port) override;
     void disconnect() override;
-    [[nodiscard]] bool isConnected() const override { return m_connectionState == ConnectionState::Connected; }
+    [[nodiscard]] bool isConnected() const override {
+        return m_connectionState == ConnectionState::Connected;
+    }
     [[nodiscard]] QString connectionStatus() const override { return m_statusMessage; }
     [[nodiscard]] ConnectionState connectionState() const override { return m_connectionState; }
 
@@ -70,9 +72,11 @@ class AllenHeathMidiProtocol : public MixerProtocol {
     [[nodiscard]] const MixerCapabilities& capabilities() const override { return m_capabilities; }
 
     // Input-channel fader level + mute via NRPN. Parameter numbers verified
-    // against the A&H SQ MIDI Protocol Issue 5 reference tables (Inputs-to-LR
-    // level p22, mutes p21, DCA level/mute p24/p21). These are the SQ numbers;
-    // GLD uses a different map (documented limitation of the shared base).
+    // against the A&H SQ MIDI Protocol (Firmware V2.0.3) reference tables:
+    // Inputs-to-LR level MSB 0x40, input mute MSB 0x00, DCA level MSB 0x4F /
+    // LSB 0x67+, DCA mute MSB 0x02 (all LSB = 0-based item index). Levels are a
+    // 14-bit position; the console applies its own NRPN Fader Law (Linear/Audio
+    // Taper). Qu shares this map; GLD is close but should be checked per its doc.
     void setChannelFader(int channel, double level) override;
     void setChannelMute(int channel, bool muted) override;
 
@@ -80,13 +84,13 @@ class AllenHeathMidiProtocol : public MixerProtocol {
     // SQ NRPN parameter MSB; the LSB is the 0-based item index unless noted.
     static constexpr int CH_LEVEL_TO_LR_MSB = 0x40; // input N -> LR level (LSB = N-1)
     static constexpr int CH_MUTE_MSB = 0x00;        // input N mute        (LSB = N-1)
-    static constexpr int DCA_LEVEL_MSB = 0x4F;      // DCA N level         (LSB = 0x20 + N-1)
-    static constexpr int DCA_LEVEL_LSB_BASE = 0x20; //
+    static constexpr int DCA_LEVEL_MSB = 0x4F;      // DCA N level         (LSB = 0x67 + N-1)
+    static constexpr int DCA_LEVEL_LSB_BASE = 0x67; // per A&H SQ MIDI Protocol, Level table
     static constexpr int DCA_MUTE_MSB = 0x02;       // DCA N mute          (LSB = N-1)
 
     // MIDI message builders used by subclasses
     QByteArray buildNRPNMessage(int channel, int nrpnMsb, int nrpnLsb, int valueMsb, int valueLsb);
-    QByteArray buildSysExSceneRecall(int sceneNumber);
+    QByteArray buildSceneRecall(int sceneNumber);
     QByteArray buildControlChange(int channel, int cc, int value);
 
     // parse incoming MIDI data

@@ -148,10 +148,9 @@ void AllenHeathMidiProtocol::recallScene(int sceneNumber) {
     if (m_connectionState != ConnectionState::Connected)
         return;
 
-    // Allen & Heath SysEx scene recall
-    // F0 00 00 1A 50 10 01 00 [scene] F7
-    QByteArray msg = buildSysExSceneRecall(sceneNumber);
-    m_transport.send(msg);
+    QByteArray msg = buildSceneRecall(sceneNumber);
+    if (!msg.isEmpty())
+        m_transport.send(msg);
 }
 
 void AllenHeathMidiProtocol::refresh() {
@@ -187,20 +186,25 @@ QByteArray AllenHeathMidiProtocol::buildNRPNMessage(int channel, int nrpnMsb, in
     return msg;
 }
 
-// SysEx builders
-QByteArray AllenHeathMidiProtocol::buildSysExSceneRecall(int sceneNumber) {
+// Allen & Heath scene recall over MIDI is a Bank Select (CC0) followed by a
+// Program Change, per the A&H MIDI Protocol. sceneNumber is the 1-based scene as
+// shown on the console; MIDI values are offset by -1, and scenes split into
+// banks of 128 (1-128 -> bank 0, 129-256 -> bank 1, 257-300 -> bank 2).
+QByteArray AllenHeathMidiProtocol::buildSceneRecall(int sceneNumber) {
+    const int index = sceneNumber - 1;
+    if (index < 0)
+        return {}; // "None" / unset
+
+    const int bank = index / 128;
+    const int program = index % 128;
+    const int channel = 0; // MIDI channel 1
+
     QByteArray msg;
-    // Allen & Heath SysEx header
-    msg.append(static_cast<char>(0xF0));               // SysEx start
-    msg.append(static_cast<char>(0x00));               // manufacturer ID byte 1
-    msg.append(static_cast<char>(0x00));               // manufacturer ID byte 2
-    msg.append(static_cast<char>(0x1A));               // manufacturer ID byte 3 (Allen & Heath)
-    msg.append(static_cast<char>(0x50));               // device ID (SQ/GLD family)
-    msg.append(static_cast<char>(0x10));               // command: scene recall
-    msg.append(static_cast<char>(0x01));               // sub-command
-    msg.append(static_cast<char>(0x00));               // reserved
-    msg.append(static_cast<char>(sceneNumber & 0x7F)); // scene number (0-indexed)
-    msg.append(static_cast<char>(0xF7));               // SysEx end
+    msg.append(static_cast<char>(0xB0 | channel)); // Control Change
+    msg.append(static_cast<char>(0x00));           // CC 0 = Bank Select MSB
+    msg.append(static_cast<char>(bank & 0x7F));
+    msg.append(static_cast<char>(0xC0 | channel)); // Program Change
+    msg.append(static_cast<char>(program & 0x7F));
 
     return msg;
 }
