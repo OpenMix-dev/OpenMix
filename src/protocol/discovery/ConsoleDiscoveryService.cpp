@@ -1,7 +1,9 @@
 #include "ConsoleDiscoveryService.h"
 #include <QNetworkDatagram>
 #include <QNetworkInterface>
+#include <QTcpSocket>
 #include <cstring>
+#include <memory>
 
 namespace OpenMix {
 
@@ -26,7 +28,8 @@ void ConsoleDiscoveryService::startScan(int timeoutMs) {
     m_discovered.clear();
     m_scanning = true;
 
-    if (!m_socket.bind(QHostAddress::Any, 0)) {
+    // IPv4-only socket: dual-stack sockets have platform quirks with IPv4 broadcast
+    if (!m_socket.bind(QHostAddress::AnyIPv4, 0)) {
         m_scanning = false;
         emit scanError("Failed to bind UDP socket for discovery");
         return;
@@ -41,50 +44,209 @@ void ConsoleDiscoveryService::startScan(int timeoutMs) {
 
 void ConsoleDiscoveryService::stopScan() {
     m_scanTimer.stop();
+    cancelIdentifyProbes();
     m_socket.close();
     m_scanning = false;
 }
 
+void ConsoleDiscoveryService::cancelIdentifyProbes() {
+    for (QTcpSocket* sock : m_identifySockets) {
+        if (sock) {
+            sock->abort();
+            sock->deleteLater();
+        }
+    }
+    m_identifySockets.clear();
+    m_identifyProbed.clear();
+}
+
 void ConsoleDiscoveryService::sendProbes() {
-    QHostAddress broadcastAddr(QHostAddress::Broadcast);
+    // per-interface subnet broadcasts, using each interface's own address for
+    // probes that embed the sender IP
+    QHostAddress firstLocal;
+    for (const QNetworkInterface& iface : QNetworkInterface::allInterfaces()) {
+        if (!(iface.flags() & QNetworkInterface::IsUp) ||
+            !(iface.flags() & QNetworkInterface::IsRunning) ||
+            (iface.flags() & QNetworkInterface::IsLoopBack)) {
+            continue;
+        }
 
-    for (const auto& strategy : m_strategies) {
-        QByteArray probeMsg = buildOscMessage(strategy->probeCommand());
-        int port = strategy->probePort();
-
-        // send to broadcast address
-        m_socket.writeDatagram(probeMsg, broadcastAddr, port);
-
-        // also send to all local subnet broadcast addresses
-        for (const QNetworkInterface& iface : QNetworkInterface::allInterfaces()) {
-            if (!(iface.flags() & QNetworkInterface::IsUp) ||
-                !(iface.flags() & QNetworkInterface::IsRunning) ||
-                (iface.flags() & QNetworkInterface::IsLoopBack)) {
+        for (const QNetworkAddressEntry& entry : iface.addressEntries()) {
+            if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol) {
                 continue;
             }
 
-            for (const QNetworkAddressEntry& entry : iface.addressEntries()) {
-                if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol) {
-                    QHostAddress subnetBroadcast = entry.broadcast();
-                    if (!subnetBroadcast.isNull() && subnetBroadcast != broadcastAddr) {
-                        m_socket.writeDatagram(probeMsg, subnetBroadcast, port);
-                    }
-                }
+            if (firstLocal.isNull()) {
+                firstLocal = entry.ip();
+            }
+
+            QHostAddress subnetBroadcast = entry.broadcast();
+            if (!subnetBroadcast.isNull()) {
+                sendProbesTo(subnetBroadcast, entry.ip());
             }
         }
     }
+
+    // global broadcast as a catch-all
+    sendProbesTo(QHostAddress(QHostAddress::Broadcast), firstLocal);
+}
+
+void ConsoleDiscoveryService::sendProbesTo(const QHostAddress& target,
+                                           const QHostAddress& localAddress) {
+    for (const auto& strategy : m_strategies) {
+        const int port = strategy->probePort();
+        const QList<QByteArray> rawPayloads = strategy->rawProbes(localAddress);
+        if (rawPayloads.isEmpty()) {
+            m_socket.writeDatagram(buildOscMessage(strategy->probeCommand()), target, port);
+            continue;
+        }
+        for (const QByteArray& payload : rawPayloads) {
+            m_socket.writeDatagram(payload, target, port);
+        }
+    }
+}
+
+void ConsoleDiscoveryService::probeHost(const QHostAddress& host) {
+    if (!m_scanning || host.isNull()) {
+        return;
+    }
+
+    // pick the local interface address on the target's subnet for probes that
+    // embed the sender IP; fall back to the first usable interface
+    QHostAddress localAddress;
+    QHostAddress firstLocal;
+    for (const QNetworkInterface& iface : QNetworkInterface::allInterfaces()) {
+        if (!(iface.flags() & QNetworkInterface::IsUp) ||
+            !(iface.flags() & QNetworkInterface::IsRunning) ||
+            (iface.flags() & QNetworkInterface::IsLoopBack)) {
+            continue;
+        }
+        for (const QNetworkAddressEntry& entry : iface.addressEntries()) {
+            if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol) {
+                continue;
+            }
+            if (firstLocal.isNull()) {
+                firstLocal = entry.ip();
+            }
+            if (host.isInSubnet(entry.ip(), entry.prefixLength())) {
+                localAddress = entry.ip();
+            }
+        }
+    }
+    if (localAddress.isNull()) {
+        localAddress = firstLocal;
+    }
+
+    sendProbesTo(host, localAddress);
 }
 
 void ConsoleDiscoveryService::onReadyRead() {
     while (m_socket.hasPendingDatagrams()) {
         QNetworkDatagram datagram = m_socket.receiveDatagram();
-        parseOscMessage(datagram.data(), datagram.senderAddress(), datagram.senderPort());
+        processDatagram(datagram.data(), datagram.senderAddress(), datagram.senderPort());
     }
 }
 
 void ConsoleDiscoveryService::onScanTimeout() {
     stopScan();
     emit scanFinished();
+}
+
+void ConsoleDiscoveryService::processDatagram(const QByteArray& data, const QHostAddress& sender,
+                                              int senderPort) {
+    if (data.isEmpty()) {
+        return;
+    }
+
+    // raw (non-OSC) replies first: WING, YSDP, etc.
+    for (const auto& strategy : m_strategies) {
+        if (strategy->canParseRawResponse(data)) {
+            addConsole(strategy->parseRawResponse(data, sender, senderPort));
+            return;
+        }
+    }
+
+    // sender-port-matched replies with follow-up TCP handshakes (Allen & Heath).
+    // A device may speak either identify protocol, so every descriptor is tried.
+    bool launched = false;
+    for (const auto& strategy : m_strategies) {
+        if (!strategy->matchesReplyPort(senderPort)) {
+            continue;
+        }
+        for (const TcpIdentify& id : strategy->tcpIdentifies()) {
+            if (id.isValid()) {
+                launchTcpIdentify(strategy, sender, id);
+                launched = true;
+            }
+        }
+    }
+    if (launched) {
+        return;
+    }
+
+    if (data.at(0) == '/') {
+        parseOscMessage(data, sender, senderPort);
+    }
+}
+
+void ConsoleDiscoveryService::launchTcpIdentify(const OscProbeStrategyPtr& strategy,
+                                                const QHostAddress& host, const TcpIdentify& id) {
+    const QString key = QString("%1:%2").arg(host.toString()).arg(id.port);
+    if (m_identifyProbed.contains(key)) {
+        return; // already probing or probed this host during the current scan
+    }
+    m_identifyProbed.insert(key);
+
+    auto* sock = new QTcpSocket(this);
+    m_identifySockets.append(sock);
+
+    auto buffer = std::make_shared<QByteArray>();
+    auto done = std::make_shared<bool>(false);
+
+    const int identifyPort = id.port;
+    auto finish = [this, sock, buffer, done, strategy, host, identifyPort]() {
+        if (*done) {
+            return;
+        }
+        *done = true;
+
+        DiscoveredConsole console = strategy->parseIdentifyResponse(*buffer, host, identifyPort);
+        addConsole(console);
+
+        m_identifySockets.removeAll(sock);
+        sock->abort();
+        sock->deleteLater();
+    };
+
+    connect(sock, &QTcpSocket::connected, sock, [sock, id]() { sock->write(id.request); });
+    connect(sock, &QTcpSocket::readyRead, sock, [sock, buffer, id, finish]() {
+        buffer->append(sock->readAll());
+        if (buffer->size() >= id.minResponseBytes) {
+            finish();
+        }
+    });
+    connect(sock, &QTcpSocket::errorOccurred, sock,
+            [finish](QAbstractSocket::SocketError) { finish(); });
+
+    // bound the wait: a silent or non-A&H host must not stall the scan
+    QTimer::singleShot(id.timeoutMs, sock, finish);
+
+    sock->connectToHost(host, id.port);
+}
+
+void ConsoleDiscoveryService::addConsole(const DiscoveredConsole& console) {
+    if (!console.isValid()) {
+        return;
+    }
+
+    for (const auto& existing : m_discovered) {
+        if (existing == console) {
+            return;
+        }
+    }
+
+    m_discovered.append(console);
+    emit consoleDiscovered(console);
 }
 
 void ConsoleDiscoveryService::parseOscMessage(const QByteArray& data, const QHostAddress& sender,
@@ -102,7 +264,7 @@ void ConsoleDiscoveryService::parseOscMessage(const QByteArray& data, const QHos
 
     // skip to type tag (4-byte aligned)
     int typeStart = ((pathEnd + 4) / 4) * 4;
-    QVariant value;
+    QVariantList args;
 
     if (typeStart < data.size() && data.at(typeStart) == ',') {
         int typeEnd = data.indexOf('\0', typeStart);
@@ -110,8 +272,15 @@ void ConsoleDiscoveryService::parseOscMessage(const QByteArray& data, const QHos
             QString types = QString::fromUtf8(data.mid(typeStart + 1, typeEnd - typeStart - 1));
             int argOffset = ((typeEnd + 4) / 4) * 4;
 
-            if (!types.isEmpty() && argOffset <= data.size()) {
-                value = parseOscArgument(data, argOffset, types.at(0).toLatin1());
+            for (const QChar& type : types) {
+                if (argOffset > data.size()) {
+                    break;
+                }
+                QVariant value = parseOscArgument(data, argOffset, type.toLatin1());
+                if (!value.isValid()) {
+                    break;
+                }
+                args.append(value);
             }
         }
     }
@@ -119,23 +288,7 @@ void ConsoleDiscoveryService::parseOscMessage(const QByteArray& data, const QHos
     // try each strategy to parse the response
     for (const auto& strategy : m_strategies) {
         if (strategy->canParseResponse(path)) {
-            DiscoveredConsole console = strategy->parseResponse(path, value, sender, senderPort);
-
-            if (console.isValid()) {
-                // check if already discovered
-                bool alreadyFound = false;
-                for (const auto& existing : m_discovered) {
-                    if (existing == console) {
-                        alreadyFound = true;
-                        break;
-                    }
-                }
-
-                if (!alreadyFound) {
-                    m_discovered.append(console);
-                    emit consoleDiscovered(console);
-                }
-            }
+            addConsole(strategy->parseResponse(path, args, sender, senderPort));
             break;
         }
     }
@@ -169,7 +322,7 @@ QVariant ConsoleDiscoveryService::parseOscArgument(const QByteArray& data, int& 
     }
     case 's': {
         int strEnd = data.indexOf('\0', offset);
-        if (strEnd > offset) {
+        if (strEnd >= offset) {
             QString str = QString::fromUtf8(data.mid(offset, strEnd - offset));
             offset = ((strEnd + 4) / 4) * 4;
             return str;
@@ -183,7 +336,7 @@ QVariant ConsoleDiscoveryService::parseOscArgument(const QByteArray& data, int& 
                           (static_cast<quint8>(data[offset + 2]) << 8) |
                           static_cast<quint8>(data[offset + 3]);
             offset += 4;
-            if (offset + size <= data.size()) {
+            if (size >= 0 && offset + size <= data.size()) {
                 QByteArray blob = data.mid(offset, size);
                 offset += ((size + 3) / 4) * 4;
                 return blob;

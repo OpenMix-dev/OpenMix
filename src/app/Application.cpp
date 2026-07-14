@@ -1,28 +1,27 @@
 #include "Application.h"
-#include "OscRemoteServer.h"
 #include "CuePlayerClient.h"
-#include "ScsClient.h"
+#include "OscRemoteServer.h"
 #include "QLabClient.h"
 #include "ReaperClient.h"
-#include "ui/MainWindow.h"
+#include "ScsClient.h"
 #include "core/AppLogger.h"
 #include "core/ChannelMonitor.h"
 #include "core/ConnectionLogBridge.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
-#include "core/CueZero.h"
-#include "core/Position.h"
-#include "core/TimecodeTrigger.h"
 #include "core/CueValidator.h"
+#include "core/CueZero.h"
 #include "core/DCAMapping.h"
 #include "core/DryRunEngine.h"
 #include "core/PlaybackEngine.h"
 #include "core/PlaybackGuard.h"
 #include "core/PlaybackLogger.h"
+#include "core/Position.h"
 #include "core/ScribbleController.h"
 #include "core/ShortcutManager.h"
 #include "core/Show.h"
 #include "core/SpareBackup.h"
+#include "core/TimecodeTrigger.h"
 #include "io/AutosaveManager.h"
 #include "io/CrashRecovery.h"
 #include "midi/MidiInputManager.h"
@@ -30,9 +29,11 @@
 #include "protocol/ProtocolFactory.h"
 #include "protocol/discovery/ConsoleDiscoveryService.h"
 #include "protocol/discovery/DiscoveredConsole.h"
+#include "protocol/discovery/probes/AllenHeathProbeStrategy.h"
 #include "protocol/discovery/probes/BehringerWingProbeStrategy.h"
 #include "protocol/discovery/probes/BehringerX32ProbeStrategy.h"
-#include "protocol/discovery/probes/YamahaOscProbeStrategy.h"
+#include "protocol/discovery/probes/YamahaYsdpProbeStrategy.h"
+#include "ui/MainWindow.h"
 #include <QDir>
 #include <QSettings>
 #include <QStandardPaths>
@@ -65,7 +66,8 @@ Application::Application(QObject* parent) : QObject(parent) {
     m_discoveryService = new ConsoleDiscoveryService(this);
     m_discoveryService->registerStrategy(std::make_shared<BehringerX32ProbeStrategy>());
     m_discoveryService->registerStrategy(std::make_shared<BehringerWingProbeStrategy>());
-    m_discoveryService->registerStrategy(std::make_shared<YamahaOscProbeStrategy>());
+    m_discoveryService->registerStrategy(std::make_shared<YamahaYsdpProbeStrategy>());
+    m_discoveryService->registerStrategy(std::make_shared<AllenHeathProbeStrategy>());
 
     // inbound OSC remote control (QLab / stage-manager)
     m_oscRemoteServer = new OscRemoteServer(this);
@@ -209,13 +211,13 @@ void Application::initialize() {
     });
     m_oscRemoteServer->loadFromSettings();
     if (m_oscRemoteServer->start(m_oscRemoteServer->port())) {
-        m_appLogger->log(LogLevel::Info, LogSource::System,
-                         QString("OSC remote control listening on port %1")
-                             .arg(m_oscRemoteServer->port()));
+        m_appLogger->log(
+            LogLevel::Info, LogSource::System,
+            QString("OSC remote control listening on port %1").arg(m_oscRemoteServer->port()));
     } else {
-        m_appLogger->log(LogLevel::Warning, LogSource::System,
-                         QString("OSC remote control could not bind port %1")
-                             .arg(m_oscRemoteServer->port()));
+        m_appLogger->log(
+            LogLevel::Warning, LogSource::System,
+            QString("OSC remote control could not bind port %1").arg(m_oscRemoteServer->port()));
     }
 
     // outbound QLab/DAW remote: fire a linked QLab cue when a cue executes
@@ -302,14 +304,13 @@ void Application::initialize() {
     // the spare channel.
     connect(m_playbackEngine, &PlaybackEngine::cueExecuted, m_show->spareBackup(),
             &SpareBackup::onCueFired);
-    connect(m_show->spareBackup(), &SpareBackup::stateChanged, this,
-            [this](SpareBackup::State state) {
-                if (state != SpareBackup::State::Active)
-                    return;
-                SpareBackup* spare = m_show->spareBackup();
-                m_playbackEngine->applyBackupSwitch(spare->allocatedChannel(),
-                                                    spare->spareChannel());
-            });
+    connect(
+        m_show->spareBackup(), &SpareBackup::stateChanged, this, [this](SpareBackup::State state) {
+            if (state != SpareBackup::State::Active)
+                return;
+            SpareBackup* spare = m_show->spareBackup();
+            m_playbackEngine->applyBackupSwitch(spare->allocatedChannel(), spare->spareChannel());
+        });
 }
 
 void Application::setupMixerConnection(const QString& type, const QString& host, int port) {
@@ -385,8 +386,7 @@ void Application::connectToDiscoveredConsole(const DiscoveredConsole& console) {
     if (!m_mixer)
         return;
 
-    setupMixerConnection(console.toCapabilities().protocolId,
-                         console.address.toString(),
+    setupMixerConnection(console.toCapabilities().protocolId, console.address.toString(),
                          console.port);
 }
 
@@ -429,21 +429,25 @@ void Application::startupScan() {
 
     if (!savedHost.isEmpty()) {
         auto conn = std::make_shared<QMetaObject::Connection>();
-        *conn = connect(m_discoveryService, &ConsoleDiscoveryService::consoleDiscovered,
-                        this, [this, savedHost, conn](const DiscoveredConsole& console) {
+        *conn = connect(m_discoveryService, &ConsoleDiscoveryService::consoleDiscovered, this,
+                        [this, savedHost, conn](const DiscoveredConsole& console) {
                             if (m_mixer == nullptr && console.address.toString() == savedHost) {
                                 QObject::disconnect(*conn);
                                 connectToDiscoveredConsole(console);
                             }
                         });
 
-        connect(m_discoveryService, &ConsoleDiscoveryService::scanFinished,
-                this, [conn]() {
-                    QObject::disconnect(*conn);
-                }, Qt::SingleShotConnection);
+        connect(
+            m_discoveryService, &ConsoleDiscoveryService::scanFinished, this,
+            [conn]() { QObject::disconnect(*conn); }, Qt::SingleShotConnection);
     }
 
     m_discoveryService->startScan(3000);
+
+    // broadcast-hostile networks: also probe the last-used console directly
+    if (!savedHost.isEmpty()) {
+        m_discoveryService->probeHost(QHostAddress(savedHost));
+    }
 }
 
 void Application::setRecordFadersActive(bool active) {

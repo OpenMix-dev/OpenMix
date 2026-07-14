@@ -644,3 +644,17 @@ add_executable(test_bubble_button
 target_link_libraries(test_bubble_button PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
 target_include_directories(test_bubble_button PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME BubbleButtonTest COMMAND test_bubble_button)
+
+add_executable(test_console_discovery
+    test_console_discovery.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/discovery/ConsoleDiscoveryService.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/discovery/DiscoveredConsole.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/discovery/probes/BehringerX32ProbeStrategy.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/discovery/probes/BehringerWingProbeStrategy.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/discovery/probes/YamahaYsdpProbeStrategy.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/discovery/probes/AllenHeathProbeStrategy.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+)
+target_link_libraries(test_console_discovery PRIVATE Qt6::Core Qt6::Network Qt6::Test)
+target_include_directories(test_console_discovery PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME ConsoleDiscoveryTest COMMAND test_console_discovery)

@@ -12,7 +12,7 @@ class BehringerX32ProbeStrategy : public OscProbeStrategy {
 
     bool canParseResponse(const QString& path) const override { return path == "/xinfo"; }
 
-    DiscoveredConsole parseResponse(const QString& path, const QVariant& value,
+    DiscoveredConsole parseResponse(const QString& path, const QVariantList& args,
                                     const QHostAddress& sender, int senderPort) override;
 
     Manufacturer manufacturer() const override { return Manufacturer::Behringer; }

@@ -196,7 +196,8 @@ set(SOURCES
     src/protocol/discovery/ConsoleDiscoveryService.cpp
     src/protocol/discovery/probes/BehringerX32ProbeStrategy.cpp
     src/protocol/discovery/probes/BehringerWingProbeStrategy.cpp
-    src/protocol/discovery/probes/YamahaOscProbeStrategy.cpp
+    src/protocol/discovery/probes/YamahaYsdpProbeStrategy.cpp
+    src/protocol/discovery/probes/AllenHeathProbeStrategy.cpp
 
     src/ui/ConsoleDiscoveryWidget.cpp
 
@@ -319,7 +320,8 @@ set(HEADERS
     src/protocol/discovery/ConsoleDiscoveryService.h
     src/protocol/discovery/probes/BehringerX32ProbeStrategy.h
     src/protocol/discovery/probes/BehringerWingProbeStrategy.h
-    src/protocol/discovery/probes/YamahaOscProbeStrategy.h
+    src/protocol/discovery/probes/YamahaYsdpProbeStrategy.h
+    src/protocol/discovery/probes/AllenHeathProbeStrategy.h
 
     src/ui/ConsoleDiscoveryWidget.h
 
