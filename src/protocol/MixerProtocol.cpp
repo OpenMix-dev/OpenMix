@@ -20,4 +20,17 @@ void MixerProtocol::setChannelDynamics(int, bool, double, double, double, double
 void MixerProtocol::setChannelName(int, const QString&) {}
 void MixerProtocol::setChannelColor(int, int) {}
 
+void MixerProtocol::setDcaMute(int dca, bool muted) {
+    sendParameter(QStringLiteral("/dca/%1/mute").arg(dca), muted ? 1 : 0);
+}
+void MixerProtocol::setDcaFader(int dca, double level) {
+    sendParameter(QStringLiteral("/dca/%1/fader").arg(dca), level);
+}
+void MixerProtocol::setDcaName(int dca, const QString& name) {
+    sendParameter(QStringLiteral("/dca/%1/config/name").arg(dca), name);
+}
+
+void MixerProtocol::setChannelDcaMask(int, quint32) {}
+void MixerProtocol::setBusDcaMask(int, quint32) {}
+
 } // namespace OpenMix

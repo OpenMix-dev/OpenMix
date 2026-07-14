@@ -128,12 +128,45 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.supportsEffectSends = true;
         break;
 
-    case ConsoleType::GLD80:
+    // Qu series shares the SQ MIDI-over-TCP control path (same "Soft" control
+    // family on port 51325). All Qu models run the same 32-channel DSP; only the
+    // physical fader count differs, so capabilities are identical across
+    // Qu-16/24/32 apart from the display name.
+    case ConsoleType::Qu16:
+    case ConsoleType::Qu24:
+    case ConsoleType::Qu32:
         caps.manufacturer = Manufacturer::AllenHeath;
         caps.protocol = ProtocolType::MidiTcp;
+        caps.defaultPort = 51325;
+        caps.dcaCount = 8;
+        caps.inputChannels = 32;
+        caps.mixBuses = 12;
+        caps.matrixOutputs = 0;
+        caps.scenes = 300;
+        caps.maxDCANameLength = 6;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LShv", "PEQ", "PEQ", "HShv"};
+        caps.effectSendBuses = 4;
+        caps.supportsEffectSends = true;
+        if (type == ConsoleType::Qu16) {
+            caps.displayName = "Allen & Heath Qu-16";
+            caps.protocolId = "qu16";
+        } else if (type == ConsoleType::Qu24) {
+            caps.displayName = "Allen & Heath Qu-24";
+            caps.protocolId = "qu24";
+        } else {
+            caps.displayName = "Allen & Heath Qu-32";
+            caps.protocolId = "qu32";
+        }
+        break;
+
+    case ConsoleType::GLD80:
+        caps.manufacturer = Manufacturer::AllenHeath;
+        caps.protocol = ProtocolType::BinaryTcp;
         caps.displayName = "Allen & Heath GLD-80";
         caps.protocolId = "gld80";
-        caps.defaultPort = 51325;
+        caps.defaultPort = 51321;
         caps.dcaCount = 8;
         caps.inputChannels = 48;
         caps.mixBuses = 20;
@@ -150,10 +183,10 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::GLD112:
         caps.manufacturer = Manufacturer::AllenHeath;
-        caps.protocol = ProtocolType::MidiTcp;
+        caps.protocol = ProtocolType::BinaryTcp;
         caps.displayName = "Allen & Heath GLD-112";
         caps.protocolId = "gld112";
-        caps.defaultPort = 51325;
+        caps.defaultPort = 51321;
         caps.dcaCount = 8;
         caps.inputChannels = 48;
         caps.mixBuses = 30;
@@ -507,6 +540,12 @@ MixerCapabilities MixerCapabilities::forProtocolId(const QString& protocolId) {
         return forConsole(ConsoleType::SQ6);
     if (id == "sq7" || id == "sq-7" || id == "sq")
         return forConsole(ConsoleType::SQ7);
+    if (id == "qu16" || id == "qu-16" || id == "qu")
+        return forConsole(ConsoleType::Qu16);
+    if (id == "qu24" || id == "qu-24")
+        return forConsole(ConsoleType::Qu24);
+    if (id == "qu32" || id == "qu-32")
+        return forConsole(ConsoleType::Qu32);
 
     // Allen & Heath GLD
     if (id == "gld80" || id == "gld-80")
@@ -574,6 +613,9 @@ QVector<MixerCapabilities> MixerCapabilities::allSupported() {
     all.append(forConsole(ConsoleType::SQ5));
     all.append(forConsole(ConsoleType::SQ6));
     all.append(forConsole(ConsoleType::SQ7));
+    all.append(forConsole(ConsoleType::Qu16));
+    all.append(forConsole(ConsoleType::Qu24));
+    all.append(forConsole(ConsoleType::Qu32));
     all.append(forConsole(ConsoleType::GLD80));
     all.append(forConsole(ConsoleType::GLD112));
 
@@ -620,10 +662,13 @@ bool MixerCapabilities::isSupported() const {
     case ConsoleType::M32:
         return true;
 
-    // Allen & Heath SQ/GLD
+    // Allen & Heath SQ/Qu/GLD
     case ConsoleType::SQ5:
     case ConsoleType::SQ6:
     case ConsoleType::SQ7:
+    case ConsoleType::Qu16:
+    case ConsoleType::Qu24:
+    case ConsoleType::Qu32:
     case ConsoleType::GLD80:
     case ConsoleType::GLD112:
         return true;

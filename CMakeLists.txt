@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(OpenMix
-    VERSION 1.0.5
+    VERSION 1.0.6
     DESCRIPTION "Stage mixing software for live theatre that lets engineers program, automate, and run cues seamlessly across 30+ digital mixing consoles"
     LANGUAGES CXX
 )
@@ -178,6 +178,7 @@ set(SOURCES
 
     src/protocol/allenheath/AllenHeathMidiProtocol.cpp
     src/protocol/allenheath/SQProtocol.cpp
+    src/protocol/allenheath/QuProtocol.cpp
     src/protocol/allenheath/GLDProtocol.cpp
     src/protocol/allenheath/AllenHeathTcpProtocol.cpp
     src/protocol/allenheath/AvantisProtocol.cpp
@@ -195,7 +196,8 @@ set(SOURCES
     src/protocol/discovery/ConsoleDiscoveryService.cpp
     src/protocol/discovery/probes/BehringerX32ProbeStrategy.cpp
     src/protocol/discovery/probes/BehringerWingProbeStrategy.cpp
-    src/protocol/discovery/probes/YamahaOscProbeStrategy.cpp
+    src/protocol/discovery/probes/YamahaYsdpProbeStrategy.cpp
+    src/protocol/discovery/probes/AllenHeathProbeStrategy.cpp
 
     src/ui/ConsoleDiscoveryWidget.cpp
 
@@ -299,6 +301,7 @@ set(HEADERS
 
     src/protocol/allenheath/AllenHeathMidiProtocol.h
     src/protocol/allenheath/SQProtocol.h
+    src/protocol/allenheath/QuProtocol.h
     src/protocol/allenheath/GLDProtocol.h
     src/protocol/allenheath/AllenHeathTcpProtocol.h
     src/protocol/allenheath/AvantisProtocol.h
@@ -317,7 +320,8 @@ set(HEADERS
     src/protocol/discovery/ConsoleDiscoveryService.h
     src/protocol/discovery/probes/BehringerX32ProbeStrategy.h
     src/protocol/discovery/probes/BehringerWingProbeStrategy.h
-    src/protocol/discovery/probes/YamahaOscProbeStrategy.h
+    src/protocol/discovery/probes/YamahaYsdpProbeStrategy.h
+    src/protocol/discovery/probes/AllenHeathProbeStrategy.h
 
     src/ui/ConsoleDiscoveryWidget.h
 

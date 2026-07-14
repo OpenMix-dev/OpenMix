@@ -3,7 +3,7 @@
 namespace OpenMix {
 
 DiscoveredConsole BehringerX32ProbeStrategy::parseResponse([[maybe_unused]] const QString& path,
-                                                           const QVariant& value,
+                                                           const QVariantList& args,
                                                            const QHostAddress& sender,
                                                            [[maybe_unused]] int senderPort) {
 
@@ -11,13 +11,25 @@ DiscoveredConsole BehringerX32ProbeStrategy::parseResponse([[maybe_unused]] cons
     console.address = sender;
     console.port = 10023;
 
-    QString modelString = value.toString();
+    // /xinfo reply: [ip, name, model, firmware]
+    QString modelString = args.value(2).toString();
+    if (modelString.isEmpty()) {
+        // unexpected arg layout: fall back to the first arg that names a model
+        for (const QVariant& arg : args) {
+            const QString candidate = arg.toString().toLower();
+            if (candidate.contains("x32") || candidate.contains("m32")) {
+                modelString = arg.toString();
+                break;
+            }
+        }
+    }
 
     if (modelString.isEmpty()) {
         return console;
     }
 
     console.modelName = modelString;
+    console.firmwareVersion = args.value(3).toString();
     console.type = identifyModel(modelString);
 
     if (console.type != ConsoleType::Unknown) {

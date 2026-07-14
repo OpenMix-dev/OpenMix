@@ -64,6 +64,22 @@ class MixerProtocol : public QObject {
     virtual void setChannelName(int channel, const QString& name);
     virtual void setChannelColor(int channel, int color);
 
+    // Defaults send generic /dca paths the A&H MIDI driver parses into NRPN; OSC
+    // drivers override (e.g. X32 mute is /dca/N/on, not /dca/N/mute).
+    virtual void setDcaMute(int dca, bool muted);
+    virtual void setDcaFader(int dca, double level);
+    virtual void setDcaName(int dca, const QString& name);
+
+    // DCA-group membership bitmask, bit d-1 = member of DCA d. Default no-op / nullopt.
+    virtual void setChannelDcaMask(int channel, quint32 mask);
+    virtual void setBusDcaMask(int bus, quint32 mask);
+    [[nodiscard]] virtual std::optional<quint32> readChannelDcaMask(int /*channel*/) {
+        return std::nullopt;
+    }
+    [[nodiscard]] virtual std::optional<quint32> readBusDcaMask(int /*bus*/) {
+        return std::nullopt;
+    }
+
     // read back a channel's current fader (normalized 0..1) from the driver's
     // parameter cache, or nullopt if unsupported / not yet known. Used to capture
     // live console levels into a cue. channel is 1-based.

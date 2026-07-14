@@ -2,45 +2,47 @@
 
 namespace OpenMix {
 
-DiscoveredConsole BehringerWingProbeStrategy::parseResponse([[maybe_unused]] const QString& path,
-                                                            const QVariant& value,
-                                                            const QHostAddress& sender,
-                                                            [[maybe_unused]] int senderPort) {
+DiscoveredConsole BehringerWingProbeStrategy::parseResponse(
+    [[maybe_unused]] const QString& path, [[maybe_unused]] const QVariantList& args,
+    [[maybe_unused]] const QHostAddress& sender, [[maybe_unused]] int senderPort) {
+    // WING discovery is raw-datagram only
+    return {};
+}
 
+DiscoveredConsole BehringerWingProbeStrategy::parseRawResponse(const QByteArray& data,
+                                                               const QHostAddress& sender,
+                                                               [[maybe_unused]] int senderPort) {
     DiscoveredConsole console;
+
+    // "WING,<ip>,<name>,<model>,<serial>,<firmware>"
+    const QList<QByteArray> fields = data.split(',');
+    if (fields.size() < 6) {
+        return console;
+    }
+
     console.address = sender;
-    console.port = 2223;
+    console.port = 2223; // OSC control port
+    console.modelName = QString::fromUtf8(fields[3]).trimmed();
+    console.firmwareVersion = QString::fromUtf8(fields[5]).trimmed();
+    console.type = identifyModel(console.modelName);
 
-    QString modelString = value.toString();
-    console.modelName = modelString;
-    console.type = identifyModel(modelString);
+    MixerCapabilities caps = MixerCapabilities::forConsole(console.type);
+    console.manufacturer = caps.manufacturer;
+    console.displayName = caps.displayName;
 
-    if (console.type != ConsoleType::Unknown) {
-        MixerCapabilities caps = MixerCapabilities::forConsole(console.type);
-        console.manufacturer = caps.manufacturer;
-        console.displayName = caps.displayName;
-    } else {
-        // if we got a response on port 2223 to /$info, it's likely a WING
-        console.type = ConsoleType::Wing;
-        console.manufacturer = Manufacturer::Behringer;
-        console.displayName = "Behringer WING";
+    const QString consoleName = QString::fromUtf8(fields[2]).trimmed();
+    if (!consoleName.isEmpty()) {
+        console.displayName = QString("%1 (%2)").arg(caps.displayName, consoleName);
     }
 
     return console;
 }
 
 ConsoleType BehringerWingProbeStrategy::identifyModel(const QString& modelString) const {
-    QString model = modelString.toLower();
-
-    if (model.contains("wing compact") || model.contains("wingcompact")) {
-        return ConsoleType::Wing; // WING Compact uses same protocol
-    }
-
-    if (model.contains("wing")) {
-        return ConsoleType::Wing;
-    }
-
-    return ConsoleType::Unknown;
+    // known tokens: wing-fullsize, wing-compact, wing-rack; all variants speak
+    // the same protocol, and a well-formed "WING," reply is always a WING
+    Q_UNUSED(modelString);
+    return ConsoleType::Wing;
 }
 
 } // namespace OpenMix

@@ -105,6 +105,33 @@ target_include_directories(test_playback_profiles PRIVATE
 )
 add_test(NAME PlaybackProfilesTest COMMAND test_playback_profiles)
 
+add_executable(test_playback_dca_assign
+    test_playback_dca_assign.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueValidator.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackGuard.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PlaybackLogger.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfile.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Actor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/ActorProfileLibrary.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/FadeEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Position.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/LoopbackProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+)
+target_link_libraries(test_playback_dca_assign PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+target_include_directories(test_playback_dca_assign PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
+add_test(NAME PlaybackDcaAssignTest COMMAND test_playback_dca_assign)
+
 add_executable(test_fade_engine
     test_fade_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/core/FadeEngine.cpp
@@ -297,6 +324,9 @@ add_test(NAME DiGiCoProtocolTest COMMAND test_digico_protocol)
 add_executable(test_allenheath_parsing
     test_allenheath_parsing.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/AllenHeathTcpProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/AvantisProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/DLiveProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/GLDProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/transport/TcpTransport.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
@@ -617,3 +647,17 @@ add_executable(test_bubble_button
 target_link_libraries(test_bubble_button PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
 target_include_directories(test_bubble_button PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME BubbleButtonTest COMMAND test_bubble_button)
+
+add_executable(test_console_discovery
+    test_console_discovery.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/discovery/ConsoleDiscoveryService.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/discovery/DiscoveredConsole.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/discovery/probes/BehringerX32ProbeStrategy.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/discovery/probes/BehringerWingProbeStrategy.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/discovery/probes/YamahaYsdpProbeStrategy.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/discovery/probes/AllenHeathProbeStrategy.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+)
+target_link_libraries(test_console_discovery PRIVATE Qt6::Core Qt6::Network Qt6::Test)
+target_include_directories(test_console_discovery PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME ConsoleDiscoveryTest COMMAND test_console_discovery)

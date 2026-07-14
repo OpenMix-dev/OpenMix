@@ -69,6 +69,14 @@ class X32Protocol : public MixerProtocol {
     void setChannelName(int channel, const QString& name) override;
     void setChannelColor(int channel, int color) override;
 
+    void setDcaMute(int dca, bool muted) override;
+    void setDcaFader(int dca, double level) override;
+    void setDcaName(int dca, const QString& name) override;
+    void setChannelDcaMask(int channel, quint32 mask) override;
+    void setBusDcaMask(int bus, quint32 mask) override;
+    [[nodiscard]] std::optional<quint32> readChannelDcaMask(int channel) override;
+    [[nodiscard]] std::optional<quint32> readBusDcaMask(int bus) override;
+
     // keep-alive
     void refresh() override;
     void requestConsoleNames(int count) override;
@@ -102,6 +110,7 @@ class X32Protocol : public MixerProtocol {
   private:
     void initializeSnapshotParams();
     void rebuildSnapshotParams();
+    void requestDcaMembership();
     void setStatus(const QString& status);
     void setConnectionState(ConnectionState state);
     void handleXinfoResponse(const QVariant& value);

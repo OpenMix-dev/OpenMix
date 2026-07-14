@@ -53,6 +53,14 @@ class LoopbackProtocol : public MixerProtocol {
     void setChannelDynamics(int channel, bool on, double thresholdDb, double ratio, double attackMs,
                             double releaseMs, double makeupDb) override;
 
+    void setDcaMute(int dca, bool muted) override;
+    void setDcaFader(int dca, double level) override;
+    void setDcaName(int dca, const QString& name) override;
+    void setChannelDcaMask(int channel, quint32 mask) override;
+    void setBusDcaMask(int bus, quint32 mask) override;
+    [[nodiscard]] std::optional<quint32> readChannelDcaMask(int channel) override;
+    [[nodiscard]] std::optional<quint32> readBusDcaMask(int bus) override;
+
     [[nodiscard]] QStringList recordedCalls() const { return m_recordedCalls; }
     void clearRecordedCalls() { m_recordedCalls.clear(); }
 

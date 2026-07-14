@@ -4,18 +4,17 @@
 
 namespace OpenMix {
 
-// WING discovery: raw ASCII "WING?" broadcast to UDP 2222; the console replies
-// with "WING,<ip>,<name>,<model>,<serial>,<firmware>". Control stays OSC on 2223.
-class BehringerWingProbeStrategy : public OscProbeStrategy {
+// Yamaha discovery (YSDP): raw datagram broadcast to UDP 54330 carrying the
+// sender's IPv4 and the "_ypa-scp" service name. Consoles reply with a
+// datagram containing "_ypa-scp" followed by length-prefixed fields
+// (host, model, version). Control is SCP over TCP 49280.
+class YamahaYsdpProbeStrategy : public OscProbeStrategy {
   public:
-    int probePort() const override { return 2222; }
+    int probePort() const override { return 54330; }
 
     QString probeCommand() const override { return QString(); }
 
-    QByteArray rawProbe(const QHostAddress& localAddress) const override {
-        Q_UNUSED(localAddress);
-        return QByteArrayLiteral("WING?");
-    }
+    QByteArray rawProbe(const QHostAddress& localAddress) const override;
 
     bool canParseResponse(const QString& path) const override {
         Q_UNUSED(path);
@@ -26,15 +25,15 @@ class BehringerWingProbeStrategy : public OscProbeStrategy {
                                     const QHostAddress& sender, int senderPort) override;
 
     bool canParseRawResponse(const QByteArray& data) const override {
-        return data.startsWith("WING,");
+        return data.contains("_ypa-scp");
     }
 
     DiscoveredConsole parseRawResponse(const QByteArray& data, const QHostAddress& sender,
                                        int senderPort) override;
 
-    Manufacturer manufacturer() const override { return Manufacturer::Behringer; }
+    Manufacturer manufacturer() const override { return Manufacturer::Yamaha; }
 
-    QString strategyName() const override { return "Behringer WING"; }
+    QString strategyName() const override { return "Yamaha TF/QL/CL/DM7"; }
 
   private:
     ConsoleType identifyModel(const QString& modelString) const;

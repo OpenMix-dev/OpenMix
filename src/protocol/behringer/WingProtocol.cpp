@@ -46,6 +46,7 @@ void WingProtocol::initializeSnapshotParams() {
         QString chPrefix = QString("/ch/%1").arg(i);
         m_snapshotParams.append(chPrefix + "/fader");
         m_snapshotParams.append(chPrefix + "/mute");
+        m_snapshotParams.append(chPrefix + "/grp/dca");
 
         // EQ params
         if (m_capabilities.supportsChannelEQ) {
@@ -75,6 +76,7 @@ void WingProtocol::initializeSnapshotParams() {
         QString busPrefix = QString("/bus/%1").arg(i);
         m_snapshotParams.append(busPrefix + "/fader");
         m_snapshotParams.append(busPrefix + "/mute");
+        m_snapshotParams.append(busPrefix + "/grp/dca");
 
         // bus EQ params
         if (m_capabilities.supportsChannelEQ) {
@@ -232,6 +234,8 @@ void WingProtocol::recallSnippet(int snippetNumber) {
 namespace {
 QString wingChannel(int channel) { return QString("/ch/%1").arg(channel); }
 
+QString wingBus(int bus) { return QString("/bus/%1").arg(bus); }
+
 // WING faders carry real-world dB; map a normalized 0..1 level onto the exact
 // X32/WING fader law (piecewise-linear in dB, per the Maillot/WING references):
 //   0.0000-0.0625 -> -inf..-60, 0.0625-0.25 -> -60..-30,
@@ -310,6 +314,41 @@ void WingProtocol::setChannelName(int channel, const QString& name) {
 void WingProtocol::setChannelColor(int channel, int color) {
     // WING channel color index (best-effort; palette differs from X32)
     sendParameter(wingChannel(channel) + "/col", color);
+}
+
+void WingProtocol::setDcaMute(int dca, bool muted) {
+    // WING /dca/N/mute: 1 = muted (opposite of X32's /dca/N/on)
+    sendParameter(QString("/dca/%1/mute").arg(dca), muted ? 1 : 0);
+}
+
+void WingProtocol::setDcaFader(int dca, double level) {
+    sendParameter(QString("/dca/%1/fdr").arg(dca), wingFaderDb(level));
+}
+
+void WingProtocol::setDcaName(int dca, const QString& name) {
+    sendParameter(QString("/dca/%1/name").arg(dca), name);
+}
+
+void WingProtocol::setChannelDcaMask(int channel, quint32 mask) {
+    sendParameter(wingChannel(channel) + "/grp/dca", static_cast<int>(mask));
+}
+
+void WingProtocol::setBusDcaMask(int bus, quint32 mask) {
+    sendParameter(wingBus(bus) + "/grp/dca", static_cast<int>(mask));
+}
+
+std::optional<quint32> WingProtocol::readChannelDcaMask(int channel) {
+    const QVariant value = getParameter(wingChannel(channel) + "/grp/dca");
+    if (!value.isValid())
+        return std::nullopt;
+    return static_cast<quint32>(value.toInt());
+}
+
+std::optional<quint32> WingProtocol::readBusDcaMask(int bus) {
+    const QVariant value = getParameter(wingBus(bus) + "/grp/dca");
+    if (!value.isValid())
+        return std::nullopt;
+    return static_cast<quint32>(value.toInt());
 }
 
 void WingProtocol::refresh() {
@@ -477,8 +516,19 @@ void WingProtocol::handleInfoResponse([[maybe_unused]] const QVariant& value) {
         // subscribe to updates
         m_transport.send("/$xremote");
 
+        requestDcaMembership();
+
         emit connected();
     }
+}
+
+void WingProtocol::requestDcaMembership() {
+    if (m_connectionState != ConnectionState::Connected)
+        return;
+    for (int i = 1; i <= m_capabilities.inputChannels && i <= 48; ++i)
+        requestParameter(wingChannel(i) + "/grp/dca");
+    for (int i = 1; i <= m_capabilities.mixBuses && i <= 16; ++i)
+        requestParameter(wingBus(i) + "/grp/dca");
 }
 
 void WingProtocol::startReconnection() {

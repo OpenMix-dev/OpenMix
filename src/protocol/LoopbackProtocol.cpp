@@ -222,4 +222,50 @@ void LoopbackProtocol::setChannelDynamics(int channel, bool on, double threshold
                                .arg(makeupDb));
 }
 
+namespace {
+QString loopChannelDca(int channel) {
+    return QString("/ch/%1/grp/dca").arg(channel, 2, 10, QChar('0'));
+}
+QString loopBusDca(int bus) { return QString("/bus/%1/grp/dca").arg(bus, 2, 10, QChar('0')); }
+} // namespace
+
+void LoopbackProtocol::setDcaMute(int dca, bool muted) {
+    m_parameterState[QString("/dca/%1/mute").arg(dca)] = muted ? 1 : 0;
+    m_recordedCalls.append(QString("dcamute:dca=%1:muted=%2").arg(dca).arg(muted ? 1 : 0));
+}
+
+void LoopbackProtocol::setDcaFader(int dca, double level) {
+    m_parameterState[QString("/dca/%1/fader").arg(dca)] = level;
+    m_recordedCalls.append(QString("dcafader:dca=%1:level=%2").arg(dca).arg(level));
+}
+
+void LoopbackProtocol::setDcaName(int dca, const QString& name) {
+    m_parameterState[QString("/dca/%1/config/name").arg(dca)] = name;
+    m_recordedCalls.append(QString("dcaname:dca=%1:name=%2").arg(dca).arg(name));
+}
+
+void LoopbackProtocol::setChannelDcaMask(int channel, quint32 mask) {
+    m_parameterState[loopChannelDca(channel)] = static_cast<int>(mask);
+    m_recordedCalls.append(QString("dcamask:ch=%1:mask=%2").arg(channel).arg(mask));
+}
+
+void LoopbackProtocol::setBusDcaMask(int bus, quint32 mask) {
+    m_parameterState[loopBusDca(bus)] = static_cast<int>(mask);
+    m_recordedCalls.append(QString("dcamask:bus=%1:mask=%2").arg(bus).arg(mask));
+}
+
+std::optional<quint32> LoopbackProtocol::readChannelDcaMask(int channel) {
+    const QString path = loopChannelDca(channel);
+    if (!m_parameterState.contains(path))
+        return std::nullopt;
+    return static_cast<quint32>(m_parameterState.value(path).toInt());
+}
+
+std::optional<quint32> LoopbackProtocol::readBusDcaMask(int bus) {
+    const QString path = loopBusDca(bus);
+    if (!m_parameterState.contains(path))
+        return std::nullopt;
+    return static_cast<quint32>(m_parameterState.value(path).toInt());
+}
+
 } // namespace OpenMix
