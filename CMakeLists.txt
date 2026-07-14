@@ -178,6 +178,7 @@ set(SOURCES
 
     src/protocol/allenheath/AllenHeathMidiProtocol.cpp
     src/protocol/allenheath/SQProtocol.cpp
+    src/protocol/allenheath/QuProtocol.cpp
     src/protocol/allenheath/GLDProtocol.cpp
     src/protocol/allenheath/AllenHeathTcpProtocol.cpp
     src/protocol/allenheath/AvantisProtocol.cpp
@@ -299,6 +300,7 @@ set(HEADERS
 
     src/protocol/allenheath/AllenHeathMidiProtocol.h
     src/protocol/allenheath/SQProtocol.h
+    src/protocol/allenheath/QuProtocol.h
     src/protocol/allenheath/GLDProtocol.h
     src/protocol/allenheath/AllenHeathTcpProtocol.h
     src/protocol/allenheath/AvantisProtocol.h

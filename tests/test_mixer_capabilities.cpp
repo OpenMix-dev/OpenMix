@@ -23,6 +23,31 @@ class TestMixerCapabilities : public QObject {
         QCOMPARE(MixerCapabilities::forProtocolId("sd12").dcaCount, 12);
     }
 
+    void quSeries_capabilities() {
+        // Qu shares the SQ MIDI-over-TCP path but runs a 32-channel DSP
+        struct Case {
+            const char* id;
+            ConsoleType type;
+            const char* name;
+        };
+        const Case cases[] = {{"qu16", ConsoleType::Qu16, "Allen & Heath Qu-16"},
+                              {"qu24", ConsoleType::Qu24, "Allen & Heath Qu-24"},
+                              {"qu32", ConsoleType::Qu32, "Allen & Heath Qu-32"}};
+        for (const Case& c : cases) {
+            const MixerCapabilities caps = MixerCapabilities::forProtocolId(c.id);
+            QCOMPARE(caps.type, c.type);
+            QCOMPARE(caps.displayName, QString(c.name));
+            QCOMPARE(caps.manufacturer, Manufacturer::AllenHeath);
+            QCOMPARE(caps.protocol, ProtocolType::MidiTcp);
+            QCOMPARE(caps.defaultPort, 51325);
+            QCOMPARE(caps.inputChannels, 32);
+            QCOMPARE(caps.dcaCount, 8);
+            QCOMPARE(caps.mixBuses, 12);
+        }
+        // bare "qu" resolves to the base Qu-16
+        QCOMPARE(MixerCapabilities::forProtocolId("qu").type, ConsoleType::Qu16);
+    }
+
     void unknownId_fallsBackToDefaults() {
         const MixerCapabilities caps = MixerCapabilities::forProtocolId("bogus");
         QCOMPARE(caps.dcaCount, 8);

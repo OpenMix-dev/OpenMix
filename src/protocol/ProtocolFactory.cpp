@@ -6,6 +6,7 @@
 #include "allenheath/AvantisProtocol.h"
 #include "allenheath/DLiveProtocol.h"
 #include "allenheath/GLDProtocol.h"
+#include "allenheath/QuProtocol.h"
 #include "allenheath/SQProtocol.h"
 #include "behringer/WingProtocol.h"
 #include "behringer/X32Protocol.h"
@@ -40,6 +41,11 @@ MixerProtocol* ProtocolFactory::create(const MixerCapabilities& caps, QObject* p
     case ConsoleType::SQ6:
     case ConsoleType::SQ7:
         return new SQProtocol(caps, parent);
+
+    case ConsoleType::Qu16:
+    case ConsoleType::Qu24:
+    case ConsoleType::Qu32:
+        return new QuProtocol(caps, parent);
 
     case ConsoleType::GLD80:
     case ConsoleType::GLD112:
@@ -95,6 +101,9 @@ bool ProtocolFactory::isImplemented(ConsoleType type) {
     case ConsoleType::SQ5:
     case ConsoleType::SQ6:
     case ConsoleType::SQ7:
+    case ConsoleType::Qu16:
+    case ConsoleType::Qu24:
+    case ConsoleType::Qu32:
     case ConsoleType::GLD80:
     case ConsoleType::GLD112:
     case ConsoleType::Avantis:
