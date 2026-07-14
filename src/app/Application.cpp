@@ -27,6 +27,7 @@
 #include "midi/MidiInputManager.h"
 #include "protocol/MixerProtocol.h"
 #include "protocol/ProtocolFactory.h"
+#include "protocol/allenheath/AllenHeathTcpProtocol.h"
 #include "protocol/discovery/ConsoleDiscoveryService.h"
 #include "protocol/discovery/DiscoveredConsole.h"
 #include "protocol/discovery/probes/AllenHeathProbeStrategy.h"
@@ -385,6 +386,17 @@ void Application::connectToDiscoveredConsole(const DiscoveredConsole& console) {
     m_mixer = ProtocolFactory::create(console, this);
     if (!m_mixer)
         return;
+
+    // pass the discovered firmware to A&H ACE protocols so their firmware-gated
+    // opcodes match the console exactly
+    if (auto* ace = dynamic_cast<AllenHeathTcpProtocol*>(m_mixer)) {
+        ace->setFirmwareVersion(console.firmwareVersion);
+        const int revIdx = console.firmwareVersion.indexOf("Rev. ");
+        if (revIdx >= 0) {
+            ace->setFirmwareRevision(
+                console.firmwareVersion.mid(revIdx + 5).remove(')').trimmed().toInt());
+        }
+    }
 
     setupMixerConnection(console.toCapabilities().protocolId, console.address.toString(),
                          console.port);

@@ -324,6 +324,9 @@ add_test(NAME DiGiCoProtocolTest COMMAND test_digico_protocol)
 add_executable(test_allenheath_parsing
     test_allenheath_parsing.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/AllenHeathTcpProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/AvantisProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/DLiveProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/GLDProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/transport/TcpTransport.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp

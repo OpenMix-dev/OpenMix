@@ -163,10 +163,10 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::GLD80:
         caps.manufacturer = Manufacturer::AllenHeath;
-        caps.protocol = ProtocolType::MidiTcp;
+        caps.protocol = ProtocolType::BinaryTcp;
         caps.displayName = "Allen & Heath GLD-80";
         caps.protocolId = "gld80";
-        caps.defaultPort = 51325;
+        caps.defaultPort = 51321;
         caps.dcaCount = 8;
         caps.inputChannels = 48;
         caps.mixBuses = 20;
@@ -183,10 +183,10 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::GLD112:
         caps.manufacturer = Manufacturer::AllenHeath;
-        caps.protocol = ProtocolType::MidiTcp;
+        caps.protocol = ProtocolType::BinaryTcp;
         caps.displayName = "Allen & Heath GLD-112";
         caps.protocolId = "gld112";
-        caps.defaultPort = 51325;
+        caps.defaultPort = 51321;
         caps.dcaCount = 8;
         caps.inputChannels = 48;
         caps.mixBuses = 30;

@@ -17,6 +17,13 @@ class AvantisProtocol : public AllenHeathTcpProtocol {
 
   protected:
     void initializeSnapshotParams() override;
+
+    // ACE opcodes / plane offsets recovered from AvantisDriver. The channel op
+    // extends by 6 (0x25->0x2B, 0x26->0x2C) on firmware build > 96884.
+    quint8 channelLevelOp() const override { return m_firmwareRev > 96884 ? 0x2B : 0x25; }
+    quint8 channelMuteOp() const override { return m_firmwareRev > 96884 ? 0x2C : 0x26; }
+    int channelMutePlane() const override { return 0x20; }
+    int dcaMutePlane() const override { return 0x18; }
 };
 
 } // namespace OpenMix
