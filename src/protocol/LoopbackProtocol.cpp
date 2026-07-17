@@ -177,7 +177,7 @@ void LoopbackProtocol::refresh() {
     // do nothing
 }
 
-void LoopbackProtocol::setChannelFader(int channel, double level) {
+void LoopbackProtocol::setChannelFaderDb(int channel, double level) {
     m_recordedCalls.append(QString("fader:ch=%1:level=%2").arg(channel).arg(level));
 }
 
@@ -234,7 +234,7 @@ void LoopbackProtocol::setDcaMute(int dca, bool muted) {
     m_recordedCalls.append(QString("dcamute:dca=%1:muted=%2").arg(dca).arg(muted ? 1 : 0));
 }
 
-void LoopbackProtocol::setDcaFader(int dca, double level) {
+void LoopbackProtocol::setDcaFaderDb(int dca, double level) {
     m_parameterState[QString("/dca/%1/fader").arg(dca)] = level;
     m_recordedCalls.append(QString("dcafader:dca=%1:level=%2").arg(dca).arg(level));
 }

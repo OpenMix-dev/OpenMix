@@ -8,6 +8,7 @@
 #include "core/CueList.h"
 #include "core/Ensemble.h"
 #include "core/FadeCurve.h"
+#include "core/LevelDb.h"
 #include "core/PlaybackEngine.h"
 #include "core/Position.h"
 #include "core/Show.h"
@@ -36,6 +37,21 @@
 #include <algorithm>
 
 namespace OpenMix {
+
+namespace {
+
+// The level spin runs from the bottom of the console's throw to +10 dB, with one
+// step below the floor reserved for -inf: a fader all the way down is not "-95 dB",
+// it is off, and the two encode differently on every console.
+constexpr double kLevelSpinMinDb = MIN_DB - 1.0;
+
+double levelSpinToDb(double spinValue) {
+    return spinValue <= kLevelSpinMinDb ? NEG_INF_DB : spinValue;
+}
+
+double levelSpinValue(double dB) { return dB <= MIN_DB ? kLevelSpinMinDb : dB; }
+
+} // namespace
 
 EnsembleLibrary* CueEditor::ensembleLibrary() const {
     return (m_app && m_app->show()) ? m_app->show()->ensembleLibrary() : nullptr;
@@ -71,8 +87,7 @@ CueEditor::CueEditor(Application* app, QWidget* parent) : QWidget(parent), m_app
     }
     if (m_app) {
         connect(m_app, &Application::dcaCountChanged, this, &CueEditor::onDcaCountChanged);
-        connect(m_app, &Application::activeDcasChanged, this,
-                &CueEditor::applyActiveDcaVisibility);
+        connect(m_app, &Application::activeDcasChanged, this, &CueEditor::applyActiveDcaVisibility);
     }
     updateGangsUI();
 }
@@ -506,9 +521,9 @@ void CueEditor::updateFromCue() {
                                             : QString("%1 (%2)").arg(snippet).arg(name));
         }
         m_snippetsEdit->setText(snippetStrs.join(", "));
-        m_snippetsEdit->setToolTip(
-            snippetNamed.isEmpty() ? tr("Console snippets recalled when this cue fires")
-                                   : tr("Snippets: %1").arg(snippetNamed.join(", ")));
+        m_snippetsEdit->setToolTip(snippetNamed.isEmpty()
+                                       ? tr("Console snippets recalled when this cue fires")
+                                       : tr("Snippets: %1").arg(snippetNamed.join(", ")));
 
         // per-FX-unit mutes
         updateFxMutesUI();
@@ -828,12 +843,15 @@ void CueEditor::rebuildChannelTable() {
                 [this, ch](bool on) { onChannelLevelToggled(ch, on); });
         m_channelTable->setCellWidget(row, 3, setCheck);
 
-        auto* levelSpin = new QSpinBox(m_channelTable);
-        levelSpin->setRange(0, 100);
-        levelSpin->setSuffix(tr(" %"));
+        auto* levelSpin = new QDoubleSpinBox(m_channelTable);
+        levelSpin->setRange(kLevelSpinMinDb, MAX_DB);
+        levelSpin->setDecimals(1);
+        levelSpin->setSingleStep(0.5);
+        levelSpin->setSuffix(tr(" dB"));
+        levelSpin->setSpecialValueText(tr("-inf"));
         levelSpin->setEnabled(false);
         levelSpin->setProperty("channel", ch);
-        connect(levelSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
+        connect(levelSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
                 [this, ch]() { onChannelLevelChanged(ch); });
         m_channelTable->setCellWidget(row, 4, levelSpin);
 
@@ -861,7 +879,7 @@ void CueEditor::populateChannelTable() {
     for (int row = 0; row < m_channelTable->rowCount(); ++row) {
         auto* combo = qobject_cast<QComboBox*>(m_channelTable->cellWidget(row, 2));
         auto* check = qobject_cast<QCheckBox*>(m_channelTable->cellWidget(row, 3));
-        auto* spin = qobject_cast<QSpinBox*>(m_channelTable->cellWidget(row, 4));
+        auto* spin = qobject_cast<QDoubleSpinBox*>(m_channelTable->cellWidget(row, 4));
         if (!combo || !check || !spin)
             continue;
         const int ch = combo->property("channel").toInt();
@@ -872,8 +890,7 @@ void CueEditor::populateChannelTable() {
         const bool hasLevel = levels.contains(ch);
         check->setChecked(hasLevel);
         spin->setEnabled(hasLevel);
-        spin->setValue(hasLevel ? std::clamp(static_cast<int>(levels.value(ch) * 100.0 + 0.5), 0, 100)
-                                : 75);
+        spin->setValue(hasLevel ? levelSpinValue(levels.value(ch)) : 0.0);
 
         if (auto* posCombo = qobject_cast<QComboBox*>(m_channelTable->cellWidget(row, 5))) {
             const int posIdx = posCombo->findData(cue->channelPosition(ch));
@@ -978,9 +995,9 @@ void CueEditor::onChannelLevelToggled(int channel, bool on) {
     if (!cue || !m_channelTable)
         return;
 
-    QSpinBox* spin = nullptr;
+    QDoubleSpinBox* spin = nullptr;
     for (int row = 0; row < m_channelTable->rowCount(); ++row) {
-        auto* s = qobject_cast<QSpinBox*>(m_channelTable->cellWidget(row, 4));
+        auto* s = qobject_cast<QDoubleSpinBox*>(m_channelTable->cellWidget(row, 4));
         if (s && s->property("channel").toInt() == channel) {
             spin = s;
             break;
@@ -990,7 +1007,7 @@ void CueEditor::onChannelLevelToggled(int channel, bool on) {
         spin->setEnabled(on);
 
     if (on)
-        cue->setChannelLevel(channel, (spin ? spin->value() : 75) / 100.0);
+        cue->setChannelLevel(channel, spin ? levelSpinToDb(spin->value()) : 0.0);
     else
         cue->removeChannelLevel(channel);
 
@@ -1005,9 +1022,9 @@ void CueEditor::onChannelLevelChanged(int channel) {
     if (!cue || !m_channelTable)
         return;
 
-    QSpinBox* spin = nullptr;
+    QDoubleSpinBox* spin = nullptr;
     for (int row = 0; row < m_channelTable->rowCount(); ++row) {
-        auto* s = qobject_cast<QSpinBox*>(m_channelTable->cellWidget(row, 4));
+        auto* s = qobject_cast<QDoubleSpinBox*>(m_channelTable->cellWidget(row, 4));
         if (s && s->property("channel").toInt() == channel) {
             spin = s;
             break;
@@ -1016,7 +1033,7 @@ void CueEditor::onChannelLevelChanged(int channel) {
     if (!spin || !spin->isEnabled())
         return;
 
-    cue->setChannelLevel(channel, spin->value() / 100.0);
+    cue->setChannelLevel(channel, levelSpinToDb(spin->value()));
     m_app->show()->cueList()->updateCue(m_currentIndex, *cue);
     emit cueModified();
 }

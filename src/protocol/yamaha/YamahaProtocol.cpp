@@ -1,5 +1,6 @@
 #include "YamahaProtocol.h"
 #include "../../core/Cue.h"
+#include "../../core/LevelDb.h"
 #include <QStringList>
 #include <algorithm>
 #include <cmath>
@@ -38,12 +39,7 @@ YamahaProtocol::~YamahaProtocol() { disconnect(); }
 // --------------------------------------------------------------------------
 
 QByteArray YamahaProtocol::scpSet(const QString& address, int idx1, int idx2, int value) {
-    return QStringLiteral("set %1 %2 %3 %4\n")
-        .arg(address)
-        .arg(idx1)
-        .arg(idx2)
-        .arg(value)
-        .toUtf8();
+    return QStringLiteral("set %1 %2 %3 %4\n").arg(address).arg(idx1).arg(idx2).arg(value).toUtf8();
 }
 
 QByteArray YamahaProtocol::scpSet(const QString& address, int idx1, int idx2,
@@ -68,23 +64,13 @@ QByteArray YamahaProtocol::scpSceneRecall(int sceneNumber) {
 // Pure value scaling.
 // --------------------------------------------------------------------------
 
-int YamahaProtocol::faderLevelToScp(double level) {
-    if (level <= 0.0)
-        return FADER_NEG_INF; // -inf
-    if (level >= 1.0)
-        return FADER_MAX_CENTIDB; // +10 dB
-
-    // Two-segment, linear-in-dB approximation of the Yamaha fader law:
-    //   0.00 .. 0.75 -> -138 dB .. 0 dB   (throw up to unity)
-    //   0.75 .. 1.00 ->    0 dB .. +10 dB (top of throw)
-    // The real console taper is finer near unity; this is a documented approx.
-    double db;
-    if (level >= 0.75)
-        db = (level - 0.75) / 0.25 * 10.0;
-    else
-        db = (level / 0.75) * 138.0 - 138.0;
-
-    int centi = static_cast<int>(std::lround(db * 100.0));
+int YamahaProtocol::faderLevelToScp(double dB) {
+    // SCP carries levels in centi-dB, so a cue's dB needs no curve at all - only
+    // the console's own -inf sentinel and range
+    if (dB <= NEG_INF_DB) {
+        return FADER_NEG_INF;
+    }
+    const int centi = static_cast<int>(std::lround(dB * 100.0));
     return std::clamp(centi, FADER_MIN_CENTIDB, FADER_MAX_CENTIDB);
 }
 
@@ -165,7 +151,7 @@ QByteArray YamahaProtocol::buildChannelColor(int ch, int color) const {
 
 // public setters take a 1-based channel (MixerProtocol contract); the SCP
 // builders use the 0-based input-channel index.
-void YamahaProtocol::setChannelFader(int ch, double level) {
+void YamahaProtocol::setChannelFaderDb(int ch, double level) {
     sendCommand(buildChannelFader(ch - 1, level));
 }
 

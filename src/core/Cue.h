@@ -1,5 +1,7 @@
 #pragma once
 
+#include "LevelDb.h"
+
 #include "FadeCurve.h"
 #include <QJsonArray>
 #include <QJsonObject>
@@ -23,7 +25,9 @@ struct DCAOverride {
     std::optional<bool> mute;     // mute state override (nullopt = don't change)
     std::optional<QString> label; // label override (nullopt = don't change)
 
-    [[nodiscard]] bool hasOverrides() const noexcept { return mute.has_value() || label.has_value(); }
+    [[nodiscard]] bool hasOverrides() const noexcept {
+        return mute.has_value() || label.has_value();
+    }
 
     QJsonObject toJson() const;
     [[nodiscard]] static DCAOverride fromJson(const QJsonObject& json);
@@ -163,7 +167,9 @@ class Cue {
     // named-position assignments (channel# -> Position id; resolved at playback
     // against the show's PositionLibrary to pan/delay sends)
     [[nodiscard]] QMap<int, QString> channelPositions() const { return m_channelPositions; }
-    void setChannelPositions(const QMap<int, QString>& positions) { m_channelPositions = positions; }
+    void setChannelPositions(const QMap<int, QString>& positions) {
+        m_channelPositions = positions;
+    }
     void setChannelPosition(int channel, const QString& positionId);
     [[nodiscard]] QString channelPosition(int channel) const {
         return m_channelPositions.value(channel);
@@ -184,11 +190,23 @@ class Cue {
     void setChannelProfile(int channel, const QString& slot) { m_channelProfiles[channel] = slot; }
     void removeChannelProfile(int channel) { m_channelProfiles.remove(channel); }
 
-    // per-channel fader level override (channel -> 0..1)
+    // Per-channel fader level override, in dB (channel -> dB), as the console
+    // itself expresses levels. Storing dB rather than a 0..1 fader position keeps
+    // a cue meaning the same thing on every console: a position only becomes a
+    // level once a console-specific fader law is applied, so the same show file
+    // would otherwise play back at different levels per desk.
     [[nodiscard]] QMap<int, double> channelLevels() const { return m_channelLevels; }
     void setChannelLevels(const QMap<int, double>& levels) { m_channelLevels = levels; }
-    void setChannelLevel(int channel, double level) { m_channelLevels[channel] = level; }
+    void setChannelLevel(int channel, double dB) { m_channelLevels[channel] = dB; }
     void removeChannelLevel(int channel) { m_channelLevels.remove(channel); }
+
+    static constexpr double NEG_INF_DB = OpenMix::NEG_INF_DB;
+    static constexpr double MAX_DB = OpenMix::MAX_DB;
+
+    // A 0..1 fader position under the law OpenMix applied before cues stored dB:
+    // unity at 3/4 travel, +10 dB at the top, -60 dB at the bottom of the useful
+    // throw. Only used to read shows written before the change.
+    static double dbFromLegacyPosition(double position);
 
     // per-FX-unit mute state (fx unit index -> muted). Sent to the console on fire.
     [[nodiscard]] QMap<int, bool> fxMutes() const { return m_fxMutes; }
@@ -285,12 +303,12 @@ class Cue {
     QMap<int, QString> m_channelProfiles; // channel -> active profile slot id
     QMap<int, double> m_channelLevels;    // channel -> fader level override (0..1)
 
-    QMap<int, bool> m_fxMutes; // fx unit index -> muted
-    QList<int> m_snippets;     // console snippet indices recalled on fire
-    QList<int> m_scenes;       // console scene numbers recalled on fire
+    QMap<int, bool> m_fxMutes;   // fx unit index -> muted
+    QList<int> m_snippets;       // console snippet indices recalled on fire
+    QList<int> m_scenes;         // console scene numbers recalled on fire
     QMap<int, bool> m_channelFX; // channel -> fx active
-    QString m_color;          // display color (hex)
-    bool m_skip = false;       // skip during standby advance
+    QString m_color;             // display color (hex)
+    bool m_skip = false;         // skip during standby advance
 };
 
 } // namespace OpenMix

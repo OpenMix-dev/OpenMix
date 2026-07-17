@@ -43,7 +43,7 @@ class LoopbackProtocol : public MixerProtocol {
     void recallScene(int sceneNumber) override;
 
     // semantic channel setters; recorded as readable strings for testing
-    void setChannelFader(int channel, double level) override;
+    void setChannelFaderDb(int channel, double level) override;
     void setChannelMute(int channel, bool muted) override;
     void setChannelPreamp(int channel, double gainDb) override;
     void setChannelHpf(int channel, bool on, double freqHz) override;
@@ -54,7 +54,7 @@ class LoopbackProtocol : public MixerProtocol {
                             double releaseMs, double makeupDb) override;
 
     void setDcaMute(int dca, bool muted) override;
-    void setDcaFader(int dca, double level) override;
+    void setDcaFaderDb(int dca, double level) override;
     void setDcaName(int dca, const QString& name) override;
     void setChannelDcaMask(int channel, quint32 mask) override;
     void setBusDcaMask(int bus, quint32 mask) override;

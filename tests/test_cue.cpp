@@ -252,6 +252,41 @@ class TestCue : public QObject {
         QCOMPARE(target.color(), QString("#ff0000"));
     }
 
+    void channelLevels_roundTripAsDb() {
+        Cue cue(1.0, "Levels");
+        cue.setChannelLevel(1, 0.0);             // unity
+        cue.setChannelLevel(2, -12.5);           // a real trim
+        cue.setChannelLevel(3, Cue::NEG_INF_DB); // fader down
+
+        const Cue back = Cue::fromJson(cue.toJson());
+        QCOMPARE(back.channelLevels().value(1), 0.0);
+        QCOMPARE(back.channelLevels().value(2), -12.5);
+        QCOMPARE(back.channelLevels().value(3), Cue::NEG_INF_DB);
+    }
+
+    void channelLevels_legacyPositionsBecomeDb() {
+        // shows written before levels moved to dB carry 0..1 positions under the
+        // old key, and must still load
+        QJsonObject json;
+        json["number"] = 1.0;
+        json["type"] = "snapshot";
+        QJsonObject legacy;
+        legacy["1"] = 0.75; // unity under the old law
+        legacy["2"] = 1.0;  // top of throw
+        legacy["3"] = 0.0;  // fully down
+        json["channelLevels"] = legacy;
+
+        const Cue cue = Cue::fromJson(json);
+        QCOMPARE(cue.channelLevels().value(1), 0.0);
+        QCOMPARE(cue.channelLevels().value(2), Cue::MAX_DB);
+        QCOMPARE(cue.channelLevels().value(3), Cue::NEG_INF_DB);
+
+        // and a re-save writes dB under the new key, not positions under the old
+        const QJsonObject saved = cue.toJson();
+        QVERIFY(saved.contains("channelLevelsDb"));
+        QVERIFY(!saved.contains("channelLevels"));
+    }
+
     void testSwapContentKeepsIdentity() {
         Cue a(1.0, "A");
         a.setColor("#111111");

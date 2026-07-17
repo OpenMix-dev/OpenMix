@@ -14,6 +14,9 @@
 
 namespace OpenMix {
 
+// below this the strip reads as off, matching the console's own throw
+static constexpr double kStripFloorDb = -60.0;
+
 DCAWidget::DCAWidget(int dcaNumber, QWidget* parent) : QWidget(parent), m_dcaNumber(dcaNumber) {
     setupUi();
 }
@@ -70,10 +73,23 @@ void DCAWidget::setupUi() {
     updateDisplay();
 }
 
-void DCAWidget::setLevel(float level) {
-    m_level = std::clamp(level, 0.0f, 1.0f);
-    m_faderSlider->setValue(static_cast<int>(m_level * 1000));
+void DCAWidget::setLevelDb(float dB) {
+    m_levelDb = dB <= MIN_DB
+                    ? static_cast<float>(NEG_INF_DB)
+                    : std::clamp(dB, static_cast<float>(MIN_DB), static_cast<float>(MAX_DB));
+    m_faderSlider->setValue(sliderPosition(m_levelDb));
     updateDisplay();
+}
+
+// where a level sits on the strip: a fader scale is a display choice, so unity
+// sits at 3/4 of the throw the way it does on a console
+int DCAWidget::sliderPosition(float dB) {
+    if (dB <= kStripFloorDb) {
+        return 0;
+    }
+    const double travel =
+        dB <= 0.0 ? (dB - kStripFloorDb) / -kStripFloorDb * 0.75 : 0.75 + (dB / MAX_DB) * 0.25;
+    return static_cast<int>(std::clamp(travel, 0.0, 1.0) * 1000);
 }
 
 void DCAWidget::setMuted(bool muted) {
@@ -179,7 +195,7 @@ void DCAWidget::setEditMode(bool editMode) {
     if (m_editMode != editMode) {
         m_editMode = editMode;
         if (editMode) {
-            m_originalLevel = m_level;
+            m_originalLevelDb = m_levelDb;
         }
         update();
     }
@@ -193,7 +209,7 @@ void DCAWidget::setPreviewMode(bool preview) {
 }
 
 void DCAWidget::setOriginalLevel(float level) {
-    m_originalLevel = std::clamp(level, 0.0f, 1.0f);
+    m_originalLevelDb = std::clamp(level, 0.0f, 1.0f);
     update();
 }
 
@@ -201,31 +217,15 @@ QSize DCAWidget::sizeHint() const { return QSize(56, 184); }
 
 QSize DCAWidget::minimumSizeHint() const { return QSize(40, 120); }
 
-QString DCAWidget::levelToDb(float level) const {
-    if (level <= 0.0f) {
+QString DCAWidget::levelText(float dB) const {
+    if (dB <= kStripFloorDb) {
         return "-inf";
     }
-
-    // x32 fader curve approximation
-    // 0.0 = -inf, 0.75 = 0dB, 1.0 = +10dB
-    double db;
-    if (level <= 0.75f) {
-        // -90dB to 0dB range
-        db = (level / 0.75f) * 90.0 - 90.0;
-    } else {
-        // 0dB to +10dB range
-        db = ((level - 0.75f) / 0.25f) * 10.0;
-    }
-
-    if (db <= -60.0) {
-        return "-inf";
-    }
-
-    return QString("%1").arg(db, 0, 'f', 1);
+    return QString("%1").arg(dB, 0, 'f', 1);
 }
 
 void DCAWidget::updateDisplay() {
-    m_levelLabel->setText(levelToDb(m_level) + " dB");
+    m_levelLabel->setText(levelText(m_levelDb) + " dB");
 
     // muted = red, unmuted = the shared inert look (not force-unmute green)
     m_muteButton->setStyleSheet(
@@ -247,7 +247,7 @@ void DCAWidget::paintEvent(QPaintEvent* event) {
         painter.drawRect(rect().adjusted(1, 1, -1, -1));
 
         // draw original level indicator if level differs
-        if (qAbs(m_level - m_originalLevel) > 0.01f && m_faderSlider) {
+        if (qAbs(m_levelDb - m_originalLevelDb) > 0.01f && m_faderSlider) {
             int sliderY = m_faderSlider->y();
             int sliderHeight = m_faderSlider->height();
             int sliderX = m_faderSlider->x();
@@ -255,7 +255,7 @@ void DCAWidget::paintEvent(QPaintEvent* event) {
 
             // calculate pos for original level marker
             int originalY =
-                sliderY + sliderHeight - static_cast<int>(m_originalLevel * sliderHeight);
+                sliderY + sliderHeight - static_cast<int>(m_originalLevelDb * sliderHeight);
 
             painter.setPen(QPen(Theme::color(Theme::Colors::AccentRed), 2));
             painter.drawLine(sliderX - 4, originalY, sliderX + sliderWidth + 4, originalY);

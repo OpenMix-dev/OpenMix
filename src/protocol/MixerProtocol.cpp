@@ -10,7 +10,7 @@ const MixerCapabilities& MixerProtocol::capabilities() const {
 
 // default no-op implementations of the semantic channel setters; drivers that
 // support direct channel control override the ones they can encode.
-void MixerProtocol::setChannelFader(int, double) {}
+void MixerProtocol::setChannelFaderDb(int, double) {}
 void MixerProtocol::setChannelMute(int, bool) {}
 void MixerProtocol::setChannelPreamp(int, double) {}
 void MixerProtocol::setChannelHpf(int, bool, double) {}
@@ -23,7 +23,7 @@ void MixerProtocol::setChannelColor(int, int) {}
 void MixerProtocol::setDcaMute(int dca, bool muted) {
     sendParameter(QStringLiteral("/dca/%1/mute").arg(dca), muted ? 1 : 0);
 }
-void MixerProtocol::setDcaFader(int dca, double level) {
+void MixerProtocol::setDcaFaderDb(int dca, double level) {
     sendParameter(QStringLiteral("/dca/%1/fader").arg(dca), level);
 }
 void MixerProtocol::setDcaName(int dca, const QString& name) {

@@ -91,7 +91,7 @@ class YamahaProtocol : public MixerProtocol {
 
     // --- semantic input-channel setters. channel is 1-based (MixerProtocol
     //     contract); converted to the 0-based SCP index internally. ---
-    void setChannelFader(int ch, double level) override; // level normalized 0..1
+    void setChannelFaderDb(int ch, double dB) override;
     void setChannelMute(int ch, bool muted) override;
     void setChannelPreamp(int ch, double gainDb) override;
     void setChannelHpf(int ch, bool on, double freqHz) override;
@@ -113,7 +113,7 @@ class YamahaProtocol : public MixerProtocol {
     [[nodiscard]] static QByteArray scpSceneRecall(int sceneNumber);
 
     // --- pure value scaling helpers. ---
-    [[nodiscard]] static int faderLevelToScp(double level0to1); // 0..1 -> centi-dB taper
+    [[nodiscard]] static int faderLevelToScp(double dB); // dB -> centi-dB, clamped
     [[nodiscard]] static int dbToCentiDb(double db);            // dB    -> centi-dB
     [[nodiscard]] static int hzToScpFreq(double hz);            // Hz    -> SCP freq (Hz * 10)
     [[nodiscard]] static int qToScp(double q);                  // Q     -> SCP Q   (Q * 1000)
