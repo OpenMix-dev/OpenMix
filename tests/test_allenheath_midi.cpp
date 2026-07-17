@@ -153,6 +153,19 @@ class TestAllenHeathMidi : public QObject {
         QCOMPARE(SqProbe::encodeAudioTaper(SqProbe::negInfDb()), quint16(0));
     }
 
+    void faderLaw_reachesTheWire() {
+        // the setting exists so an operator can match the desk; prove it changes
+        // the bytes a fader move puts on the wire, not just an internal flag
+        SqProbe probe(MixerCapabilities::forConsole(ConsoleType::Loopback));
+        probe.setFaderLaw(SqProbe::FaderLaw::LinearTaper);
+        const quint16 lin = probe.encodeLevel14(0.0);
+        probe.setFaderLaw(SqProbe::FaderLaw::AudioTaper);
+        const quint16 aud = probe.encodeLevel14(0.0);
+        QVERIFY(lin != aud);
+        QCOMPARE(lin, quint16((0x76 << 7) | 0x5C)); // doc p20 linear 0 dB
+        QCOMPARE(aud, quint16(0x62 << 7));          // doc p20 audio 0 dB
+    }
+
     void faderLaw_selectsTheCurve() {
         SqProbe probe(MixerCapabilities::forConsole(ConsoleType::Loopback));
         // linear is the console's standard mode, so it is the default

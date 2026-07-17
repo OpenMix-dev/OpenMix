@@ -100,6 +100,16 @@ void ConnectionPanel::setupUi() {
     m_portEdit->setPlaceholderText(tr("10023")); // default X32 port
     formLayout->addRow(m_portLabel, m_portEdit);
 
+    // the console applies one of two curves to NRPN levels and cannot report
+    // which; the desk and the show have to be told the same thing
+    m_faderLawLabel = new QLabel(tr("NRPN Fader Law:"), this);
+    m_faderLawCombo = new QComboBox(this);
+    m_faderLawCombo->addItem(tr("Linear Taper"), "linear");
+    m_faderLawCombo->addItem(tr("Audio Taper"), "audio");
+    m_faderLawCombo->setToolTip(
+        tr("Must match the console: Utility > General > MIDI > NRPN Fader Law."));
+    formLayout->addRow(m_faderLawLabel, m_faderLawCombo);
+
     m_loopbackLabel = new QLabel(tr("No hardware connection required."), this);
     m_loopbackLabel->setStyleSheet("color: gray; font-style: italic;");
     m_loopbackLabel->setVisible(false);
@@ -350,6 +360,10 @@ void ConnectionPanel::onProtocolTypeChanged(int index) {
     m_portEdit->setVisible(!isLoopback);
     m_loopbackLabel->setVisible(isLoopback);
 
+    const bool hasFaderLaw = type.startsWith("sq");
+    m_faderLawLabel->setVisible(hasFaderLaw);
+    m_faderLawCombo->setVisible(hasFaderLaw);
+
     if (!isLoopback) {
         m_portEdit->setText(QString::number(caps.defaultPort));
     }
@@ -429,6 +443,9 @@ void ConnectionPanel::loadFromConfig() {
 
     m_hostEdit->setText(config.host);
     m_portEdit->setText(QString::number(config.port));
+
+    const int lawIdx = m_faderLawCombo->findData(config.faderLaw);
+    m_faderLawCombo->setCurrentIndex(lawIdx < 0 ? 0 : lawIdx);
 }
 
 void ConnectionPanel::saveToConfig() {
@@ -437,6 +454,7 @@ void ConnectionPanel::saveToConfig() {
     config.host = m_hostEdit->text().trimmed();
     config.port = m_portEdit->text().toInt();
     config.dcaCount = MixerCapabilities::forProtocolId(config.type).dcaCount;
+    config.faderLaw = m_faderLawCombo->currentData().toString();
     m_app->show()->setMixerConfig(config);
 }
 

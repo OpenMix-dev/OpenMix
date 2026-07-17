@@ -59,6 +59,24 @@ class TestShow : public QObject {
         QCOMPARE(spy.count(), 1);
     }
 
+    void mixerConfig_faderLawRoundTrips() {
+        // the console cannot report its NRPN Fader Law, so the show has to carry it
+        MixerConfig config;
+        config.type = "sq7";
+        config.host = "192.168.1.70";
+        config.faderLaw = "audio";
+
+        const MixerConfig back = MixerConfig::fromJson(config.toJson());
+        QCOMPARE(back.faderLaw, QString("audio"));
+        QVERIFY(back == config);
+
+        // shows written before the setting existed default to the console's
+        // standard mode rather than to nothing
+        QJsonObject legacy;
+        legacy["type"] = "sq7";
+        QCOMPARE(MixerConfig::fromJson(legacy).faderLaw, QString("linear"));
+    }
+
     void setMixerConfig_identicalConfig_isNoOp() {
         Show show;
         MixerConfig config = show.mixerConfig();

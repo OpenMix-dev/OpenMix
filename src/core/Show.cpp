@@ -11,6 +11,7 @@ QJsonObject MixerConfig::toJson() const {
     json["host"] = host;
     json["port"] = port;
     json["dcaCount"] = dcaCount;
+    json["faderLaw"] = faderLaw;
     return json;
 }
 
@@ -20,12 +21,13 @@ MixerConfig MixerConfig::fromJson(const QJsonObject& json) {
     config.host = json["host"].toString();
     config.port = json["port"].toInt(10023);
     config.dcaCount = json["dcaCount"].toInt(8);
+    config.faderLaw = json["faderLaw"].toString("linear");
     return config;
 }
 
 bool MixerConfig::operator==(const MixerConfig& other) const {
     return type == other.type && host == other.host && port == other.port &&
-           dcaCount == other.dcaCount;
+           dcaCount == other.dcaCount && faderLaw == other.faderLaw;
 }
 
 Show::Show(QObject* parent)

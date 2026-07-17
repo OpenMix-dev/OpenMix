@@ -1,8 +1,8 @@
 #pragma once
 
 #include "ActorProfileLibrary.h"
-#include "CueList.h"
 #include "ConsoleNameCache.h"
+#include "CueList.h"
 #include "CueZero.h"
 #include "DCAMapping.h"
 #include "Ensemble.h"
@@ -24,10 +24,16 @@ struct MixerConfig {
     static constexpr int DEFAULT_PORT = 10023;
     static constexpr int DEFAULT_DCA_COUNT = 8;
 
-    QString type;     // protocol ID: "x32", "wing", "sq7", "cl5", etc.
-    QString host;     // IP address or hostname
+    QString type; // protocol ID: "x32", "wing", "sq7", "cl5", etc.
+    QString host; // IP address or hostname
     int port = DEFAULT_PORT;
     int dcaCount = DEFAULT_DCA_COUNT;
+
+    // Which curve an SQ maps NRPN levels through. It is a console-side setting
+    // (Utility > General > MIDI > NRPN Fader Law) that cannot be read back, so
+    // the desk and the show have to agree: "linear" (the console's standard
+    // mode) or "audio". Ignored by consoles without the setting.
+    QString faderLaw = "linear";
 
     [[nodiscard]] bool operator==(const MixerConfig& other) const;
     [[nodiscard]] bool operator!=(const MixerConfig& other) const { return !(*this == other); }
@@ -46,13 +52,22 @@ class Show : public QObject {
     void setName(const QString& name);
 
     [[nodiscard]] QString author() const { return m_author; }
-    void setAuthor(const QString& author) { m_author = author; checkModifiedState(); }
+    void setAuthor(const QString& author) {
+        m_author = author;
+        checkModifiedState();
+    }
 
     [[nodiscard]] QString designer() const { return m_designer; }
-    void setDesigner(const QString& designer) { m_designer = designer; checkModifiedState(); }
+    void setDesigner(const QString& designer) {
+        m_designer = designer;
+        checkModifiedState();
+    }
 
     [[nodiscard]] QString notes() const { return m_notes; }
-    void setNotes(const QString& notes) { m_notes = notes; checkModifiedState(); }
+    void setNotes(const QString& notes) {
+        m_notes = notes;
+        checkModifiedState();
+    }
 
     [[nodiscard]] QString filePath() const { return m_filePath; }
     void setFilePath(const QString& path) { m_filePath = path; }
@@ -111,13 +126,25 @@ class Show : public QObject {
     // DCA-apply behavior via PlaybackEngine; selectOnSpill and suppressBackupSwitch
     // are stored preferences the app reads.
     [[nodiscard]] bool dimDcaFaders() const noexcept { return m_dimDcaFaders; }
-    void setDimDcaFaders(bool on) { m_dimDcaFaders = on; checkModifiedState(); }
+    void setDimDcaFaders(bool on) {
+        m_dimDcaFaders = on;
+        checkModifiedState();
+    }
     [[nodiscard]] bool selectOnSpill() const noexcept { return m_selectOnSpill; }
-    void setSelectOnSpill(bool on) { m_selectOnSpill = on; checkModifiedState(); }
+    void setSelectOnSpill(bool on) {
+        m_selectOnSpill = on;
+        checkModifiedState();
+    }
     [[nodiscard]] bool muteDcaUnassign() const noexcept { return m_muteDcaUnassign; }
-    void setMuteDcaUnassign(bool on) { m_muteDcaUnassign = on; checkModifiedState(); }
+    void setMuteDcaUnassign(bool on) {
+        m_muteDcaUnassign = on;
+        checkModifiedState();
+    }
     [[nodiscard]] bool suppressBackupSwitch() const noexcept { return m_suppressBackupSwitch; }
-    void setSuppressBackupSwitch(bool on) { m_suppressBackupSwitch = on; checkModifiedState(); }
+    void setSuppressBackupSwitch(bool on) {
+        m_suppressBackupSwitch = on;
+        checkModifiedState();
+    }
 
     // DCAs OpenMix does not control: hidden from the cue list, greyed in the
     // mapping panel, and never written to on the console during playback.
@@ -154,7 +181,7 @@ class Show : public QObject {
     QString m_filePath;
     CueList m_cueList;
     MixerConfig m_mixerConfig;
-    QList<QPair<int, int>> m_channelGangs;         // ganged input-channel pairs
+    QList<QPair<int, int>> m_channelGangs;            // ganged input-channel pairs
     QList<QPair<QString, QString>> m_channelGangMeta; // per-gang (name, color), by index
 
     bool m_dimDcaFaders = false;

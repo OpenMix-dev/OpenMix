@@ -27,6 +27,7 @@
 #include "midi/MidiInputManager.h"
 #include "protocol/MixerProtocol.h"
 #include "protocol/ProtocolFactory.h"
+#include "protocol/allenheath/AllenHeathMidiProtocol.h"
 #include "protocol/allenheath/AllenHeathTcpProtocol.h"
 #include "protocol/discovery/ConsoleDiscoveryService.h"
 #include "protocol/discovery/DiscoveredConsole.h"
@@ -373,6 +374,14 @@ void Application::connectToMixer(const QString& type, const QString& host, int p
     m_mixer = ProtocolFactory::create(type, this);
     if (!m_mixer)
         return;
+
+    // the console cannot report which fader law it is in, so hand the driver the
+    // one the show says the desk is set to
+    if (auto* midi = dynamic_cast<AllenHeathMidiProtocol*>(m_mixer)) {
+        midi->setFaderLaw(m_show->mixerConfig().faderLaw == "audio"
+                              ? AllenHeathMidiProtocol::FaderLaw::AudioTaper
+                              : AllenHeathMidiProtocol::FaderLaw::LinearTaper);
+    }
 
     setupMixerConnection(type, host, port);
 }
