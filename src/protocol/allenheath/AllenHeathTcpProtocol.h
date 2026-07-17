@@ -19,10 +19,10 @@ namespace OpenMix {
 // and scene recall (the DCA *fader* plane is receive-only, as in the reference).
 // Byte layouts recovered from the reference AvantisDriver/DLiveDriver.
 //
-// A session needs two sockets. The client advertises its UDP local port
+// A session needs two sockets: the client advertises its UDP local port
 // (E0 00 04 01 03 <port:2> E7), the console answers with its own
 // (E0 00 04 02 03 <port:2> E7), and only then does the subscribe chain start.
-// Metering arrives on the UDP socket and the keep-alive goes back out over it.
+// Metering arrives on that UDP socket and the keep-alive goes back out over it.
 class AllenHeathTcpProtocol : public MixerProtocol {
     Q_OBJECT
 
@@ -123,8 +123,7 @@ class AllenHeathTcpProtocol : public MixerProtocol {
     // A meter datagram carries one 8-byte record per channel, in channel order;
     // only the record's first byte is a level. 0 is -inf and 0xFE/0xFF mark a
     // channel the console is not metering, so both read as silence. The byte's dB
-    // curve is unknown: it is passed through as a monotonic 0..1 position, not a
-    // calibrated level.
+    // curve is unknown, so it passes through as a monotonic position.
     static constexpr int METER_RECORD_SIZE = 8;
     static constexpr int METER_CHANNELS = 128;
     static constexpr quint8 METER_INVALID = 0xFE;

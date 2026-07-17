@@ -4,12 +4,10 @@
 
 namespace OpenMix {
 
-// Allen & Heath GLD series (GLD-80, GLD-112), MIDI over TCP 51325.
-//
-// Verified against the GLD MIDI and TCP/IP Protocol V1.4. GLD sits between SQ
-// and Qu: like Qu it puts the channel in the NRPN MSB and mutes with Note On,
-// but its fader NRPN carries no data-entry LSB, and its level table is its own
-// (0 dB = 0x6B, where Qu's is 0x62). Names and colours are SysEx, not NRPN.
+// Allen & Heath GLD series (GLD-80, GLD-112), MIDI over TCP 51325, per the GLD
+// MIDI and TCP/IP Protocol V1.4. Like Qu, the channel goes in the NRPN MSB and
+// mutes are Note On, but the fader NRPN carries no data-entry LSB and the level
+// table is GLD's own. Names and colours are SysEx.
 //
 // The console's MIDI channel (Setup / Control) has to match the one used here:
 // it appears in every message and cannot be read back.
@@ -41,11 +39,10 @@ class GLDProtocol : public AllenHeathMidiProtocol {
     // NRPN parameter ids
     static constexpr int ID_FADER = 0x17;
 
-    // the console's colour palette, in its own order
     static constexpr int COLOUR_OFF = 0x00;
     static constexpr int COLOUR_MAX = 0x07;
 
-    // names longer than this are the console's to reject, not ours to send
+    // the console takes 8 characters and shows 5 of them on the strip
     static constexpr int MAX_NAME_LENGTH = 8;
 
     QByteArray buildFader(int channelId, double dB) const;

@@ -5,14 +5,13 @@
 
 namespace OpenMix {
 
-// Allen & Heath Qu series (Qu-16, Qu-24, Qu-32) protocol, MIDI over TCP 51325.
-// All Qu models run the same 32-channel DSP, differing only in fader count.
+// Allen & Heath Qu series (Qu-16, Qu-24, Qu-32), MIDI over TCP 51325, per the Qu
+// Mixer MIDI Protocol V1.9+. All Qu models run the same 32-channel DSP, differing
+// only in fader count.
 //
-// Qu is not SQ with different numbers: the two NRPN halves are swapped. Qu puts
-// the channel in the MSB and the parameter id in the LSB (BN 63 CH, BN 62 ID,
-// BN 06 VA, BN 26 VX), levels are 7-bit, and mutes are Note On/Off rather than an
-// NRPN. Verified against the Qu Mixer MIDI Protocol V1.9+ (Oct 2021), which
-// covers Qu-16/24/32 alongside Qu-Pac and Qu-SB.
+// Qu is not SQ with different numbers: the NRPN halves are swapped. Qu puts the
+// channel in the MSB and the parameter id in the LSB (BN 63 CH, BN 62 ID,
+// BN 06 VA, BN 26 VX), levels are 7-bit, and mutes are Note On/Off.
 class QuProtocol : public AllenHeathMidiProtocol {
     Q_OBJECT
 

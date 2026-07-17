@@ -265,13 +265,13 @@ class TestCue : public QObject {
     }
 
     void channelLevels_legacyPositionsBecomeDb() {
-        // shows written before levels moved to dB carry 0..1 positions under the
-        // old key, and must still load
+        // shows that store 0..1 positions carry them under the old key, and must
+        // still load
         QJsonObject json;
         json["number"] = 1.0;
         json["type"] = "snapshot";
         QJsonObject legacy;
-        legacy["1"] = 0.75; // unity under the old law
+        legacy["1"] = 0.75; // unity under the position law
         legacy["2"] = 1.0;  // top of throw
         legacy["3"] = 0.0;  // fully down
         json["channelLevels"] = legacy;

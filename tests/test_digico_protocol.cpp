@@ -4,11 +4,9 @@
 
 using namespace OpenMix;
 
-// DiGiCo publishes no OSC address map: Generic OSC is user-defined, and the
-// syntax varies by model and software version. The driver therefore sends the
-// operator's patterns and nothing else, so what is worth testing is that a
-// pattern is expanded exactly as given and that a missing one sends nothing at
-// all - a guessed address would look like it worked and do nothing on the desk.
+// The driver sends the operator's OSC patterns and nothing else, so what is worth
+// testing is that a pattern expands exactly as given and that a missing one sends
+// nothing at all.
 class TestDiGiCoProtocol : public QObject {
     Q_OBJECT
 
@@ -56,8 +54,7 @@ class TestDiGiCoProtocol : public QObject {
 
     void capabilities_areGenericOsc() {
         // Generic OSC is UDP, and the port is whatever the operator paired; 9000
-        // is only the common default. It is not Allen & Heath's 51321, which this
-        // driver used to point at while speaking Yamaha's protocol.
+        // is only the common default.
         const auto caps = MixerCapabilities::forConsole(ConsoleType::SD12);
         QCOMPARE(caps.protocol, ProtocolType::OscUdp);
         QCOMPARE(caps.defaultPort, 9000);

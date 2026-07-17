@@ -79,11 +79,9 @@ class AllenHeathMidiProtocol : public MixerProtocol {
     void setChannelFaderDb(int channel, double dB) override;
     void setChannelMute(int channel, bool muted) override;
 
-    // Which curve the console maps NRPN levels through. This is a console-side
-    // setting (Utility > General > MIDI > NRPN Fader Law) that cannot be read back
-    // over MIDI, so the app has to be told which one the desk is in; a mismatch
-    // still moves the fader, just to the wrong dB. Linear Taper is the console's
-    // standard mode.
+    // Which curve the console maps NRPN levels through, set at Utility > General >
+    // MIDI > NRPN Fader Law and not readable over MIDI, so it has to be told: a
+    // mismatch still moves the fader, just to the wrong dB. Linear is standard.
     enum class FaderLaw { LinearTaper, AudioTaper };
     void setFaderLaw(FaderLaw law) { m_faderLaw = law; }
     [[nodiscard]] FaderLaw faderLaw() const { return m_faderLaw; }

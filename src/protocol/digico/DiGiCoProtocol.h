@@ -10,16 +10,11 @@ namespace OpenMix {
 
 // DiGiCo SD / Quantum series, over the console's Generic OSC.
 //
-// DiGiCo publishes no OSC address map. Generic OSC is user-defined by design:
-// the operator writes the messages on the console, "*" stands for the channel
-// number, and the syntax varies by console model and software version - DiGiCo
-// hands out command sets through its support desk rather than a spec. Inbound
-// OSC only does anything when External Control is enabled on the desk.
-//
-// So this driver is a template: it sends what the operator says their console
-// listens for, and nothing at all for an operation they have not given a pattern
-// for. Guessing an address here would look like it worked and silently do
-// nothing on the desk.
+// DiGiCo publishes no address map: Generic OSC is user-defined, the syntax varies
+// by model and software version, and the console only acts on it with External
+// Control enabled. So the driver is a template - it sends the operator's patterns
+// and nothing for an operation they left blank, since a guessed address would
+// look like it worked here and do nothing on the desk.
 class DiGiCoProtocol : public MixerProtocol {
     Q_OBJECT
 

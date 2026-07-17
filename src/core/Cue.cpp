@@ -582,10 +582,9 @@ Cue Cue::fromJson(const QJsonObject& json) {
         }
     }
 
-    // per-channel level overrides. Shows written before levels moved to dB carry
-    // 0..1 positions under the old key; convert them through the law that was in
-    // force then, which is the best that can be done - what a position meant in dB
-    // depended on the console it was played back on.
+    // per-channel level overrides. Shows that store 0..1 positions carry them
+    // under the old key; converting them is the best that can be done, since what
+    // a position meant in dB depended on the console it played back on.
     if (json.contains("channelLevelsDb")) {
         const QJsonObject levelsObj = json["channelLevelsDb"].toObject();
         for (auto it = levelsObj.constBegin(); it != levelsObj.constEnd(); ++it) {

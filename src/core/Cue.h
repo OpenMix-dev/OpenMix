@@ -190,11 +190,8 @@ class Cue {
     void setChannelProfile(int channel, const QString& slot) { m_channelProfiles[channel] = slot; }
     void removeChannelProfile(int channel) { m_channelProfiles.remove(channel); }
 
-    // Per-channel fader level override, in dB (channel -> dB), as the console
-    // itself expresses levels. Storing dB rather than a 0..1 fader position keeps
-    // a cue meaning the same thing on every console: a position only becomes a
-    // level once a console-specific fader law is applied, so the same show file
-    // would otherwise play back at different levels per desk.
+    // per-channel fader level override in dB, so a cue means the same thing on
+    // every console (see LevelDb.h)
     [[nodiscard]] QMap<int, double> channelLevels() const { return m_channelLevels; }
     void setChannelLevels(const QMap<int, double>& levels) { m_channelLevels = levels; }
     void setChannelLevel(int channel, double dB) { m_channelLevels[channel] = dB; }
@@ -203,9 +200,9 @@ class Cue {
     static constexpr double NEG_INF_DB = OpenMix::NEG_INF_DB;
     static constexpr double MAX_DB = OpenMix::MAX_DB;
 
-    // A 0..1 fader position under the law OpenMix applied before cues stored dB:
-    // unity at 3/4 travel, +10 dB at the top, -60 dB at the bottom of the useful
-    // throw. Only used to read shows written before the change.
+    // The law behind a 0..1 fader position: unity at 3/4 travel, +10 dB at the
+    // top, -60 dB at the bottom of the useful throw. Reads shows that store
+    // positions rather than dB.
     static double dbFromLegacyPosition(double position);
 
     // per-FX-unit mute state (fx unit index -> muted). Sent to the console on fire.

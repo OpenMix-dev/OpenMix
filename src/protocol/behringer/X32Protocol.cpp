@@ -25,9 +25,8 @@ QString x32Bus(int bus) { return QString("/bus/%1").arg(bus, 2, 10, QChar('0'));
 
 float clampUnit(double v) { return static_cast<float>(std::clamp(v, 0.0, 1.0)); }
 
-// X32 faders are the one wire format in OpenMix that is a position rather than a
-// level: the console takes a 0..1 float and applies its own piecewise law. The
-// segments are the published law (X32 OSC Remote Protocol, "level(float)"):
+// X32 faders are a position, not a level: the console takes a 0..1 float and
+// applies its own piecewise law (X32 OSC Remote Protocol, "level(float)"):
 //   0..0.0625 = -oo/-90..-60 dB, 0.0625..0.25 = -60..-30,
 //   0.25..0.5 = -30..-10,        0.5..1.0     = -10..+10.
 float x32FaderFromDb(double dB) {

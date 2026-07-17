@@ -9,10 +9,9 @@ using namespace OpenMix;
 
 namespace {
 
-// Stands in for a dLive MixRack's ACE control socket, replaying the reference's
-// side of the session: stay silent until the client advertises its UDP port with
-// E0 00 04 01 03 <port:2> E7, answer with our own port, then hand back a 2-byte
-// handle per subscribe (one at a time, as the console does).
+// Stands in for a dLive MixRack's ACE control socket: silent until the client
+// advertises its UDP port with E0 00 04 01 03 <port:2> E7, then answers with its
+// own and hands back one 2-byte handle per subscribe.
 class StubMixRack : public QObject {
     Q_OBJECT
 

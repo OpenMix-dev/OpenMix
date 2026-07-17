@@ -129,9 +129,8 @@ class X32Protocol : public MixerProtocol {
     ConnectionState m_connectionState = ConnectionState::Disconnected;
     QString m_statusMessage;
 
-    // The console stops sending updates ~10 s after the last /xremote, so renew at
-    // 4.5 s (as the reference does): a single dropped renew still leaves a further
-    // one inside the window, where an 8 s period would not.
+    // the console stops sending updates ~10 s after the last /xremote, so renew
+    // often enough that a dropped one still leaves another inside the window
     QTimer m_keepAliveTimer;
     static constexpr int KEEPALIVE_INTERVAL = 4500;
 
