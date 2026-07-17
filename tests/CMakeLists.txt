@@ -301,7 +301,7 @@ add_test(NAME DeletePlayingCueTest COMMAND test_delete_playing_cue)
 add_executable(test_digico_protocol
     test_digico_protocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/digico/DiGiCoProtocol.cpp
-    ${CMAKE_SOURCE_DIR}/src/protocol/transport/TcpTransport.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/transport/OscTransport.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
@@ -312,6 +312,7 @@ target_link_libraries(test_digico_protocol PRIVATE
     Qt6::Core
     Qt6::Network
     Qt6::Test
+    openmix_liblo
 )
 target_include_directories(test_digico_protocol PRIVATE
     ${CMAKE_SOURCE_DIR}/src

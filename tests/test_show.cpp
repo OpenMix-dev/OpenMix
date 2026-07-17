@@ -77,6 +77,25 @@ class TestShow : public QObject {
         QCOMPARE(MixerConfig::fromJson(legacy).faderLaw, QString("linear"));
     }
 
+    void mixerConfig_oscTemplatesRoundTrip() {
+        // DiGiCo's OSC addresses are the operator's to supply, so the show carries
+        // them; a show that has never been configured carries none
+        MixerConfig config;
+        config.type = "sd12";
+        config.oscChannelFader = "/ch/*/fader";
+        config.oscSceneRecall = "/snapshot/fire";
+
+        const MixerConfig back = MixerConfig::fromJson(config.toJson());
+        QCOMPARE(back.oscChannelFader, QString("/ch/*/fader"));
+        QCOMPARE(back.oscSceneRecall, QString("/snapshot/fire"));
+        QVERIFY(back.oscChannelMute.isEmpty());
+        QVERIFY(back == config);
+
+        QJsonObject legacy;
+        legacy["type"] = "sd12";
+        QVERIFY(MixerConfig::fromJson(legacy).oscChannelFader.isEmpty());
+    }
+
     void setMixerConfig_identicalConfig_isNoOp() {
         Show show;
         MixerConfig config = show.mixerConfig();

@@ -39,6 +39,16 @@ struct MixerConfig {
     // has to match Setup / Control on the console. 1-16.
     int midiChannel = 1;
 
+    // DiGiCo publishes no OSC address map: its Generic OSC is user-defined by
+    // design, and the syntax varies by model and software version. So the
+    // operator supplies the patterns their desk speaks rather than us guessing.
+    // "*" stands for the channel, as in the console's own examples. An empty
+    // pattern means the console was not told how to do that, and we send nothing.
+    QString oscChannelFader; // e.g. "/ch/*/fader"
+    QString oscChannelMute;  // e.g. "/ch/*/mute"
+    QString oscSceneRecall;  // e.g. "/snapshot/fire"
+    int oscReceivePort = 8000;
+
     [[nodiscard]] bool operator==(const MixerConfig& other) const;
     [[nodiscard]] bool operator!=(const MixerConfig& other) const { return !(*this == other); }
 

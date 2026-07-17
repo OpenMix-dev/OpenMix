@@ -418,13 +418,15 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.supportsEffectSends = true;
         break;
 
-    // DiGiCo SD series (TLV binary over TCP 51321, reverse-engineered)
+    // DiGiCo SD series over the console's Generic OSC (UDP). DiGiCo publishes no
+    // address map, so the driver takes the operator's patterns; see DiGiCoProtocol.
+    // Send/receive ports are paired by the operator, 9000/8000 being the common one.
     case ConsoleType::SD7:
         caps.manufacturer = Manufacturer::DiGiCo;
-        caps.protocol = ProtocolType::BinaryTcp;
+        caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "DiGiCo SD7";
         caps.protocolId = "sd7";
-        caps.defaultPort = 51321;
+        caps.defaultPort = 9000;
         caps.dcaCount = 24;
         caps.inputChannels = 128;
         caps.mixBuses = 48;
@@ -440,10 +442,10 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::SD9:
         caps.manufacturer = Manufacturer::DiGiCo;
-        caps.protocol = ProtocolType::BinaryTcp;
+        caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "DiGiCo SD9";
         caps.protocolId = "sd9";
-        caps.defaultPort = 51321;
+        caps.defaultPort = 9000;
         caps.dcaCount = 12;
         caps.inputChannels = 96;
         caps.mixBuses = 48;
@@ -459,10 +461,10 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::SD11:
         caps.manufacturer = Manufacturer::DiGiCo;
-        caps.protocol = ProtocolType::BinaryTcp;
+        caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "DiGiCo SD11";
         caps.protocolId = "sd11";
-        caps.defaultPort = 51321;
+        caps.defaultPort = 9000;
         caps.dcaCount = 8;
         caps.inputChannels = 32;
         caps.mixBuses = 16;
@@ -478,10 +480,10 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::SD12:
         caps.manufacturer = Manufacturer::DiGiCo;
-        caps.protocol = ProtocolType::BinaryTcp;
+        caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "DiGiCo SD12";
         caps.protocolId = "sd12";
-        caps.defaultPort = 51321;
+        caps.defaultPort = 9000;
         caps.dcaCount = 12;
         caps.inputChannels = 72;
         caps.mixBuses = 36;
