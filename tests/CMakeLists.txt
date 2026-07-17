@@ -347,9 +347,34 @@ if(WIN32)
 endif()
 add_test(NAME AllenHeathParsingTest COMMAND test_allenheath_parsing)
 
+add_executable(test_allenheath_session
+    test_allenheath_session.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/AllenHeathTcpProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/DLiveProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/transport/TcpTransport.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+)
+target_link_libraries(test_allenheath_session PRIVATE
+    Qt6::Core
+    Qt6::Network
+    Qt6::Test
+)
+target_include_directories(test_allenheath_session PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
+if(WIN32)
+    target_compile_definitions(test_allenheath_session PRIVATE NOMINMAX)
+endif()
+add_test(NAME AllenHeathSessionTest COMMAND test_allenheath_session)
+
 add_executable(test_allenheath_midi
     test_allenheath_midi.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/AllenHeathMidiProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/QuProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/transport/TcpTransport.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp

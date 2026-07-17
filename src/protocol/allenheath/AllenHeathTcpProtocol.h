@@ -4,9 +4,11 @@
 #include "../MixerProtocol.h"
 #include "../transport/TcpTransport.h"
 #include <QByteArray>
+#include <QElapsedTimer>
 #include <QList>
 #include <QMap>
 #include <QTimer>
+#include <QUdpSocket>
 
 namespace OpenMix {
 
@@ -16,6 +18,11 @@ namespace OpenMix {
 // values are a 2-byte dB encoding. Control covers channel level/mute, DCA mute,
 // and scene recall (the DCA *fader* plane is receive-only, as in the reference).
 // Byte layouts recovered from the reference AvantisDriver/DLiveDriver.
+//
+// A session needs two sockets. The client advertises its UDP local port
+// (E0 00 04 01 03 <port:2> E7), the console answers with its own
+// (E0 00 04 02 03 <port:2> E7), and only then does the subscribe chain start.
+// Metering arrives on the UDP socket and the keep-alive goes back out over it.
 class AllenHeathTcpProtocol : public MixerProtocol {
     Q_OBJECT
 
@@ -51,7 +58,7 @@ class AllenHeathTcpProtocol : public MixerProtocol {
     void recallScene(int sceneNumber) override;
 
     // semantic setters
-    void setChannelFader(int channel, double level) override;
+    void setChannelFaderDb(int channel, double level) override;
     void setChannelMute(int channel, bool muted) override;
 
     // keep-alive
@@ -93,6 +100,38 @@ class AllenHeathTcpProtocol : public MixerProtocol {
 
     // frame builders (protected for tests). Handle is the 2-byte object handle.
     static QByteArray buildSubscribe(const QByteArray& objectName);
+
+    static QByteArray buildSessionSeed(quint16 udpPort);
+    static QByteArray buildKeepAlive();
+
+    // the console's advertised UDP port; 0 if the frame is not a session reply
+    static quint16 parseSessionReply(const QByteArray& frame);
+
+    // the functional area a frame belongs to, from [3..4]
+    static quint16 areaOf(const QByteArray& frame);
+
+    // our source id, written at [5..6] of every frame we originate
+    static constexpr quint16 SOURCE_ID = 0x0001;
+
+    // inbound frames carry the functional area they belong to at [3..4]
+    static constexpr quint16 AREA_SUBSCRIBE_REPLY = 0x0001;
+    static constexpr quint16 AREA_METERING = 0x0006;
+    static constexpr quint16 AREA_SCENE_CHANGED = 0x000B;
+
+    static constexpr int ACE_HEADER_SIZE = 11;
+
+    // A meter datagram carries one 8-byte record per channel, in channel order;
+    // only the record's first byte is a level. 0 is -inf and 0xFE/0xFF mark a
+    // channel the console is not metering, so both read as silence. The byte's dB
+    // curve is unknown: it is passed through as a monotonic 0..1 position, not a
+    // calibrated level.
+    static constexpr int METER_RECORD_SIZE = 8;
+    static constexpr int METER_CHANNELS = 128;
+    static constexpr quint8 METER_INVALID = 0xFE;
+    static constexpr int METER_MIN_DATAGRAM = 200;
+
+    // the 1-based scene the console switched to; 0 if the frame is not a scene change
+    static int parseSceneChanged(const QByteArray& frame);
     QByteArray buildChannelLevel(const QByteArray& handle, int channel, double dB) const;
     QByteArray buildChannelMute(const QByteArray& handle, int channel, bool on) const;
     QByteArray buildDcaMute(const QByteArray& handle, int dca, bool on) const;
@@ -103,13 +142,11 @@ class AllenHeathTcpProtocol : public MixerProtocol {
     QByteArray buildChannelLevelSpill(const QByteArray& bankHandle, int channel, double dB) const;
     QByteArray buildChannelMuteSpill(const QByteArray& bankHandle, int channel, bool on) const;
 
-    // maps a normalized 0..1 fader position to dB for the encoder
-    static double dbFromLevel(double level);
-
     // object names whose handles the control path needs
     static const QByteArray kInputMixer;
     static const QByteArray kDcaLevelsAndMutes;
     static const QByteArray kSceneManager;
+    static const QByteArray kMeteringSources; // subscribing starts the UDP meter stream
 
     MixerCapabilities m_capabilities;
     TcpTransport m_transport;
@@ -126,7 +163,10 @@ class AllenHeathTcpProtocol : public MixerProtocol {
     void onTransportConnectionLost();
     void onDataReceived(const QByteArray& data);
     void onKeepAliveTimeout();
+    void onRxWatchdogTimeout();
+    void onHandshakeTimeout();
     void onReconnecting(int attempt, int maxAttempts);
+    void onUdpDataReceived();
 
   private:
     void setStatus(const QString& status);
@@ -134,6 +174,9 @@ class AllenHeathTcpProtocol : public MixerProtocol {
     void startHandshake();
     void sendNextSubscribe();
     void handleAceFrame(const QByteArray& frame);
+    void handleControlFrame(const QByteArray& frame);
+    void handleMeterDatagram(const QByteArray& datagram);
+    void failHandshake(const QString& reason);
     QByteArray handleFor(const QByteArray& objectName) const { return m_handles.value(objectName); }
 
     QString m_host;
@@ -141,8 +184,21 @@ class AllenHeathTcpProtocol : public MixerProtocol {
     ConnectionState m_connectionState = ConnectionState::Disconnected;
     QString m_statusMessage;
 
+    // metering in, keep-alive out
+    QUdpSocket m_udpSocket;
+    quint16 m_consoleUdpPort = 0;
+
     QTimer m_keepAliveTimer;
-    static constexpr int KEEPALIVE_INTERVAL = 5000;
+    QTimer m_rxWatchdogTimer;
+    QTimer m_handshakeTimer;
+    QElapsedTimer m_lastRxTimer;
+
+    // the console drops a session that goes silent for 1.5 s; any inbound byte
+    // counts as alive
+    static constexpr int KEEPALIVE_INTERVAL = 1000;
+    static constexpr int RX_WATCHDOG_INTERVAL = 500;
+    static constexpr int RX_SILENCE_LIMIT = 1500;
+    static constexpr int HANDSHAKE_TIMEOUT = 5000;
 
     int m_latencyMs = 0;
     QByteArray m_receiveBuffer;
@@ -151,6 +207,7 @@ class AllenHeathTcpProtocol : public MixerProtocol {
     QList<QByteArray> m_subscribeQueue;
     int m_subscribeIndex = 0;
     bool m_handshakeComplete = false;
+    bool m_sessionOpen = false;
 };
 
 } // namespace OpenMix

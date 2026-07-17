@@ -10,10 +10,14 @@ const QByteArray AllenHeathTcpProtocol::kInputMixer = QByteArrayLiteral("Input M
 const QByteArray AllenHeathTcpProtocol::kDcaLevelsAndMutes =
     QByteArrayLiteral("DCA Levels and Mutes");
 const QByteArray AllenHeathTcpProtocol::kSceneManager = QByteArrayLiteral("StageBox Scene Manager");
+const QByteArray AllenHeathTcpProtocol::kMeteringSources = QByteArrayLiteral("Metering Sources");
 
 namespace {
 constexpr char ACE_F0 = '\xf0';
 constexpr char ACE_F7 = '\xf7';
+
+// the console's half of the port exchange; the client's seed carries 01 here
+const QByteArray kSessionReply = QByteArrayLiteral("\xe0\x00\x04\x02\x03");
 } // namespace
 
 AllenHeathTcpProtocol::AllenHeathTcpProtocol(const MixerCapabilities& caps, QObject* parent)
@@ -36,6 +40,15 @@ AllenHeathTcpProtocol::AllenHeathTcpProtocol(const MixerCapabilities& caps, QObj
 
     QObject::connect(&m_keepAliveTimer, &QTimer::timeout, this,
                      &AllenHeathTcpProtocol::onKeepAliveTimeout);
+    QObject::connect(&m_rxWatchdogTimer, &QTimer::timeout, this,
+                     &AllenHeathTcpProtocol::onRxWatchdogTimeout);
+
+    m_handshakeTimer.setSingleShot(true);
+    QObject::connect(&m_handshakeTimer, &QTimer::timeout, this,
+                     &AllenHeathTcpProtocol::onHandshakeTimeout);
+
+    QObject::connect(&m_udpSocket, &QUdpSocket::readyRead, this,
+                     &AllenHeathTcpProtocol::onUdpDataReceived);
 }
 
 AllenHeathTcpProtocol::~AllenHeathTcpProtocol() { disconnect(); }
@@ -86,27 +99,15 @@ QByteArray AllenHeathTcpProtocol::encodeDb(double dB) const {
 }
 
 QList<QByteArray> AllenHeathTcpProtocol::subscribeObjects() const {
-    // control-relevant subset of the ACE handshake (identity gate + the three
-    // objects whose handles the control path addresses). The full reference
-    // handshake also subscribes name/colour/metering objects used only for RX.
-    return {QByteArrayLiteral("DR Box Identification"), QByteArrayLiteral("Surface Identification"),
-            kInputMixer, kDcaLevelsAndMutes, kSceneManager};
-}
-
-double AllenHeathTcpProtocol::dbFromLevel(double level) {
-    // OpenMix stores fader positions normalized 0..1; the console wants dB. Map
-    // with 0 dB at 0.75 travel and +10 dB at the top, -inf at the bottom.
-    level = std::clamp(level, 0.0, 1.0);
-    if (level <= 0.0) {
-        return -96.0; // below the encoder's -95 floor -> 0x0000
-    }
-    if (level >= 1.0) {
-        return 10.0;
-    }
-    if (level < 0.75) {
-        return -60.0 + (level / 0.75) * 60.0; // -60 .. 0 dB
-    }
-    return (level - 0.75) / 0.25 * 10.0; // 0 .. +10 dB
+    // subset of the reference's chain: the identity gate, the three objects the
+    // control path addresses, and the metering subscribe that starts the UDP meter
+    // stream. The reference also subscribes name/colour objects we do not read.
+    return {QByteArrayLiteral("DR Box Identification"),
+            QByteArrayLiteral("Surface Identification"),
+            kInputMixer,
+            kDcaLevelsAndMutes,
+            kSceneManager,
+            kMeteringSources};
 }
 
 QByteArray AllenHeathTcpProtocol::buildSubscribe(const QByteArray& objectName) {
@@ -119,19 +120,37 @@ QByteArray AllenHeathTcpProtocol::buildSubscribe(const QByteArray& objectName) {
     return f;
 }
 
+QByteArray AllenHeathTcpProtocol::buildSessionSeed(quint16 udpPort) {
+    QByteArray f = QByteArray::fromHex("e000040103");
+    f.append(static_cast<char>((udpPort >> 8) & 0xFF));
+    f.append(static_cast<char>(udpPort & 0xFF));
+    f.append('\xe7');
+    return f;
+}
+
+QByteArray AllenHeathTcpProtocol::buildKeepAlive() { return QByteArray::fromHex("e0000103e7"); }
+
+quint16 AllenHeathTcpProtocol::parseSessionReply(const QByteArray& frame) {
+    if (frame.size() < 8 || !frame.startsWith(kSessionReply)) {
+        return 0;
+    }
+    return static_cast<quint16>((static_cast<quint8>(frame.at(5)) << 8) |
+                                static_cast<quint8>(frame.at(6)));
+}
+
 QByteArray AllenHeathTcpProtocol::buildChannelLevel(const QByteArray& handle, int channel,
                                                     double dB) const {
     if (handle.isEmpty() || channel < 1) {
         return {};
     }
-    // F0 00 00 <handle:2> 00 00 <op> <ch-1> 00 02 <dB:2> F7
+    // F0 00 00 <handle:2> <src:2> <op> <ch-1> 00 02 <dB:2> F7
     QByteArray f;
     f.append(ACE_F0);
     f.append('\0');
     f.append('\0');
     f.append(handle);
-    f.append('\0');
-    f.append('\0');
+    f.append(static_cast<char>((SOURCE_ID >> 8) & 0xFF));
+    f.append(static_cast<char>(SOURCE_ID & 0xFF));
     f.append(static_cast<char>(channelLevelOp()));
     f.append(static_cast<char>((channel - 1) & 0xFF));
     f.append('\0');
@@ -146,14 +165,14 @@ QByteArray AllenHeathTcpProtocol::buildChannelMute(const QByteArray& handle, int
     if (handle.isEmpty() || channel < 1) {
         return {};
     }
-    // F0 00 00 <handle:2> 00 00 <op> <(ch-1)+plane> 00 01 <on> F7
+    // F0 00 00 <handle:2> <src:2> <op> <(ch-1)+plane> 00 01 <on> F7
     QByteArray f;
     f.append(ACE_F0);
     f.append('\0');
     f.append('\0');
     f.append(handle);
-    f.append('\0');
-    f.append('\0');
+    f.append(static_cast<char>((SOURCE_ID >> 8) & 0xFF));
+    f.append(static_cast<char>(SOURCE_ID & 0xFF));
     f.append(static_cast<char>(channelMuteOp()));
     f.append(static_cast<char>(((channel - 1) + channelMutePlane()) & 0xFF));
     f.append('\0');
@@ -167,14 +186,14 @@ QByteArray AllenHeathTcpProtocol::buildDcaMute(const QByteArray& handle, int dca
     if (handle.isEmpty() || dca < 1) {
         return {};
     }
-    // F0 00 00 <handle:2> 00 00 10 <(dca-1)+plane> 00 01 <on> F7
+    // F0 00 00 <handle:2> <src:2> 10 <(dca-1)+plane> 00 01 <on> F7
     QByteArray f;
     f.append(ACE_F0);
     f.append('\0');
     f.append('\0');
     f.append(handle);
-    f.append('\0');
-    f.append('\0');
+    f.append(static_cast<char>((SOURCE_ID >> 8) & 0xFF));
+    f.append(static_cast<char>(SOURCE_ID & 0xFF));
     f.append('\x10');
     f.append(static_cast<char>(((dca - 1) + dcaMutePlane()) & 0xFF));
     f.append('\0');
@@ -189,14 +208,14 @@ QByteArray AllenHeathTcpProtocol::buildChannelLevelSpill(const QByteArray& bankH
     if (bankHandle.isEmpty() || channel < 1) {
         return {};
     }
-    // F0 00 00 <bankHandle:2> 00 00 12 <((ch-1)&7)+0x80> 00 02 <dB:2> F7
+    // F0 00 00 <bankHandle:2> <src:2> 12 <((ch-1)&7)+0x80> 00 02 <dB:2> F7
     QByteArray f;
     f.append(ACE_F0);
     f.append('\0');
     f.append('\0');
     f.append(bankHandle);
-    f.append('\0');
-    f.append('\0');
+    f.append(static_cast<char>((SOURCE_ID >> 8) & 0xFF));
+    f.append(static_cast<char>(SOURCE_ID & 0xFF));
     f.append('\x12');
     f.append(static_cast<char>((((channel - 1) & 0x07) + 0x80) & 0xFF));
     f.append('\0');
@@ -211,14 +230,14 @@ QByteArray AllenHeathTcpProtocol::buildChannelMuteSpill(const QByteArray& bankHa
     if (bankHandle.isEmpty() || channel < 1) {
         return {};
     }
-    // F0 00 00 <bankHandle:2> 00 00 12 <((ch-1)&7)+0x98> 00 01 <on> F7
+    // F0 00 00 <bankHandle:2> <src:2> 12 <((ch-1)&7)+0x98> 00 01 <on> F7
     QByteArray f;
     f.append(ACE_F0);
     f.append('\0');
     f.append('\0');
     f.append(bankHandle);
-    f.append('\0');
-    f.append('\0');
+    f.append(static_cast<char>((SOURCE_ID >> 8) & 0xFF));
+    f.append(static_cast<char>(SOURCE_ID & 0xFF));
     f.append('\x12');
     f.append(static_cast<char>((((channel - 1) & 0x07) + 0x98) & 0xFF));
     f.append('\0');
@@ -232,15 +251,15 @@ QByteArray AllenHeathTcpProtocol::buildSceneRecall(const QByteArray& handle, int
     if (handle.isEmpty() || sceneNumber < 1) {
         return {};
     }
-    // F0 00 00 <handle:2> 00 00 10 00 00 02 <(scene-1):2 BE> F7
+    // F0 00 00 <handle:2> <src:2> 10 00 00 02 <(scene-1):2 BE> F7
     const int s = sceneNumber - 1;
     QByteArray f;
     f.append(ACE_F0);
     f.append('\0');
     f.append('\0');
     f.append(handle);
-    f.append('\0');
-    f.append('\0');
+    f.append(static_cast<char>((SOURCE_ID >> 8) & 0xFF));
+    f.append(static_cast<char>(SOURCE_ID & 0xFF));
     f.append('\x10');
     f.append('\0');
     f.append('\0');
@@ -265,17 +284,32 @@ bool AllenHeathTcpProtocol::connect(const QString& host, int port) {
     setConnectionState(ConnectionState::Connecting);
     setStatus(QString("Connecting to %1:%2...").arg(host).arg(port));
 
+    // the seed carries our UDP local port, so bind before connecting
+    if (m_udpSocket.state() != QAbstractSocket::BoundState &&
+        !m_udpSocket.bind(QHostAddress::Any, 0,
+                          QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint)) {
+        const QString error =
+            QString("Failed to bind metering socket: %1").arg(m_udpSocket.errorString());
+        setStatus(error);
+        setConnectionState(ConnectionState::Disconnected);
+        emit connectionError(error);
+        return false;
+    }
+
     return m_transport.connect(host, port);
 }
 
 void AllenHeathTcpProtocol::disconnect() {
     m_keepAliveTimer.stop();
+    m_rxWatchdogTimer.stop();
+    m_handshakeTimer.stop();
 
     // ACE teardown: E0 00 03 "BYE" E7
     if (m_transport.isConnected()) {
         m_transport.send(QByteArray::fromHex("e00003425945e7"));
     }
     m_transport.disconnect();
+    m_udpSocket.close();
 
     m_parameterCache.clear();
     m_receiveBuffer.clear();
@@ -283,6 +317,8 @@ void AllenHeathTcpProtocol::disconnect() {
     m_subscribeQueue.clear();
     m_subscribeIndex = 0;
     m_handshakeComplete = false;
+    m_sessionOpen = false;
+    m_consoleUdpPort = 0;
     m_latencyMs = 0;
 
     setConnectionState(ConnectionState::Disconnected);
@@ -291,25 +327,42 @@ void AllenHeathTcpProtocol::disconnect() {
 }
 
 void AllenHeathTcpProtocol::startHandshake() {
-    // session seed, then subscribe to the objects whose handles we need to
-    // address. The console replies to each with a 14-byte frame carrying the
-    // object's 2-byte handle at offset 11.
-    m_transport.send(QByteArray::fromHex("e000040203"));
-
+    // the console accepts nothing until the port exchange completes; the subscribe
+    // chain starts in handleControlFrame()
     m_handles.clear();
     m_subscribeQueue = subscribeObjects();
     m_subscribeIndex = 0;
     m_handshakeComplete = false;
-    sendNextSubscribe();
+    m_sessionOpen = false;
+    m_consoleUdpPort = 0;
+
+    m_lastRxTimer.start();
+    m_handshakeTimer.start(HANDSHAKE_TIMEOUT);
+
+    m_transport.send(buildSessionSeed(m_udpSocket.localPort()));
+}
+
+void AllenHeathTcpProtocol::failHandshake(const QString& reason) {
+    m_handshakeTimer.stop();
+    m_keepAliveTimer.stop();
+    m_rxWatchdogTimer.stop();
+    m_transport.disconnect();
+    m_udpSocket.close();
+    m_handshakeComplete = false;
+    m_sessionOpen = false;
+
+    setConnectionState(ConnectionState::Disconnected);
+    setStatus(reason);
+    emit connectionError(reason);
 }
 
 void AllenHeathTcpProtocol::sendNextSubscribe() {
     if (m_subscribeIndex >= m_subscribeQueue.size()) {
         // all handles learned: ready to control
         m_handshakeComplete = true;
+        m_handshakeTimer.stop();
         setConnectionState(ConnectionState::Connected);
         setStatus(QString("Connected to %1:%2").arg(m_host).arg(m_port));
-        m_keepAliveTimer.start(KEEPALIVE_INTERVAL);
         emit connected();
         return;
     }
@@ -331,8 +384,8 @@ void AllenHeathTcpProtocol::sendParameter(const QString& path, const QVariant& v
 
         if (ok && parts[0] == "ch") {
             if (param == "fader") {
-                m_transport.send(buildChannelLevel(handleFor(kInputMixer), index,
-                                                   dbFromLevel(value.toDouble())));
+                m_transport.send(
+                    buildChannelLevel(handleFor(kInputMixer), index, value.toDouble()));
             } else if (param == "mute") {
                 m_transport.send(buildChannelMute(handleFor(kInputMixer), index, value.toBool()));
             }
@@ -382,7 +435,7 @@ void AllenHeathTcpProtocol::recallScene(int sceneNumber) {
     m_transport.send(buildSceneRecall(handleFor(kSceneManager), sceneNumber));
 }
 
-void AllenHeathTcpProtocol::setChannelFader(int channel, double level) {
+void AllenHeathTcpProtocol::setChannelFaderDb(int channel, double level) {
     sendParameter(QString("/ch/%1/fader").arg(channel), level);
 }
 
@@ -396,6 +449,7 @@ void AllenHeathTcpProtocol::refresh() {}
 
 void AllenHeathTcpProtocol::onDataReceived(const QByteArray& data) {
     m_receiveBuffer.append(data);
+    m_lastRxTimer.restart();
 
     // property frames are length-prefixed: an F0 frame's total length is the
     // 16-bit big-endian payload length at bytes [9..10] plus 0x0C of header/tail.
@@ -420,11 +474,63 @@ void AllenHeathTcpProtocol::onDataReceived(const QByteArray& data) {
             if (end < 0) {
                 break;
             }
-            m_receiveBuffer.remove(0, end + 1); // console control frame; no action
+            handleControlFrame(m_receiveBuffer.left(end + 1));
+            m_receiveBuffer.remove(0, end + 1);
         } else {
             m_receiveBuffer.remove(0, 1); // padding / resync
         }
     }
+}
+
+void AllenHeathTcpProtocol::handleControlFrame(const QByteArray& frame) {
+    const quint16 port = parseSessionReply(frame);
+    if (port == 0 || m_sessionOpen) {
+        return;
+    }
+
+    m_consoleUdpPort = port;
+    m_sessionOpen = true;
+    m_keepAliveTimer.start(KEEPALIVE_INTERVAL);
+    m_rxWatchdogTimer.start(RX_WATCHDOG_INTERVAL);
+    sendNextSubscribe();
+}
+
+void AllenHeathTcpProtocol::onUdpDataReceived() {
+    while (m_udpSocket.hasPendingDatagrams()) {
+        QByteArray datagram(static_cast<int>(m_udpSocket.pendingDatagramSize()), '\0');
+        QHostAddress sender;
+        m_udpSocket.readDatagram(datagram.data(), datagram.size(), &sender);
+
+        // the socket is dual-stack, so the console's IPv4 address can arrive
+        // v4-mapped; compare tolerantly or every datagram is discarded as foreign
+        if (sender.isEqual(QHostAddress(m_host), QHostAddress::TolerantConversion)) {
+            handleMeterDatagram(datagram);
+        }
+    }
+}
+
+void AllenHeathTcpProtocol::handleMeterDatagram(const QByteArray& datagram) {
+    // meters arrive as one 8-byte record per channel, in channel order: the record
+    // index is the channel, there is no index field on the wire
+    if (datagram.size() < METER_MIN_DATAGRAM || areaOf(datagram) != AREA_METERING) {
+        return;
+    }
+
+    const QByteArray records = datagram.mid(ACE_HEADER_SIZE);
+    const int count = qMin(METER_CHANNELS, records.size() / METER_RECORD_SIZE);
+    for (int i = 0; i < count; ++i) {
+        const quint8 raw = static_cast<quint8>(records.at(i * METER_RECORD_SIZE));
+        const float level = (raw == 0 || raw >= METER_INVALID) ? 0.0f : raw / 253.0f;
+        emit channelMeter(i + 1, level);
+    }
+}
+
+quint16 AllenHeathTcpProtocol::areaOf(const QByteArray& frame) {
+    if (frame.size() < 5) {
+        return 0;
+    }
+    return static_cast<quint16>((static_cast<quint8>(frame.at(3)) << 8) |
+                                static_cast<quint8>(frame.at(4)));
 }
 
 void AllenHeathTcpProtocol::handleAceFrame(const QByteArray& frame) {
@@ -441,8 +547,22 @@ void AllenHeathTcpProtocol::handleAceFrame(const QByteArray& frame) {
         return;
     }
 
-    // other frames are parameter/metering feedback (not needed for the outbound
-    // control path)
+    if (areaOf(frame) == AREA_SCENE_CHANGED) {
+        const int scene = parseSceneChanged(frame);
+        if (scene > 0) {
+            emit sceneChanged(scene);
+        }
+    }
+}
+
+int AllenHeathTcpProtocol::parseSceneChanged(const QByteArray& frame) {
+    // payload is the 0-based scene index, big-endian
+    if (frame.size() < ACE_HEADER_SIZE + 2 || areaOf(frame) != AREA_SCENE_CHANGED) {
+        return 0;
+    }
+    const int index = (static_cast<quint8>(frame.at(ACE_HEADER_SIZE)) << 8) |
+                      static_cast<quint8>(frame.at(ACE_HEADER_SIZE + 1));
+    return index + 1;
 }
 
 void AllenHeathTcpProtocol::onTransportConnected() { startHandshake(); }
@@ -468,9 +588,24 @@ void AllenHeathTcpProtocol::onTransportConnectionLost() {
 }
 
 void AllenHeathTcpProtocol::onKeepAliveTimeout() {
-    if (m_connectionState == ConnectionState::Connected) {
-        m_transport.send(QByteArray::fromHex("e000040203"));
+    if (m_sessionOpen && m_consoleUdpPort != 0) {
+        m_udpSocket.writeDatagram(buildKeepAlive(), QHostAddress(m_host), m_consoleUdpPort);
     }
+}
+
+void AllenHeathTcpProtocol::onRxWatchdogTimeout() {
+    if (m_sessionOpen && m_lastRxTimer.isValid() && m_lastRxTimer.elapsed() > RX_SILENCE_LIMIT) {
+        failHandshake(
+            QString("Console stopped responding (no data for %1ms)").arg(RX_SILENCE_LIMIT));
+    }
+}
+
+void AllenHeathTcpProtocol::onHandshakeTimeout() {
+    if (m_handshakeComplete) {
+        return;
+    }
+    failHandshake(m_sessionOpen ? "Console did not complete the subscribe handshake"
+                                : "Console did not answer the session handshake");
 }
 
 void AllenHeathTcpProtocol::onReconnecting(int attempt, int maxAttempts) {
