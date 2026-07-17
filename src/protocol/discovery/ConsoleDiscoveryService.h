@@ -35,6 +35,9 @@ class ConsoleDiscoveryService : public QObject {
     // handles one inbound discovery datagram (exposed for tests)
     void processDatagram(const QByteArray& data, const QHostAddress& sender, int senderPort);
 
+    // consoles may answer to this fixed source port rather than an ephemeral one
+    static constexpr quint16 DISCOVERY_SOURCE_PORT = 32323;
+
     static QByteArray buildOscMessage(const QString& path);
 
   signals:
@@ -50,7 +53,7 @@ class ConsoleDiscoveryService : public QObject {
   private:
     void sendProbes();
     void sendProbesTo(const QHostAddress& target, const QHostAddress& localAddress);
-    void addConsole(const DiscoveredConsole& console);
+    void addConsole(const DiscoveredConsole& in);
     void parseOscMessage(const QByteArray& data, const QHostAddress& sender, int senderPort);
     QVariant parseOscArgument(const QByteArray& data, int& offset, char type);
 

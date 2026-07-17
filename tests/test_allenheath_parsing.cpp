@@ -11,12 +11,17 @@ namespace {
 class AvantisProbe : public AvantisProtocol {
   public:
     AvantisProbe() : AvantisProtocol(MixerCapabilities::forConsole(ConsoleType::Avantis)) {}
+    using AllenHeathTcpProtocol::areaOf;
     using AllenHeathTcpProtocol::buildChannelLevel;
     using AllenHeathTcpProtocol::buildChannelMute;
     using AllenHeathTcpProtocol::buildDcaMute;
+    using AllenHeathTcpProtocol::buildKeepAlive;
     using AllenHeathTcpProtocol::buildSceneRecall;
+    using AllenHeathTcpProtocol::buildSessionSeed;
     using AllenHeathTcpProtocol::buildSubscribe;
     using AllenHeathTcpProtocol::encodeDb;
+    using AllenHeathTcpProtocol::parseSceneChanged;
+    using AllenHeathTcpProtocol::parseSessionReply;
 };
 
 class DLiveProbe : public DLiveProtocol {
@@ -62,33 +67,83 @@ class TestAllenHeathParsing : public QObject {
         QCOMPARE(p.encodeDb(-6.0), QByteArray::fromHex("7a00"));
     }
 
+    void sessionSeed_advertisesUdpPort() {
+        // the 01 is what makes it a client seed; sending the console's 02 reply
+        // back at it opens no session
+        AvantisProbe p;
+        QCOMPARE(p.buildSessionSeed(0x1234), QByteArray::fromHex("e0000401031234e7"));
+        QCOMPARE(p.buildSessionSeed(51321), QByteArray::fromHex("e000040103c879e7"));
+        QCOMPARE(p.buildSessionSeed(0), QByteArray::fromHex("e0000401030000e7"));
+    }
+
+    void sessionReply_yieldsConsoleUdpPort() {
+        AvantisProbe p;
+        QCOMPARE(p.parseSessionReply(QByteArray::fromHex("e0000402031234e7")), quint16(0x1234));
+        // the client's own seed is not a reply, however similar it looks
+        QCOMPARE(p.parseSessionReply(QByteArray::fromHex("e0000401031234e7")), quint16(0));
+        QCOMPARE(p.parseSessionReply(QByteArray::fromHex("e00003425945e7")), quint16(0)); // BYE
+        QCOMPARE(p.parseSessionReply(QByteArray()), quint16(0));
+        QCOMPARE(p.parseSessionReply(QByteArray::fromHex("e00004020312")), quint16(0)); // truncated
+    }
+
+    void keepAlive_matchesReference() {
+        AvantisProbe p;
+        QCOMPARE(p.buildKeepAlive(), QByteArray::fromHex("e0000103e7"));
+    }
+
+    void sceneChanged_isZeroBasedOnTheWire() {
+        AvantisProbe p;
+        // F0 <class> <area 000B> <src> <op> <len> | <scene-1 BE>
+        QCOMPARE(p.parseSceneChanged(QByteArray::fromHex("f00000000b000100020002"
+                                                         "0000")),
+                 1);
+        QCOMPARE(p.parseSceneChanged(QByteArray::fromHex("f00000000b000100020002"
+                                                         "0063")),
+                 100);
+        QCOMPARE(p.parseSceneChanged(QByteArray::fromHex("f00000000b000100020002"
+                                                         "0100")),
+                 257);
+        // a frame from any other functional area is not a scene change
+        QCOMPARE(p.parseSceneChanged(QByteArray::fromHex("f000000001000100020002"
+                                                         "0000")),
+                 0);
+        QCOMPARE(p.parseSceneChanged(QByteArray::fromHex("f00000000b")), 0);
+    }
+
+    void areaOf_readsTheFunctionalArea() {
+        AvantisProbe p;
+        QCOMPARE(p.areaOf(QByteArray::fromHex("f000000006000100020002")), quint16(0x0006));
+        QCOMPARE(p.areaOf(QByteArray::fromHex("f0000000010001")), quint16(0x0001));
+        QCOMPARE(p.areaOf(QByteArray::fromHex("f000")), quint16(0));
+    }
+
     void avantis_firmwareGatedOp() {
         AvantisProbe p;
         p.setFirmwareRevision(96500); // <= 96884 -> base op 0x25
         QCOMPARE(p.buildChannelLevel(H, 1, 0.0),
-                 QByteArray::fromHex("f00000abcd0000250000028000f7"));
+                 QByteArray::fromHex("f00000abcd0001250000028000f7"));
         p.setFirmwareRevision(97000); // > 96884 -> extended op 0x2B
         QCOMPARE(p.buildChannelLevel(H, 1, 0.0),
-                 QByteArray::fromHex("f00000abcd00002b0000028000f7"));
+                 QByteArray::fromHex("f00000abcd00012b0000028000f7"));
     }
 
     void dlive_extendedOpForNon1x() {
         DLiveProbe p;
         p.setFirmwareVersion("1.90"); // 1.x -> base op 0x30
         QCOMPARE(p.buildChannelLevel(H, 1, 0.0),
-                 QByteArray::fromHex("f00000abcd0000300000028000f7"));
+                 QByteArray::fromHex("f00000abcd0001300000028000f7"));
         p.setFirmwareVersion("2.00"); // non-1.x -> extended op 0x38
         QCOMPARE(p.buildChannelLevel(H, 1, 0.0),
-                 QByteArray::fromHex("f00000abcd0000380000028000f7"));
+                 QByteArray::fromHex("f00000abcd0001380000028000f7"));
     }
 
     void dlive_spillFrames() {
         DLiveProbe p;
         // op 0x12, level idx ((ch-1)&7)+0x80, mute idx +0x98, bank handle
         QCOMPARE(p.buildChannelLevelSpill(H, 1, 0.0),
-                 QByteArray::fromHex("f00000abcd0000128000028000f7"));
+                 QByteArray::fromHex("f00000abcd0001128000028000f7"));
         QCOMPARE(p.buildChannelMuteSpill(H, 1, true),
-                 QByteArray::fromHex("f00000abcd00001298000101f7"));
+                 QByteArray::fromHex("f00000abcd00011298000101f7"));
     }
 
     void subscribe_matchesReferenceBlob() {
@@ -101,44 +156,44 @@ class TestAllenHeathParsing : public QObject {
         AvantisProbe p;
         // F0 00 00 <H> 00 00 25 (ch-1) 00 02 <dB> F7 ; ch1 @ 0 dB
         QCOMPARE(p.buildChannelLevel(H, 1, 0.0),
-                 QByteArray::fromHex("f00000abcd0000250000028000f7"));
+                 QByteArray::fromHex("f00000abcd0001250000028000f7"));
         // ch2 @ +10 dB -> idx 01, value 8A00
         QCOMPARE(p.buildChannelLevel(H, 2, 10.0),
-                 QByteArray::fromHex("f00000abcd0000250100028a00f7"));
+                 QByteArray::fromHex("f00000abcd0001250100028a00f7"));
     }
 
     void avantis_channelMute() {
         AvantisProbe p;
         // op 0x26, idx = (ch-1)+0x20, disc 01 ; ch1 mute on / off
-        QCOMPARE(p.buildChannelMute(H, 1, true), QByteArray::fromHex("f00000abcd00002620000101f7"));
+        QCOMPARE(p.buildChannelMute(H, 1, true), QByteArray::fromHex("f00000abcd00012620000101f7"));
         QCOMPARE(p.buildChannelMute(H, 1, false),
-                 QByteArray::fromHex("f00000abcd00002620000100f7"));
+                 QByteArray::fromHex("f00000abcd00012620000100f7"));
     }
 
     void avantis_dcaMute() {
         AvantisProbe p;
         // op 0x10, idx = (dca-1)+0x18 ; dca1 on, dca2 -> idx 0x19
-        QCOMPARE(p.buildDcaMute(H, 1, true), QByteArray::fromHex("f00000abcd00001018000101f7"));
-        QCOMPARE(p.buildDcaMute(H, 2, true), QByteArray::fromHex("f00000abcd00001019000101f7"));
+        QCOMPARE(p.buildDcaMute(H, 1, true), QByteArray::fromHex("f00000abcd00011018000101f7"));
+        QCOMPARE(p.buildDcaMute(H, 2, true), QByteArray::fromHex("f00000abcd00011019000101f7"));
     }
 
     void sceneRecall_matchesReference() {
         AvantisProbe p;
         // F0 00 00 <H> 00 00 10 00 00 02 <(scene-1) BE> F7 ; scene 1 -> 0000
-        QCOMPARE(p.buildSceneRecall(H, 1), QByteArray::fromHex("f00000abcd0000100000020000f7"));
+        QCOMPARE(p.buildSceneRecall(H, 1), QByteArray::fromHex("f00000abcd0001100000020000f7"));
         // scene 256 -> (255) = 00FF
-        QCOMPARE(p.buildSceneRecall(H, 256), QByteArray::fromHex("f00000abcd00001000000200fff7"));
+        QCOMPARE(p.buildSceneRecall(H, 256), QByteArray::fromHex("f00000abcd00011000000200fff7"));
     }
 
     void dlive_opcodesDifferFromAvantis() {
         DLiveProbe p;
         // dLive channel level op 0x30, mute op 0x31 / plane 0x80, DCA plane 0x20
         QCOMPARE(p.buildChannelLevel(H, 1, 0.0),
-                 QByteArray::fromHex("f00000abcd0000300000028000f7"));
+                 QByteArray::fromHex("f00000abcd0001300000028000f7"));
         QCOMPARE(p.buildChannelMute(H, 1, true),
-                 QByteArray::fromHex("f00000abcd00003180000101f7")); // idx (0)+0x80
+                 QByteArray::fromHex("f00000abcd00013180000101f7")); // idx (0)+0x80
         QCOMPARE(p.buildDcaMute(H, 1, true),
-                 QByteArray::fromHex("f00000abcd00001020000101f7")); // idx (0)+0x20
+                 QByteArray::fromHex("f00000abcd00011020000101f7")); // idx (0)+0x20
     }
 
     void emptyHandle_producesNoFrame() {
@@ -151,9 +206,9 @@ class TestAllenHeathParsing : public QObject {
         GLDProbe p;
         // GLD level + mute share op 0x16 (mute plane 0x90); DCA mute op 0x10 plane 0x10
         QCOMPARE(p.buildChannelLevel(H, 1, 0.0),
-                 QByteArray::fromHex("f00000abcd0000160000028000f7"));
-        QCOMPARE(p.buildChannelMute(H, 1, true), QByteArray::fromHex("f00000abcd00001690000101f7"));
-        QCOMPARE(p.buildDcaMute(H, 1, true), QByteArray::fromHex("f00000abcd00001010000101f7"));
+                 QByteArray::fromHex("f00000abcd0001160000028000f7"));
+        QCOMPARE(p.buildChannelMute(H, 1, true), QByteArray::fromHex("f00000abcd00011690000101f7"));
+        QCOMPARE(p.buildDcaMute(H, 1, true), QByteArray::fromHex("f00000abcd00011010000101f7"));
     }
 
     void gld_dbTableDiffersFromAce() {

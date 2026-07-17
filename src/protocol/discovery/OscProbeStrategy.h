@@ -85,6 +85,20 @@ class OscProbeStrategy {
     // the device answers wins.
     virtual QList<TcpIdentify> tcpIdentifies() const { return {}; }
 
+    // second leg of a two-step identify; empty = the first reply is the whole
+    // answer. The ACE families answer a by-name request with a handle and only
+    // report the model when that handle is read back.
+    virtual QByteArray identifyFollowUp(int identifyPort, const QByteArray& firstReply) const {
+        Q_UNUSED(identifyPort);
+        Q_UNUSED(firstReply);
+        return {};
+    }
+
+    virtual int identifyFollowUpMinBytes(int identifyPort) const {
+        Q_UNUSED(identifyPort);
+        return 0;
+    }
+
     // parse the response from the handshake sent to identifyPort
     virtual DiscoveredConsole parseIdentifyResponse(const QByteArray& response,
                                                     const QHostAddress& sender,
