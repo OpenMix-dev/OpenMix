@@ -41,7 +41,8 @@ class TestMixerCapabilities : public QObject {
             QCOMPARE(caps.protocol, ProtocolType::MidiTcp);
             QCOMPARE(caps.defaultPort, 51325);
             QCOMPARE(caps.inputChannels, 32);
-            QCOMPARE(caps.dcaCount, 8);
+            QCOMPARE(caps.dcaCount, 4); // Qu MIDI Protocol V1.9+: DCA Groups 1 to 4
+            QCOMPARE(caps.scenes, 100); // ... and Scene 1 to 100
             QCOMPARE(caps.mixBuses, 12);
         }
         // bare "qu" resolves to the base Qu-16

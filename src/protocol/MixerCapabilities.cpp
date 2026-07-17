@@ -128,21 +128,22 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.supportsEffectSends = true;
         break;
 
-    // Qu series shares the SQ MIDI-over-TCP control path (same "Soft" control
-    // family on port 51325). All Qu models run the same 32-channel DSP; only the
-    // physical fader count differs, so capabilities are identical across
-    // Qu-16/24/32 apart from the display name.
+    // Qu is MIDI over TCP 51325 like SQ, but a different message map (see
+    // QuProtocol). All Qu models run the same 32-channel DSP; only the physical
+    // fader count differs, so capabilities are identical across Qu-16/24/32 apart
+    // from the display name. Counts per the Qu MIDI Protocol V1.9+: 4 DCA groups,
+    // 100 scenes.
     case ConsoleType::Qu16:
     case ConsoleType::Qu24:
     case ConsoleType::Qu32:
         caps.manufacturer = Manufacturer::AllenHeath;
         caps.protocol = ProtocolType::MidiTcp;
         caps.defaultPort = 51325;
-        caps.dcaCount = 8;
+        caps.dcaCount = 4;
         caps.inputChannels = 32;
         caps.mixBuses = 12;
         caps.matrixOutputs = 0;
-        caps.scenes = 300;
+        caps.scenes = 100;
         caps.maxDCANameLength = 6;
         caps.eqBandsPerChannel = 4;
         caps.supportsChannelEQ = true;
