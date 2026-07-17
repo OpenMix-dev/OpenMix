@@ -1,5 +1,6 @@
 #include "X32Protocol.h"
 #include "../../core/Cue.h"
+#include "../../core/LevelDb.h"
 #include <QDateTime>
 #include <QtEndian>
 #include <algorithm>
@@ -24,6 +25,50 @@ QString x32Bus(int bus) { return QString("/bus/%1").arg(bus, 2, 10, QChar('0'));
 
 float clampUnit(double v) { return static_cast<float>(std::clamp(v, 0.0, 1.0)); }
 
+// X32 faders are the one wire format in OpenMix that is a position rather than a
+// level: the console takes a 0..1 float and applies its own piecewise law. The
+// segments are the published law (X32 OSC Remote Protocol, "level(float)"):
+//   0..0.0625 = -oo/-90..-60 dB, 0.0625..0.25 = -60..-30,
+//   0.25..0.5 = -30..-10,        0.5..1.0     = -10..+10.
+float x32FaderFromDb(double dB) {
+    if (dB <= NEG_INF_DB || dB <= -90.0) {
+        return 0.0f;
+    }
+    double pos;
+    if (dB >= -10.0) {
+        pos = (dB + 30.0) / 40.0; // -10 .. +10 dB
+    } else if (dB >= -30.0) {
+        pos = (dB + 50.0) / 80.0; // -30 .. -10 dB
+    } else if (dB >= -60.0) {
+        pos = (dB + 70.0) / 160.0; // -60 .. -30 dB
+    } else {
+        pos = (dB + 90.0) / 480.0; // -90 .. -60 dB
+    }
+    return clampUnit(pos);
+}
+
+// the paths whose value is a fader position rather than a real-world unit
+bool isFaderPath(const QString& path) {
+    return path.endsWith("/mix/fader") || path.endsWith("/fader");
+}
+
+double x32DbFromFader(double position) {
+    position = std::clamp(position, 0.0, 1.0);
+    if (position <= 0.0) {
+        return NEG_INF_DB;
+    }
+    if (position >= 0.5) {
+        return position * 40.0 - 30.0;
+    }
+    if (position >= 0.25) {
+        return position * 80.0 - 50.0;
+    }
+    if (position >= 0.0625) {
+        return position * 160.0 - 70.0;
+    }
+    return position * 480.0 - 90.0;
+}
+
 float linNorm(double v, double lo, double hi) { return clampUnit((v - lo) / (hi - lo)); }
 
 float logNorm(double v, double lo, double hi) {
@@ -36,7 +81,7 @@ float logNorm(double v, double lo, double hi) {
 
 // X32 compressor ratio is an enum index into a fixed table
 int x32RatioIndex(double ratio) {
-    static constexpr std::array<double, 12> ratios = {1.1, 1.3, 1.5, 2.0, 2.5, 3.0,
+    static constexpr std::array<double, 12> ratios = {1.1, 1.3, 1.5, 2.0,  2.5,  3.0,
                                                       4.0, 5.0, 7.0, 10.0, 20.0, 100.0};
     int best = 0;
     double bestDiff = 1e9;
@@ -181,6 +226,9 @@ bool X32Protocol::connect(const QString& host, int port) {
     }
 
     m_waitingForXinfo = true;
+    // the reference probes with /info, and some consoles answer only that; /xinfo
+    // carries the richer payload, so ask for both and connect on whichever lands
+    m_transport.send("/info");
     m_transport.send("/xinfo");
     m_connectionTimer.start(m_connectionTimeoutMs);
 
@@ -212,7 +260,7 @@ void X32Protocol::sendParameter(const QString& path, const QVariant& value) {
         return;
 
     m_transport.send(path, value);
-    m_parameterCache[path] = value;
+    m_parameterCache[path] = isFaderPath(path) ? QVariant(x32DbFromFader(value.toDouble())) : value;
 }
 
 QVariant X32Protocol::getParameter(const QString& path) { return m_parameterCache.value(path); }
@@ -275,8 +323,8 @@ void X32Protocol::recallSnippet(int snippetNumber) {
     m_transport.send("/-action/gosnippet", snippetNumber);
 }
 
-void X32Protocol::setChannelFader(int channel, double level) {
-    sendParameter(x32Channel(channel) + "/mix/fader", clampUnit(level));
+void X32Protocol::setChannelFaderDb(int channel, double dB) {
+    sendParameter(x32Channel(channel) + "/mix/fader", x32FaderFromDb(dB));
 }
 
 std::optional<double> X32Protocol::readChannelFader(int channel) {
@@ -343,8 +391,8 @@ void X32Protocol::setDcaMute(int dca, bool muted) {
     sendParameter(QString("/dca/%1/on").arg(dca), muted ? 0 : 1);
 }
 
-void X32Protocol::setDcaFader(int dca, double level) {
-    sendParameter(QString("/dca/%1/fader").arg(dca), clampUnit(level));
+void X32Protocol::setDcaFaderDb(int dca, double dB) {
+    sendParameter(QString("/dca/%1/fader").arg(dca), x32FaderFromDb(dB));
 }
 
 void X32Protocol::setDcaName(int dca, const QString& name) {
@@ -429,7 +477,7 @@ void X32Protocol::onMessageReceived(const QString& path, const QVariant& value) 
 void X32Protocol::onKeepAliveTimeout() {
     if (m_connectionState == ConnectionState::Connected) {
         qint64 now = QDateTime::currentMSecsSinceEpoch();
-        if (m_lastResponseTime > 0 && (now - m_lastResponseTime) > (KEEPALIVE_INTERVAL * 3)) {
+        if (m_lastResponseTime > 0 && (now - m_lastResponseTime) > RESPONSE_TIMEOUT) {
             setStatus("Connection lost - no response from mixer");
             emit connectionLost();
             startReconnection();
@@ -504,6 +552,9 @@ void X32Protocol::onReconnectAttempt() {
     }
 
     m_waitingForXinfo = true;
+    // the reference probes with /info, and some consoles answer only that; /xinfo
+    // carries the richer payload, so ask for both and connect on whichever lands
+    m_transport.send("/info");
     m_transport.send("/xinfo");
     m_connectionTimer.start(m_connectionTimeoutMs);
 }
@@ -512,7 +563,7 @@ void X32Protocol::processResponse(const QString& path, const QVariant& value) {
     qint64 now = QDateTime::currentMSecsSinceEpoch();
     m_lastResponseTime = now;
 
-    if (path == "/xinfo") {
+    if (path == "/xinfo" || path == "/info") {
         handleXinfoResponse(value);
         return;
     }
@@ -535,7 +586,7 @@ void X32Protocol::processResponse(const QString& path, const QVariant& value) {
     static const QRegularExpression faderRe(QStringLiteral("^/ch/(\\d+)/mix/fader$"));
     const QRegularExpressionMatch faderMatch = faderRe.match(path);
     if (faderMatch.hasMatch() && value.isValid()) {
-        emit channelFaderChanged(faderMatch.captured(1).toInt(), value.toDouble());
+        emit channelFaderChanged(faderMatch.captured(1).toInt(), x32DbFromFader(value.toDouble()));
     }
 
     if (m_pendingRequests.contains(path)) {
@@ -549,8 +600,12 @@ void X32Protocol::processResponse(const QString& path, const QVariant& value) {
     }
 
     if (value.isValid()) {
-        m_parameterCache[path] = value;
-        emit parameterChanged(path, value);
+        // the console reports faders as positions; publish dB so consumers do not
+        // have to know which console they are looking at
+        const QVariant cached =
+            isFaderPath(path) ? QVariant(x32DbFromFader(value.toDouble())) : value;
+        m_parameterCache[path] = cached;
+        emit parameterChanged(path, cached);
     }
 }
 

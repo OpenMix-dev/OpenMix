@@ -1,5 +1,6 @@
 #include "WingProtocol.h"
 #include "../../core/Cue.h"
+#include "../../core/LevelDb.h"
 #include <QDateTime>
 #include <algorithm>
 
@@ -136,7 +137,7 @@ bool WingProtocol::connect(const QString& host, int port) {
 
     // request device info to verify connection
     m_waitingForInfo = true;
-    m_transport.send("/$info");
+    m_transport.send("/?");
 
     m_connectionTimer.start(m_connectionTimeoutMs);
 
@@ -219,16 +220,17 @@ void WingProtocol::recallScene(int sceneNumber) {
     if (m_connectionState != ConnectionState::Connected)
         return;
 
-    // WING scene recall via OSC
-    m_transport.send("/action/scenes/recall", sceneNumber);
+    // select the library entry, then act on it. These are the console's own node
+    // names; the OSC doc does not cover the show library, so this is unconfirmed
+    // against hardware.
+    m_transport.send("/$ctl/lib/$actionidx", sceneNumber);
+    m_transport.send("/$ctl/lib/$action", QString("GO"));
 }
 
 void WingProtocol::recallSnippet(int snippetNumber) {
-    if (m_connectionState != ConnectionState::Connected)
-        return;
-
-    // WING snippet recall
-    m_transport.send("/-action/gosnippet", snippetNumber);
+    // the console's library is one list addressed by index; snippets are not a
+    // separate namespace as they are on X32
+    recallScene(snippetNumber);
 }
 
 namespace {
@@ -236,21 +238,12 @@ QString wingChannel(int channel) { return QString("/ch/%1").arg(channel); }
 
 QString wingBus(int bus) { return QString("/bus/%1").arg(bus); }
 
-// WING faders carry real-world dB; map a normalized 0..1 level onto the exact
-// X32/WING fader law (piecewise-linear in dB, per the Maillot/WING references):
-//   0.0000-0.0625 -> -inf..-60, 0.0625-0.25 -> -60..-30,
-//   0.25-0.5      -> -30..-10,  0.5-1.0      -> -10..+10  (0.75 = 0 dB).
-float wingFaderDb(double level) {
-    level = std::clamp(level, 0.0, 1.0);
-    if (level <= 0.0)
-        return -144.0f; // -inf floor
-    if (level < 0.0625)
-        return static_cast<float>(-60.0 - (0.0625 - level) / 0.0625 * 84.0);
-    if (level < 0.25)
-        return static_cast<float>(level * 160.0 - 70.0);
-    if (level < 0.5)
-        return static_cast<float>(level * 80.0 - 50.0);
-    return static_cast<float>(level * 40.0 - 30.0);
+// /fdr carries dB; -144 is the console's own -inf
+float wingFaderDb(double dB) {
+    if (dB <= NEG_INF_DB) {
+        return -144.0f;
+    }
+    return static_cast<float>(std::clamp(dB, -144.0, 10.0));
 }
 
 // WING STD EQ exposes named bands l,1,2,3,4,h (not numbered 1..N)
@@ -261,7 +254,7 @@ QString wingEqBand(int band) {
 }
 } // namespace
 
-void WingProtocol::setChannelFader(int channel, double level) {
+void WingProtocol::setChannelFaderDb(int channel, double level) {
     sendParameter(wingChannel(channel) + "/fdr", wingFaderDb(level));
 }
 
@@ -321,7 +314,7 @@ void WingProtocol::setDcaMute(int dca, bool muted) {
     sendParameter(QString("/dca/%1/mute").arg(dca), muted ? 1 : 0);
 }
 
-void WingProtocol::setDcaFader(int dca, double level) {
+void WingProtocol::setDcaFaderDb(int dca, double level) {
     sendParameter(QString("/dca/%1/fdr").arg(dca), wingFaderDb(level));
 }
 
@@ -404,7 +397,7 @@ void WingProtocol::onKeepAliveTimeout() {
         }
 
         // send keep-alive
-        m_transport.send("/$xremote");
+        m_transport.send(SUBSCRIBE_COMMAND);
     }
 }
 
@@ -471,7 +464,7 @@ void WingProtocol::onReconnectAttempt() {
     }
 
     m_waitingForInfo = true;
-    m_transport.send("/$info");
+    m_transport.send("/?");
     m_connectionTimer.start(m_connectionTimeoutMs);
 }
 
@@ -479,7 +472,7 @@ void WingProtocol::processResponse(const QString& path, const QVariant& value) {
     qint64 now = QDateTime::currentMSecsSinceEpoch();
     m_lastResponseTime = now;
 
-    if (path == "/$info" || path.startsWith("/$")) {
+    if (path == "/?") {
         handleInfoResponse(value);
         return;
     }
@@ -514,7 +507,7 @@ void WingProtocol::handleInfoResponse([[maybe_unused]] const QVariant& value) {
         m_reconnectAttempts = 0;
 
         // subscribe to updates
-        m_transport.send("/$xremote");
+        m_transport.send(SUBSCRIBE_COMMAND);
 
         requestDcaMembership();
 

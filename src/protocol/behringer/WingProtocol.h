@@ -17,11 +17,13 @@ struct WingPendingRequest {
     qint64 sentTime;
 };
 
-// Behringer WING OSC protocol implementation
-// WING uses OSC but with different namespace than X32:
-// DCA paths: /dca/1-24/fader, /dca/1-24/mute
-// scene recall: /action/scenes/recall,i with scene number
-// defaults to port 2223
+// Behringer WING OSC protocol implementation (OSC over UDP 2223; the console's
+// other interface, native binary on 2222, is not used here).
+//
+// "/?" returns "WING,<ip>,<name>,<model>,<serial>,<firmware>" and stands in for a
+// connection check. Unsolicited updates require a subscription ("/*s~") that the
+// console drops after 10 s unless renewed, and only one client may hold it.
+// Paths follow the console's node tree: /ch/N/fdr, /ch/N/mute, /dca/N/fdr, ...
 class WingProtocol : public MixerProtocol {
     Q_OBJECT
 
@@ -31,12 +33,16 @@ class WingProtocol : public MixerProtocol {
 
     // protocol identification
     [[nodiscard]] QString protocolName() const override { return m_capabilities.displayName; }
-    [[nodiscard]] QString protocolDescription() const override { return "Behringer WING OSC Protocol"; }
+    [[nodiscard]] QString protocolDescription() const override {
+        return "Behringer WING OSC Protocol";
+    }
 
     // connection management
     [[nodiscard]] bool connect(const QString& host, int port) override;
     void disconnect() override;
-    [[nodiscard]] bool isConnected() const override { return m_connectionState == ConnectionState::Connected; }
+    [[nodiscard]] bool isConnected() const override {
+        return m_connectionState == ConnectionState::Connected;
+    }
     [[nodiscard]] QString connectionStatus() const override { return m_statusMessage; }
     [[nodiscard]] ConnectionState connectionState() const override { return m_connectionState; }
 
@@ -56,7 +62,7 @@ class WingProtocol : public MixerProtocol {
     void recallSnippet(int snippetNumber) override;
 
     // semantic channel setters (WING uses real-world values, so most pass through)
-    void setChannelFader(int channel, double level) override;
+    void setChannelFaderDb(int channel, double level) override;
     void setChannelMute(int channel, bool muted) override;
     void setChannelPreamp(int channel, double gainDb) override;
     void setChannelHpf(int channel, bool on, double freqHz) override;
@@ -71,7 +77,7 @@ class WingProtocol : public MixerProtocol {
     void setChannelColor(int channel, int color) override;
 
     void setDcaMute(int dca, bool muted) override;
-    void setDcaFader(int dca, double level) override;
+    void setDcaFaderDb(int dca, double level) override;
     void setDcaName(int dca, const QString& name) override;
     void setChannelDcaMask(int channel, quint32 mask) override;
     void setBusDcaMask(int bus, quint32 mask) override;
@@ -116,9 +122,11 @@ class WingProtocol : public MixerProtocol {
     ConnectionState m_connectionState = ConnectionState::Disconnected;
     QString m_statusMessage;
 
-    // keep-alive timer (WING requires periodic messages)
     QTimer m_keepAliveTimer;
-    static constexpr int KEEPALIVE_INTERVAL = 8000;
+    // the subscription dies 10 s after the last request, so renew at 4.5 s: one
+    // dropped renew still leaves a further one inside the window
+    static constexpr int KEEPALIVE_INTERVAL = 4500;
+    static constexpr auto SUBSCRIBE_COMMAND = "/*s~";
 
     // connection timeout
     QTimer m_connectionTimer;

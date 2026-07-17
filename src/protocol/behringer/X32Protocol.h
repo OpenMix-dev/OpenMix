@@ -34,7 +34,9 @@ class X32Protocol : public MixerProtocol {
     // connection management
     [[nodiscard]] bool connect(const QString& host, int port) override;
     void disconnect() override;
-    [[nodiscard]] bool isConnected() const override { return m_connectionState == ConnectionState::Connected; }
+    [[nodiscard]] bool isConnected() const override {
+        return m_connectionState == ConnectionState::Connected;
+    }
     [[nodiscard]] QString connectionStatus() const override { return m_statusMessage; }
     [[nodiscard]] ConnectionState connectionState() const override { return m_connectionState; }
 
@@ -54,7 +56,7 @@ class X32Protocol : public MixerProtocol {
     void recallSnippet(int snippetNumber) override;
 
     // semantic channel setters (used by actor-voice recall and fades)
-    void setChannelFader(int channel, double level) override;
+    void setChannelFaderDb(int channel, double dB) override;
     [[nodiscard]] std::optional<double> readChannelFader(int channel) override;
     void setChannelMute(int channel, bool muted) override;
     void setChannelPreamp(int channel, double gainDb) override;
@@ -70,7 +72,7 @@ class X32Protocol : public MixerProtocol {
     void setChannelColor(int channel, int color) override;
 
     void setDcaMute(int dca, bool muted) override;
-    void setDcaFader(int dca, double level) override;
+    void setDcaFaderDb(int dca, double dB) override;
     void setDcaName(int dca, const QString& name) override;
     void setChannelDcaMask(int channel, quint32 mask) override;
     void setBusDcaMask(int bus, quint32 mask) override;
@@ -127,9 +129,15 @@ class X32Protocol : public MixerProtocol {
     ConnectionState m_connectionState = ConnectionState::Disconnected;
     QString m_statusMessage;
 
-    // keep-alive timer (X32 requires /xremote every 10 seconds)
+    // The console stops sending updates ~10 s after the last /xremote, so renew at
+    // 4.5 s (as the reference does): a single dropped renew still leaves a further
+    // one inside the window, where an 8 s period would not.
     QTimer m_keepAliveTimer;
-    static constexpr int KEEPALIVE_INTERVAL = 8000; // 8s
+    static constexpr int KEEPALIVE_INTERVAL = 4500;
+
+    // how long the console may go silent before the link counts as dead; metering
+    // streams continuously once subscribed, so silence this long is a real fault
+    static constexpr int RESPONSE_TIMEOUT = 24000;
 
     // connection timeout
     QTimer m_connectionTimer;
