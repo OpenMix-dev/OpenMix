@@ -46,7 +46,7 @@ class RecordingMixer : public MixerProtocol {
     void recallScene(int scene) override { calls << QString("scene:%1").arg(scene); }
     void recallSnippet(int snippet) override { calls << QString("snippet:%1").arg(snippet); }
 
-    void setChannelFader(int channel, double level) override {
+    void setChannelFaderDb(int channel, double level) override {
         calls << QString("fader:ch=%1:level=%2").arg(channel).arg(level);
     }
 
