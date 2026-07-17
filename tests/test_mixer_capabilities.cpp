@@ -13,7 +13,8 @@ class TestMixerCapabilities : public QObject {
         QCOMPARE(MixerCapabilities::forProtocolId("m32").dcaCount, 8);
         QCOMPARE(MixerCapabilities::forProtocolId("wing").dcaCount, 16);
         QCOMPARE(MixerCapabilities::forProtocolId("sq7").dcaCount, 8);
-        QCOMPARE(MixerCapabilities::forProtocolId("gld80").dcaCount, 8);
+        // GLD MIDI Protocol V1.4: DCA 1 to 16 = CH 10..1F
+        QCOMPARE(MixerCapabilities::forProtocolId("gld80").dcaCount, 16);
         QCOMPARE(MixerCapabilities::forProtocolId("avantis").dcaCount, 16);
         QCOMPARE(MixerCapabilities::forProtocolId("dlive").dcaCount, 16);
         QCOMPARE(MixerCapabilities::forProtocolId("tf5").dcaCount, 8);

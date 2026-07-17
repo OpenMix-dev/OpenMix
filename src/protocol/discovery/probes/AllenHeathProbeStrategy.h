@@ -11,10 +11,10 @@ namespace OpenMix {
 //   * SQ family  - TCP 51326, binary 7F 01 / 7F 02 frame with a model byte.
 //   * ACE family - TCP 51321, SysEx "DR Box Identification" request. The reply is
 //     a handle, not a name; reading that handle back returns the string that
-//     identifies dLive ("TLD..."), Avantis ("Bridge"/"Avantis Solo"), or GLD
-//     ("GLD...").
+//     identifies dLive ("TLD...") or Avantis ("Bridge"/"Avantis Solo"). GLD does
+//     not answer this handshake and stays a connect-time selection.
 // Both are attempted; the one the device answers wins. Control ports differ
-// (SQ/GLD MIDI-over-TCP 51325, Avantis/dLive ACE-TCP 51321).
+// (SQ/Qu/GLD MIDI-over-TCP 51325, Avantis/dLive ACE-TCP 51321).
 class AllenHeathProbeStrategy : public OscProbeStrategy {
   public:
     int probePort() const override { return 51320; }

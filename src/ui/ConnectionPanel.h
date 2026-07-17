@@ -7,6 +7,7 @@
 
 class QLineEdit;
 class QComboBox;
+class QSpinBox;
 class QPushButton;
 class QLabel;
 
@@ -54,6 +55,8 @@ class ConnectionPanel : public QWidget {
     QLabel* m_portLabel;
     QComboBox* m_faderLawCombo;
     QLabel* m_faderLawLabel;
+    QSpinBox* m_midiChannelSpin;
+    QLabel* m_midiChannelLabel;
     QLabel* m_loopbackLabel;
     QPushButton* m_connectButton;
     QPushButton* m_disconnectButton;

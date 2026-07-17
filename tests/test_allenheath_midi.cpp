@@ -1,6 +1,7 @@
 #include "core/Cue.h"
 #include "protocol/MixerCapabilities.h"
 #include "protocol/allenheath/AllenHeathMidiProtocol.h"
+#include "protocol/allenheath/GLDProtocol.h"
 #include "protocol/allenheath/QuProtocol.h"
 #include <QtTest/QtTest>
 
@@ -15,6 +16,18 @@ class QuProbe : public QuProtocol {
     using QuProtocol::buildMute;
     using QuProtocol::buildSceneRecall;
     using QuProtocol::levelFromDb;
+};
+
+// exposes GLD's builders; GLD's map is its own again
+class GldProbe : public GLDProtocol {
+  public:
+    GldProbe() : GLDProtocol(MixerCapabilities::forConsole(ConsoleType::GLD80)) {}
+    using GLDProtocol::buildColour;
+    using GLDProtocol::buildFader;
+    using GLDProtocol::buildMute;
+    using GLDProtocol::buildName;
+    using GLDProtocol::levelFromDb;
+    using GLDProtocol::setMidiChannel;
 };
 
 // exposes the protected NRPN builder + satisfies the pure virtuals
@@ -240,6 +253,68 @@ class TestAllenHeathMidi : public QObject {
         QCOMPARE(caps.dcaCount, 4); // DCA Groups 1 to 4
         QCOMPARE(caps.scenes, 100); // Scene 1 to 100
         QCOMPARE(caps.inputChannels, 32);
+    }
+
+    // --- GLD, per the GLD MIDI and TCP/IP Protocol V1.4 ---
+
+    void gld_levelReproducesThePrintedTable() {
+        // its own table: 0 dB is 6B here, 62 on Qu
+        struct Row {
+            double dB;
+            quint8 lv;
+        };
+        static const Row rows[] = {
+            {10, 0x7F},  {5, 0x74},   {0, 0x6B},   {-5, 0x61},  {-10, 0x57}, {-15, 0x4D},
+            {-20, 0x43}, {-25, 0x39}, {-30, 0x2F}, {-35, 0x25}, {-40, 0x1B}, {-45, 0x11},
+        };
+        for (const Row& r : rows) {
+            QCOMPARE(GldProbe::levelFromDb(r.dB), static_cast<int>(r.lv));
+        }
+        QCOMPARE(GldProbe::levelFromDb(NEG_INF_DB), 0x00);
+    }
+
+    void gld_faderCarriesNoDataEntryLsb() {
+        // BN 63 CH | BN 62 17 | BN 06 LV - three messages, where SQ and Qu send four
+        GldProbe g;
+        // Input 1 = CH 20 at unity
+        QCOMPARE(g.buildFader(0x20, 0.0), QByteArray::fromHex("B06320B06217B0066B"));
+        // DCA 1 = CH 10, fully down
+        QCOMPARE(g.buildFader(0x10, NEG_INF_DB), QByteArray::fromHex("B06310B06217B00600"));
+    }
+
+    void gld_muteIsANote() {
+        GldProbe g;
+        QCOMPARE(g.buildMute(0x20, true), QByteArray::fromHex("90207F902000"));
+        QCOMPARE(g.buildMute(0x20, false), QByteArray::fromHex("90203F902000"));
+    }
+
+    void gld_nameAndColourAreSysex() {
+        // header F0 00 00 1A 50 10 01 00 0N, then 03 CH <ascii> F7 / 06 CH Col F7
+        GldProbe g;
+        QCOMPARE(g.buildName(0x20, "Vox"), QByteArray::fromHex("f000001a50100100000320566f78f7"));
+        QCOMPARE(g.buildColour(0x20, 0x02), QByteArray::fromHex("f000001a5010010000062002f7"));
+    }
+
+    void gld_midiChannelReachesEveryMessage() {
+        // the channel rides the status byte and the SysEx header, and the console
+        // cannot report it: a mismatch silently talks to nobody
+        GldProbe g;
+        g.setMidiChannel(3); // console channel 3 -> N = 2
+        QCOMPARE(g.midiChannel(), 3);
+        QCOMPARE(g.buildFader(0x20, 0.0), QByteArray::fromHex("B26320B26217B2066B"));
+        QCOMPARE(g.buildMute(0x20, true), QByteArray::fromHex("92207F922000"));
+        QCOMPARE(g.buildColour(0x20, 0x02), QByteArray::fromHex("f000001a5010010002062002f7"));
+
+        g.setMidiChannel(1); // the default: N = 0
+        QCOMPARE(g.buildFader(0x20, 0.0), QByteArray::fromHex("B06320B06217B0066B"));
+    }
+
+    void gld_capabilitiesMatchTheDoc() {
+        const auto caps = MixerCapabilities::forConsole(ConsoleType::GLD80);
+        QCOMPARE(caps.defaultPort, 51325); // MIDI over TCP, not ACE 51321
+        QCOMPARE(caps.protocol, ProtocolType::MidiTcp);
+        QCOMPARE(caps.dcaCount, 16); // DCA 1 to 16 = 10..1F
+        QCOMPARE(caps.scenes, 500);  // 500 scenes in 4 banks
     }
 };
 

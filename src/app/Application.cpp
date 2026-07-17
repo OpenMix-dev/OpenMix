@@ -29,6 +29,7 @@
 #include "protocol/ProtocolFactory.h"
 #include "protocol/allenheath/AllenHeathMidiProtocol.h"
 #include "protocol/allenheath/AllenHeathTcpProtocol.h"
+#include "protocol/allenheath/GLDProtocol.h"
 #include "protocol/discovery/ConsoleDiscoveryService.h"
 #include "protocol/discovery/DiscoveredConsole.h"
 #include "protocol/discovery/probes/AllenHeathProbeStrategy.h"
@@ -381,6 +382,10 @@ void Application::connectToMixer(const QString& type, const QString& host, int p
         midi->setFaderLaw(m_show->mixerConfig().faderLaw == "audio"
                               ? AllenHeathMidiProtocol::FaderLaw::AudioTaper
                               : AllenHeathMidiProtocol::FaderLaw::LinearTaper);
+    }
+
+    if (auto* gld = dynamic_cast<GLDProtocol*>(m_mixer)) {
+        gld->setMidiChannel(m_show->mixerConfig().midiChannel);
     }
 
     setupMixerConnection(type, host, port);

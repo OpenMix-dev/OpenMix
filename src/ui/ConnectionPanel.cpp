@@ -18,6 +18,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QVBoxLayout>
 
 namespace OpenMix {
@@ -109,6 +110,12 @@ void ConnectionPanel::setupUi() {
     m_faderLawCombo->setToolTip(
         tr("Must match the console: Utility > General > MIDI > NRPN Fader Law."));
     formLayout->addRow(m_faderLawLabel, m_faderLawCombo);
+
+    m_midiChannelLabel = new QLabel(tr("MIDI Channel:"), this);
+    m_midiChannelSpin = new QSpinBox(this);
+    m_midiChannelSpin->setRange(1, 16);
+    m_midiChannelSpin->setToolTip(tr("Must match the console: Setup / Control / MIDI channel."));
+    formLayout->addRow(m_midiChannelLabel, m_midiChannelSpin);
 
     m_loopbackLabel = new QLabel(tr("No hardware connection required."), this);
     m_loopbackLabel->setStyleSheet("color: gray; font-style: italic;");
@@ -364,6 +371,11 @@ void ConnectionPanel::onProtocolTypeChanged(int index) {
     m_faderLawLabel->setVisible(hasFaderLaw);
     m_faderLawCombo->setVisible(hasFaderLaw);
 
+    // GLD stamps its MIDI channel into every message it sends
+    const bool hasMidiChannel = type.startsWith("gld");
+    m_midiChannelLabel->setVisible(hasMidiChannel);
+    m_midiChannelSpin->setVisible(hasMidiChannel);
+
     if (!isLoopback) {
         m_portEdit->setText(QString::number(caps.defaultPort));
     }
@@ -446,6 +458,7 @@ void ConnectionPanel::loadFromConfig() {
 
     const int lawIdx = m_faderLawCombo->findData(config.faderLaw);
     m_faderLawCombo->setCurrentIndex(lawIdx < 0 ? 0 : lawIdx);
+    m_midiChannelSpin->setValue(config.midiChannel);
 }
 
 void ConnectionPanel::saveToConfig() {
@@ -455,6 +468,7 @@ void ConnectionPanel::saveToConfig() {
     config.port = m_portEdit->text().toInt();
     config.dcaCount = MixerCapabilities::forProtocolId(config.type).dcaCount;
     config.faderLaw = m_faderLawCombo->currentData().toString();
+    config.midiChannel = m_midiChannelSpin->value();
     m_app->show()->setMixerConfig(config);
 }
 

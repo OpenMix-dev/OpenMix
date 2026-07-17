@@ -162,17 +162,19 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         }
         break;
 
+    // GLD is MIDI over TCP 51325 per the GLD MIDI and TCP/IP Protocol V1.4, which
+    // also gives it 16 DCAs and 500 scenes (4 banks of 128).
     case ConsoleType::GLD80:
         caps.manufacturer = Manufacturer::AllenHeath;
-        caps.protocol = ProtocolType::BinaryTcp;
+        caps.protocol = ProtocolType::MidiTcp;
         caps.displayName = "Allen & Heath GLD-80";
         caps.protocolId = "gld80";
-        caps.defaultPort = 51321;
-        caps.dcaCount = 8;
+        caps.defaultPort = 51325;
+        caps.dcaCount = 16;
         caps.inputChannels = 48;
         caps.mixBuses = 20;
         caps.matrixOutputs = 4;
-        caps.scenes = 250;
+        caps.scenes = 500;
         caps.maxDCANameLength = 8;
         caps.eqBandsPerChannel = 4;
         caps.supportsChannelEQ = true;
@@ -184,15 +186,15 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::GLD112:
         caps.manufacturer = Manufacturer::AllenHeath;
-        caps.protocol = ProtocolType::BinaryTcp;
+        caps.protocol = ProtocolType::MidiTcp;
         caps.displayName = "Allen & Heath GLD-112";
         caps.protocolId = "gld112";
-        caps.defaultPort = 51321;
-        caps.dcaCount = 8;
+        caps.defaultPort = 51325;
+        caps.dcaCount = 16;
         caps.inputChannels = 48;
         caps.mixBuses = 30;
         caps.matrixOutputs = 4;
-        caps.scenes = 250;
+        caps.scenes = 500;
         caps.maxDCANameLength = 8;
         caps.eqBandsPerChannel = 4;
         caps.supportsChannelEQ = true;

@@ -326,7 +326,6 @@ add_executable(test_allenheath_parsing
     ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/AllenHeathTcpProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/AvantisProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/DLiveProtocol.cpp
-    ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/GLDProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/transport/TcpTransport.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
@@ -374,6 +373,7 @@ add_test(NAME AllenHeathSessionTest COMMAND test_allenheath_session)
 add_executable(test_allenheath_midi
     test_allenheath_midi.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/AllenHeathMidiProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/GLDProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/QuProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/transport/TcpTransport.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp

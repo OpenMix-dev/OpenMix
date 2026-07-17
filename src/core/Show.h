@@ -35,6 +35,10 @@ struct MixerConfig {
     // mode) or "audio". Ignored by consoles without the setting.
     QString faderLaw = "linear";
 
+    // GLD stamps its MIDI channel into every message and cannot report it, so it
+    // has to match Setup / Control on the console. 1-16.
+    int midiChannel = 1;
+
     [[nodiscard]] bool operator==(const MixerConfig& other) const;
     [[nodiscard]] bool operator!=(const MixerConfig& other) const { return !(*this == other); }
 

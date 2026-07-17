@@ -1,7 +1,6 @@
 #include "protocol/MixerCapabilities.h"
 #include "protocol/allenheath/AvantisProtocol.h"
 #include "protocol/allenheath/DLiveProtocol.h"
-#include "protocol/allenheath/GLDProtocol.h"
 #include <QtTest/QtTest>
 
 using namespace OpenMix;
@@ -32,15 +31,6 @@ class DLiveProbe : public DLiveProtocol {
     using AllenHeathTcpProtocol::buildChannelMute;
     using AllenHeathTcpProtocol::buildChannelMuteSpill;
     using AllenHeathTcpProtocol::buildDcaMute;
-};
-
-class GLDProbe : public GLDProtocol {
-  public:
-    GLDProbe() : GLDProtocol(MixerCapabilities::forConsole(ConsoleType::GLD80)) {}
-    using AllenHeathTcpProtocol::buildChannelLevel;
-    using AllenHeathTcpProtocol::buildChannelMute;
-    using AllenHeathTcpProtocol::buildDcaMute;
-    using AllenHeathTcpProtocol::encodeDb;
 };
 
 const QByteArray H = QByteArray::fromHex("abcd"); // mock learned handle
@@ -200,25 +190,6 @@ class TestAllenHeathParsing : public QObject {
         AvantisProbe p;
         QVERIFY(p.buildChannelLevel(QByteArray(), 1, 0.0).isEmpty());
         QVERIFY(p.buildDcaMute(QByteArray(), 1, true).isEmpty());
-    }
-
-    void gld_propertyFrames() {
-        GLDProbe p;
-        // GLD level + mute share op 0x16 (mute plane 0x90); DCA mute op 0x10 plane 0x10
-        QCOMPARE(p.buildChannelLevel(H, 1, 0.0),
-                 QByteArray::fromHex("f00000abcd0001160000028000f7"));
-        QCOMPARE(p.buildChannelMute(H, 1, true), QByteArray::fromHex("f00000abcd00011690000101f7"));
-        QCOMPARE(p.buildDcaMute(H, 1, true), QByteArray::fromHex("f00000abcd00011010000101f7"));
-    }
-
-    void gld_dbTableDiffersFromAce() {
-        GLDProbe g;
-        AvantisProbe a;
-        // GLD uses reference FUN_00415780: positive .3 = 0x4E (ACE 0x4F)
-        QCOMPARE(g.encodeDb(5.3), QByteArray::fromHex("854e"));
-        QCOMPARE(a.encodeDb(5.3), QByteArray::fromHex("854f"));
-        // GLD negative .3 = 0xB3
-        QCOMPARE(g.encodeDb(-5.3), QByteArray::fromHex("7ab3"));
     }
 };
 
