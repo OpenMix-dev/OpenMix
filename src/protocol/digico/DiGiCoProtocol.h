@@ -2,26 +2,19 @@
 
 #include "../MixerCapabilities.h"
 #include "../MixerProtocol.h"
-#include "../transport/TcpTransport.h"
-#include <QByteArray>
+#include "../transport/OscTransport.h"
 #include <QMap>
-#include <QTimer>
+#include <QString>
 
 namespace OpenMix {
 
-// DiGiCo SD-series console driver.
+// DiGiCo SD / Quantum series, over the console's Generic OSC.
 //
-// Speaks the console's TLV control protocol over TCP port 51321. Frames carry a
-// 4-character block tag (MMIX mixing, MSUP setup, MPRO property, EEVT events),
-// a big-endian length, a fixed 0x11 marker, an inner-length byte, a 4-byte
-// opcode, then a run of type/length/value elements (0x31 string, 0x14 int32,
-// 0x11/0x01 byte). Channel indices are zero-based; fader/gain values are carried
-// as centidB (dB x 100) in a big-endian signed int32.
-//
-// The wire format was reverse-engineered from a reference implementation and has
-// not been validated against physical hardware. It is offered as a best-effort
-// driver for the SD range; the framing, opcodes, and value scaling below reflect
-// what could be recovered.
+// DiGiCo publishes no address map: Generic OSC is user-defined, the syntax varies
+// by model and software version, and the console only acts on it with External
+// Control enabled. So the driver is a template - it sends the operator's patterns
+// and nothing for an operation they left blank, since a guessed address would
+// look like it worked here and do nothing on the desk.
 class DiGiCoProtocol : public MixerProtocol {
     Q_OBJECT
 
@@ -31,7 +24,7 @@ class DiGiCoProtocol : public MixerProtocol {
 
     [[nodiscard]] QString protocolName() const override { return m_capabilities.displayName; }
     [[nodiscard]] QString protocolDescription() const override {
-        return m_capabilities.displayName + " SD Protocol";
+        return m_capabilities.displayName + " Generic OSC";
     }
 
     [[nodiscard]] bool connect(const QString& host, int port) override;
@@ -50,54 +43,41 @@ class DiGiCoProtocol : public MixerProtocol {
     void recallSnapshot(const Cue& cue) override;
     void recallScene(int sceneNumber) override;
 
+    void setChannelFaderDb(int channel, double dB) override;
+    void setChannelMute(int channel, bool muted) override;
+
     void refresh() override;
     [[nodiscard]] int latencyMs() const override { return m_latencyMs; }
     [[nodiscard]] const MixerCapabilities& capabilities() const override { return m_capabilities; }
 
-    // frame construction (exposed for tests)
-    static QByteArray buildFrame(const char* tag, const QByteArray& opcode,
-                                 const QByteArray& elements);
-    static QByteArray stringElement(const QString& text);
-    static QByteArray int32Element(qint32 value);
-    static QByteArray byteElement(quint8 value);
+    // The addresses this console listens on, as the operator entered them. "*" in
+    // a pattern is replaced with the channel number. An empty pattern disables
+    // that operation outright.
+    struct OscTemplates {
+        QString channelFader;
+        QString channelMute;
+        QString sceneRecall;
+    };
+    void setTemplates(const OscTemplates& templates) { m_templates = templates; }
+    [[nodiscard]] const OscTemplates& templates() const { return m_templates; }
 
-    // semantic setters (exposed for tests)
-    QByteArray buildFaderMessage(const QString& objectPath, double db);
-    QByteArray buildMuteMessage(const QString& objectPath, bool muted);
-    QByteArray buildSubscribeMixing();
-    QByteArray buildSetClientType();
-
-  protected:
-    virtual void parseProtocolData(const QByteArray& data);
-
-  private slots:
-    void onTransportConnected();
-    void onTransportDisconnected();
-    void onTransportError(const QString& error);
-    void onTransportConnectionLost();
-    void onDataReceived(const QByteArray& data);
-    void onKeepAliveTimeout();
-    void onReconnecting(int attempt, int maxAttempts);
+    // "/ch/*/fader" + channel 3 -> "/ch/3/fader"; empty in, empty out
+    static QString expand(const QString& pattern, int channel);
 
   private:
     void setStatus(const QString& status);
     void setConnectionState(ConnectionState state);
-    void sendHandshake();
 
     MixerCapabilities m_capabilities;
-    TcpTransport m_transport;
-    QMap<QString, QVariant> m_parameterCache;
+    OscTransport m_transport;
+    OscTemplates m_templates;
 
     QString m_host;
     int m_port = 0;
     ConnectionState m_connectionState = ConnectionState::Disconnected;
     QString m_statusMessage;
-
-    QTimer m_keepAliveTimer;
-    static constexpr int KEEPALIVE_INTERVAL = 5000;
-
     int m_latencyMs = 0;
-    QByteArray m_receiveBuffer;
+    QMap<QString, QVariant> m_parameterCache;
 };
 
 } // namespace OpenMix

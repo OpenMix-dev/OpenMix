@@ -67,7 +67,7 @@ void AllenHeathMidiProtocol::sendParameter(const QString& path, const QVariant& 
 
             if (param == "fader") {
                 // DCA level: 14-bit NRPN (SQ Issue 5, Master Sends/Control p24)
-                int midiValue = qBound(0, static_cast<int>(value.toFloat() * 16383.0f), 16383);
+                const quint16 midiValue = encodeLevel14(value.toDouble());
                 QByteArray msg = buildNRPNMessage(0, DCA_LEVEL_MSB, DCA_LEVEL_LSB_BASE + dca - 1,
                                                   (midiValue >> 7) & 0x7F, midiValue & 0x7F);
                 m_transport.send(msg);
@@ -86,7 +86,7 @@ void AllenHeathMidiProtocol::sendParameter(const QString& path, const QVariant& 
 
             if (param == "fader") {
                 // input-channel level to LR: 14-bit NRPN (SQ Issue 5 p22)
-                int midiValue = qBound(0, static_cast<int>(value.toFloat() * 16383.0f), 16383);
+                const quint16 midiValue = encodeLevel14(value.toDouble());
                 QByteArray msg = buildNRPNMessage(0, CH_LEVEL_TO_LR_MSB, ch - 1,
                                                   (midiValue >> 7) & 0x7F, midiValue & 0x7F);
                 m_transport.send(msg);
@@ -101,9 +101,9 @@ void AllenHeathMidiProtocol::sendParameter(const QString& path, const QVariant& 
     m_parameterCache[path] = value;
 }
 
-void AllenHeathMidiProtocol::setChannelFader(int channel, double level) {
+void AllenHeathMidiProtocol::setChannelFaderDb(int channel, double dB) {
     // route through the path-based encoder above (keeps one wire-format code path)
-    sendParameter(QString("/ch/%1/fader").arg(channel), static_cast<float>(level));
+    sendParameter(QString("/ch/%1/fader").arg(channel), dB);
 }
 
 void AllenHeathMidiProtocol::setChannelMute(int channel, bool muted) {
@@ -156,6 +156,75 @@ void AllenHeathMidiProtocol::recallScene(int sceneNumber) {
 void AllenHeathMidiProtocol::refresh() {
     // MIDI doesn't support general refresh
     // console pushes updates automatically
+}
+
+namespace {
+
+// Approximate Audio Taper Level Values (SQ MIDI Protocol Issue 5, p20), as
+// <dB, VC, VF>. The curve is not expressible as a formula, unlike the linear
+// taper, so the printed anchors are interpolated between.
+struct TaperPoint {
+    double dB;
+    quint8 vc;
+    quint8 vf;
+};
+
+constexpr TaperPoint kAudioTaper[] = {
+    {-89, 0x01, 0x40}, {-85, 0x02, 0x00}, {-80, 0x02, 0x40}, {-75, 0x03, 0x40}, {-70, 0x04, 0x00},
+    {-65, 0x05, 0x00}, {-60, 0x06, 0x00}, {-55, 0x07, 0x00}, {-50, 0x08, 0x00}, {-45, 0x0C, 0x00},
+    {-40, 0x0F, 0x40}, {-38, 0x12, 0x40}, {-36, 0x15, 0x40}, {-35, 0x17, 0x00}, {-34, 0x19, 0x00},
+    {-33, 0x1A, 0x40}, {-32, 0x1C, 0x00}, {-31, 0x1D, 0x40}, {-30, 0x1F, 0x00}, {-29, 0x20, 0x40},
+    {-28, 0x22, 0x00}, {-27, 0x23, 0x40}, {-26, 0x25, 0x00}, {-25, 0x26, 0x40}, {-24, 0x28, 0x40},
+    {-23, 0x2A, 0x00}, {-22, 0x2B, 0x40}, {-21, 0x2D, 0x00}, {-20, 0x2E, 0x40}, {-19, 0x30, 0x00},
+    {-18, 0x31, 0x40}, {-17, 0x33, 0x00}, {-16, 0x34, 0x40}, {-15, 0x36, 0x00}, {-14, 0x38, 0x00},
+    {-13, 0x39, 0x40}, {-12, 0x3B, 0x00}, {-11, 0x3C, 0x40}, {-10, 0x3E, 0x00}, {-9, 0x41, 0x40},
+    {-8, 0x44, 0x40},  {-7, 0x48, 0x00},  {-6, 0x4B, 0x00},  {-5, 0x4E, 0x40},  {-4, 0x52, 0x40},
+    {-3, 0x56, 0x40},  {-2, 0x5A, 0x00},  {-1, 0x5E, 0x00},  {0, 0x62, 0x00},   {1, 0x65, 0x40},
+    {2, 0x69, 0x00},   {3, 0x6C, 0x40},   {4, 0x70, 0x00},   {5, 0x73, 0x40},   {6, 0x75, 0x40},
+    {7, 0x78, 0x00},   {8, 0x7A, 0x40},   {9, 0x7D, 0x00},   {10, 0x7F, 0x40},
+};
+
+quint16 taperValue(const TaperPoint& p) { return static_cast<quint16>((p.vc << 7) | p.vf); }
+
+} // namespace
+
+quint16 AllenHeathMidiProtocol::encodeLinearTaper(double dB) {
+    // the printed table is exactly linear in dB: 0 dB = 15196, +10 dB = 16383,
+    // so 118.7 steps per dB. Anchors reproduce to within the doc's own rounding.
+    if (dB <= NEG_INF_DB) {
+        return 0;
+    }
+    const int v = static_cast<int>(std::lround(15196.0 + 118.7 * dB));
+    return static_cast<quint16>(std::clamp(v, 0, 16383));
+}
+
+quint16 AllenHeathMidiProtocol::encodeAudioTaper(double dB) {
+    if (dB <= NEG_INF_DB) {
+        return 0;
+    }
+    const auto* first = std::begin(kAudioTaper);
+    const auto* last = std::end(kAudioTaper) - 1;
+    if (dB <= first->dB) {
+        return taperValue(*first);
+    }
+    if (dB >= last->dB) {
+        return taperValue(*last);
+    }
+    for (const TaperPoint* p = first; p < last; ++p) {
+        const TaperPoint* next = p + 1;
+        if (dB >= p->dB && dB <= next->dB) {
+            const double span = next->dB - p->dB;
+            const double t = span > 0.0 ? (dB - p->dB) / span : 0.0;
+            const double lo = taperValue(*p);
+            const double hi = taperValue(*next);
+            return static_cast<quint16>(std::lround(lo + t * (hi - lo)));
+        }
+    }
+    return taperValue(*last);
+}
+
+quint16 AllenHeathMidiProtocol::encodeLevel14(double dB) const {
+    return m_faderLaw == FaderLaw::AudioTaper ? encodeAudioTaper(dB) : encodeLinearTaper(dB);
 }
 
 QByteArray AllenHeathMidiProtocol::buildNRPNMessage(int channel, int nrpnMsb, int nrpnLsb,

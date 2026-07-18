@@ -18,6 +18,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QVBoxLayout>
 
 namespace OpenMix {
@@ -99,6 +100,47 @@ void ConnectionPanel::setupUi() {
     m_portEdit = new QLineEdit(this);
     m_portEdit->setPlaceholderText(tr("10023")); // default X32 port
     formLayout->addRow(m_portLabel, m_portEdit);
+
+    // the console applies one of two curves to NRPN levels and cannot report
+    // which; the desk and the show have to be told the same thing
+    m_faderLawLabel = new QLabel(tr("NRPN Fader Law:"), this);
+    m_faderLawCombo = new QComboBox(this);
+    m_faderLawCombo->addItem(tr("Linear Taper"), "linear");
+    m_faderLawCombo->addItem(tr("Audio Taper"), "audio");
+    m_faderLawCombo->setToolTip(
+        tr("Must match the console: Utility > General > MIDI > NRPN Fader Law."));
+    formLayout->addRow(m_faderLawLabel, m_faderLawCombo);
+
+    m_midiChannelLabel = new QLabel(tr("MIDI Channel:"), this);
+    m_midiChannelSpin = new QSpinBox(this);
+    m_midiChannelSpin->setRange(1, 16);
+    m_midiChannelSpin->setToolTip(tr("Must match the console: Setup / Control / MIDI channel."));
+    formLayout->addRow(m_midiChannelLabel, m_midiChannelSpin);
+
+    // DiGiCo publishes no OSC address map, so the operator supplies the patterns
+    // their console listens for
+    m_oscHintLabel = new QLabel(
+        tr("DiGiCo does not publish its OSC addresses. Enter the patterns your console\n"
+           "listens for (\"*\" = channel number), and enable External Control on the desk."),
+        this);
+    m_oscHintLabel->setStyleSheet("color: gray; font-style: italic;");
+    m_oscHintLabel->setWordWrap(true);
+    formLayout->addRow(QString(), m_oscHintLabel);
+
+    m_oscFaderLabel = new QLabel(tr("OSC Fader:"), this);
+    m_oscFaderEdit = new QLineEdit(this);
+    m_oscFaderEdit->setPlaceholderText(tr("/ch/*/fader"));
+    formLayout->addRow(m_oscFaderLabel, m_oscFaderEdit);
+
+    m_oscMuteLabel = new QLabel(tr("OSC Mute:"), this);
+    m_oscMuteEdit = new QLineEdit(this);
+    m_oscMuteEdit->setPlaceholderText(tr("/ch/*/mute"));
+    formLayout->addRow(m_oscMuteLabel, m_oscMuteEdit);
+
+    m_oscSceneLabel = new QLabel(tr("OSC Scene Recall:"), this);
+    m_oscSceneEdit = new QLineEdit(this);
+    m_oscSceneEdit->setPlaceholderText(tr("/snapshot/fire"));
+    formLayout->addRow(m_oscSceneLabel, m_oscSceneEdit);
 
     m_loopbackLabel = new QLabel(tr("No hardware connection required."), this);
     m_loopbackLabel->setStyleSheet("color: gray; font-style: italic;");
@@ -350,6 +392,24 @@ void ConnectionPanel::onProtocolTypeChanged(int index) {
     m_portEdit->setVisible(!isLoopback);
     m_loopbackLabel->setVisible(isLoopback);
 
+    const bool hasFaderLaw = type.startsWith("sq");
+    m_faderLawLabel->setVisible(hasFaderLaw);
+    m_faderLawCombo->setVisible(hasFaderLaw);
+
+    // GLD stamps its MIDI channel into every message it sends
+    const bool hasMidiChannel = type.startsWith("gld");
+    m_midiChannelLabel->setVisible(hasMidiChannel);
+    m_midiChannelSpin->setVisible(hasMidiChannel);
+
+    const bool hasOscTemplates = type.startsWith("sd");
+    m_oscHintLabel->setVisible(hasOscTemplates);
+    m_oscFaderLabel->setVisible(hasOscTemplates);
+    m_oscFaderEdit->setVisible(hasOscTemplates);
+    m_oscMuteLabel->setVisible(hasOscTemplates);
+    m_oscMuteEdit->setVisible(hasOscTemplates);
+    m_oscSceneLabel->setVisible(hasOscTemplates);
+    m_oscSceneEdit->setVisible(hasOscTemplates);
+
     if (!isLoopback) {
         m_portEdit->setText(QString::number(caps.defaultPort));
     }
@@ -429,6 +489,13 @@ void ConnectionPanel::loadFromConfig() {
 
     m_hostEdit->setText(config.host);
     m_portEdit->setText(QString::number(config.port));
+
+    const int lawIdx = m_faderLawCombo->findData(config.faderLaw);
+    m_faderLawCombo->setCurrentIndex(lawIdx < 0 ? 0 : lawIdx);
+    m_midiChannelSpin->setValue(config.midiChannel);
+    m_oscFaderEdit->setText(config.oscChannelFader);
+    m_oscMuteEdit->setText(config.oscChannelMute);
+    m_oscSceneEdit->setText(config.oscSceneRecall);
 }
 
 void ConnectionPanel::saveToConfig() {
@@ -437,6 +504,11 @@ void ConnectionPanel::saveToConfig() {
     config.host = m_hostEdit->text().trimmed();
     config.port = m_portEdit->text().toInt();
     config.dcaCount = MixerCapabilities::forProtocolId(config.type).dcaCount;
+    config.faderLaw = m_faderLawCombo->currentData().toString();
+    config.midiChannel = m_midiChannelSpin->value();
+    config.oscChannelFader = m_oscFaderEdit->text().trimmed();
+    config.oscChannelMute = m_oscMuteEdit->text().trimmed();
+    config.oscSceneRecall = m_oscSceneEdit->text().trimmed();
     m_app->show()->setMixerConfig(config);
 }
 

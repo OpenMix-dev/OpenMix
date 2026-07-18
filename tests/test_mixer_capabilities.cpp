@@ -13,7 +13,8 @@ class TestMixerCapabilities : public QObject {
         QCOMPARE(MixerCapabilities::forProtocolId("m32").dcaCount, 8);
         QCOMPARE(MixerCapabilities::forProtocolId("wing").dcaCount, 16);
         QCOMPARE(MixerCapabilities::forProtocolId("sq7").dcaCount, 8);
-        QCOMPARE(MixerCapabilities::forProtocolId("gld80").dcaCount, 8);
+        // GLD MIDI Protocol V1.4: DCA 1 to 16 = CH 10..1F
+        QCOMPARE(MixerCapabilities::forProtocolId("gld80").dcaCount, 16);
         QCOMPARE(MixerCapabilities::forProtocolId("avantis").dcaCount, 16);
         QCOMPARE(MixerCapabilities::forProtocolId("dlive").dcaCount, 16);
         QCOMPARE(MixerCapabilities::forProtocolId("tf5").dcaCount, 8);
@@ -41,7 +42,8 @@ class TestMixerCapabilities : public QObject {
             QCOMPARE(caps.protocol, ProtocolType::MidiTcp);
             QCOMPARE(caps.defaultPort, 51325);
             QCOMPARE(caps.inputChannels, 32);
-            QCOMPARE(caps.dcaCount, 8);
+            QCOMPARE(caps.dcaCount, 4); // Qu MIDI Protocol V1.9+: DCA Groups 1 to 4
+            QCOMPARE(caps.scenes, 100); // ... and Scene 1 to 100
             QCOMPARE(caps.mixBuses, 12);
         }
         // bare "qu" resolves to the base Qu-16

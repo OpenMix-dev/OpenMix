@@ -89,6 +89,16 @@ QByteArray buildAceReply(const QByteArray& identity) {
     return frame;
 }
 
+// what a console answers a by-name request with: the object's handle at [11..12].
+// The identity string only comes back when that handle is read.
+QByteArray buildAceHandleReply(const QByteArray& handle) {
+    QByteArray frame = QByteArray::fromHex("f0000100000001000200");
+    frame.append('\x02');
+    frame.append(handle);
+    frame.append('\xf7');
+    return frame;
+}
+
 DiscoveredConsole parseAce(const QByteArray& identity) {
     AllenHeathProbeStrategy strategy;
     return strategy.parseIdentifyResponse(buildAceReply(identity), QHostAddress("192.168.1.81"),
@@ -439,22 +449,52 @@ class TestConsoleDiscovery : public QObject {
         QCOMPARE(count, 1);
     }
 
+    void service_normalizesV4MappedAddresses() {
+        // a dual-stack socket reports an IPv4 sender as ::ffff:a.b.c.d, and that
+        // literal string then reaches the driver as the host to connect to
+        ConsoleDiscoveryService service;
+        service.registerStrategy(std::make_shared<BehringerX32ProbeStrategy>());
+        service.startScan(1000);
+
+        DiscoveredConsole found;
+        connect(&service, &ConsoleDiscoveryService::consoleDiscovered,
+                [&](const DiscoveredConsole& c) { found = c; });
+
+        service.processDatagram(
+            buildOscReply("/xinfo", {"192.168.8.199", "MyDesk", "X32 RACK", "4.06"}),
+            QHostAddress("::ffff:192.168.8.199"), 10023);
+
+        QTRY_VERIFY_WITH_TIMEOUT(found.isValid(), 2000);
+        QCOMPARE(found.address, QHostAddress("192.168.8.199"));
+        QCOMPARE(found.address.toString(), QString("192.168.8.199"));
+    }
+
     void service_twoStageAceIdentify() {
-        // fake dLive responder on the ACE identify port; drives the UDP-reply ->
-        // TCP "DR Box Identification" -> reply-string path over real sockets
+        // fake dLive responder on the ACE identify port, sequencing the exchange
+        // the way a console does
         QTcpServer server;
         QVERIFY2(server.listen(QHostAddress::LocalHost, AllenHeathProbeStrategy::ACE_IDENTIFY_PORT),
                  qPrintable(server.errorString()));
 
-        QByteArray requestSeen;
-        connect(&server, &QTcpServer::newConnection, [&server, &requestSeen]() {
-            QTcpSocket* conn = server.nextPendingConnection();
-            connect(conn, &QTcpSocket::readyRead, [conn, &requestSeen]() {
-                requestSeen = conn->readAll();
-                conn->write(buildAceReply("TLDDM32Stagebox V1.90 - Rev. 100"));
-                conn->flush();
-            });
-        });
+        const QByteArray handle = QByteArray::fromHex("abcd");
+        QByteArray nameRequestSeen;
+        QByteArray followUpSeen;
+        connect(&server, &QTcpServer::newConnection,
+                [&server, &nameRequestSeen, &followUpSeen, handle]() {
+                    QTcpSocket* conn = server.nextPendingConnection();
+                    connect(conn, &QTcpSocket::readyRead,
+                            [conn, &nameRequestSeen, &followUpSeen, handle]() {
+                                const QByteArray req = conn->readAll();
+                                if (nameRequestSeen.isEmpty()) {
+                                    nameRequestSeen = req;
+                                    conn->write(buildAceHandleReply(handle));
+                                } else {
+                                    followUpSeen = req;
+                                    conn->write(buildAceReply("TLDDM32Stagebox V1.90 - Rev. 100"));
+                                }
+                                conn->flush();
+                            });
+                });
 
         ConsoleDiscoveryService service;
         service.registerStrategy(std::make_shared<AllenHeathProbeStrategy>());
@@ -474,7 +514,8 @@ class TestConsoleDiscovery : public QObject {
         QCOMPARE(found.type, ConsoleType::DLive);
         QCOMPARE(found.modelName, QString("dLive DM32"));
         QCOMPARE(found.port, 51321);
-        QVERIFY(requestSeen.contains("DR Box Identification"));
+        QVERIFY(nameRequestSeen.contains("DR Box Identification"));
+        QCOMPARE(followUpSeen, AllenHeathProbeStrategy::buildAceHandleRead(handle));
     }
 };
 

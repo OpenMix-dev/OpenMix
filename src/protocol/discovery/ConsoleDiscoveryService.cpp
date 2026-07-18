@@ -29,7 +29,8 @@ void ConsoleDiscoveryService::startScan(int timeoutMs) {
     m_scanning = true;
 
     // IPv4-only socket: dual-stack sockets have platform quirks with IPv4 broadcast
-    if (!m_socket.bind(QHostAddress::AnyIPv4, 0)) {
+    if (!m_socket.bind(QHostAddress::AnyIPv4, DISCOVERY_SOURCE_PORT) &&
+        !m_socket.bind(QHostAddress::AnyIPv4, 0)) {
         m_scanning = false;
         emit scanError("Failed to bind UDP socket for discovery");
         return;
@@ -202,6 +203,7 @@ void ConsoleDiscoveryService::launchTcpIdentify(const OscProbeStrategyPtr& strat
 
     auto buffer = std::make_shared<QByteArray>();
     auto done = std::make_shared<bool>(false);
+    auto followUpSent = std::make_shared<bool>(false);
 
     const int identifyPort = id.port;
     auto finish = [this, sock, buffer, done, strategy, host, identifyPort]() {
@@ -219,12 +221,29 @@ void ConsoleDiscoveryService::launchTcpIdentify(const OscProbeStrategyPtr& strat
     };
 
     connect(sock, &QTcpSocket::connected, sock, [sock, id]() { sock->write(id.request); });
-    connect(sock, &QTcpSocket::readyRead, sock, [sock, buffer, id, finish]() {
-        buffer->append(sock->readAll());
-        if (buffer->size() >= id.minResponseBytes) {
-            finish();
-        }
-    });
+    connect(sock, &QTcpSocket::readyRead, sock,
+            [sock, buffer, id, finish, followUpSent, strategy, identifyPort]() {
+                buffer->append(sock->readAll());
+
+                if (!*followUpSent) {
+                    if (buffer->size() < id.minResponseBytes) {
+                        return;
+                    }
+                    const QByteArray followUp = strategy->identifyFollowUp(identifyPort, *buffer);
+                    if (!followUp.isEmpty()) {
+                        *followUpSent = true;
+                        buffer->clear();
+                        sock->write(followUp);
+                        return;
+                    }
+                    finish();
+                    return;
+                }
+
+                if (buffer->size() >= strategy->identifyFollowUpMinBytes(identifyPort)) {
+                    finish();
+                }
+            });
     connect(sock, &QTcpSocket::errorOccurred, sock,
             [finish](QAbstractSocket::SocketError) { finish(); });
 
@@ -234,9 +253,19 @@ void ConsoleDiscoveryService::launchTcpIdentify(const OscProbeStrategyPtr& strat
     sock->connectToHost(host, id.port);
 }
 
-void ConsoleDiscoveryService::addConsole(const DiscoveredConsole& console) {
-    if (!console.isValid()) {
+void ConsoleDiscoveryService::addConsole(const DiscoveredConsole& in) {
+    if (!in.isValid()) {
         return;
+    }
+
+    // A dual-stack socket reports an IPv4 sender as ::ffff:a.b.c.d, which then
+    // reaches the driver as that literal string. Store the plain IPv4 form so
+    // everything downstream sees an address the console will answer on.
+    DiscoveredConsole console = in;
+    bool isV4 = false;
+    const quint32 v4 = console.address.toIPv4Address(&isV4);
+    if (isV4) {
+        console.address = QHostAddress(v4);
     }
 
     for (const auto& existing : m_discovered) {

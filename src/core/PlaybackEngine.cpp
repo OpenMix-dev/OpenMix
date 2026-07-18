@@ -3,6 +3,7 @@
 #include "ActorProfileLibrary.h"
 #include "CueList.h"
 #include "DCAMapping.h"
+#include "LevelDb.h"
 #include "PlaybackGuard.h"
 #include "Position.h"
 #include "protocol/MixerCapabilities.h"
@@ -373,7 +374,7 @@ void PlaybackEngine::applyDCAOverrides(const Cue& cue, const QSet<int>& targetDC
 
             // optional console behaviors, only on the muting edge
             if (muting && m_dimDcaFaders)
-                m_mixer->setDcaFader(dca, 0.0);
+                m_mixer->setDcaFaderDb(dca, 0.0);
             if (muting && m_muteDcaUnassign)
                 clearDcaFromMembers(dca);
         }
@@ -536,14 +537,21 @@ void PlaybackEngine::driveChannelLevel(int channel, double target, double fadeMs
 
     const double from = m_appliedChannelLevels.value(channel, target);
 
-    if (fadeMs > 0.0 && !qFuzzyCompare(from + 1.0, target + 1.0)) {
-        m_fadeEngine.start(QString("ch:%1").arg(channel), from, target, fadeMs, curve,
+    // Fades run in dB, but -inf is a sentinel far below the throw: ramping to it
+    // literally would dive through -900 dB and land as an abrupt cut. Ramp to the
+    // bottom of the throw instead, and let the last step become -inf.
+    const double rampFrom = std::max(from, MIN_DB);
+    const double rampTo = std::max(target, MIN_DB);
+
+    if (fadeMs > 0.0 && !qFuzzyCompare(rampFrom + 1.0, rampTo + 1.0)) {
+        m_fadeEngine.start(QString("ch:%1").arg(channel), rampFrom, rampTo, fadeMs, curve,
                            [this, channel](double v) {
                                if (m_mixer)
-                                   m_mixer->setChannelFader(channel, v);
+                                   m_mixer->setChannelFaderDb(channel,
+                                                              v <= MIN_DB ? NEG_INF_DB : v);
                            });
     } else {
-        m_mixer->setChannelFader(channel, target);
+        m_mixer->setChannelFaderDb(channel, target);
     }
     m_appliedChannelLevels[channel] = target;
 }
@@ -666,7 +674,8 @@ void PlaybackEngine::verifyCue(int index, const Cue& cue) {
         int index;
         QStringList drifted;
     };
-    auto acc = std::make_shared<Accumulator>(Accumulator{static_cast<int>(toVerify.size()), index, {}});
+    auto acc =
+        std::make_shared<Accumulator>(Accumulator{static_cast<int>(toVerify.size()), index, {}});
 
     for (const QString& path : toVerify) {
         const double expected = params.value(path).toDouble();

@@ -24,6 +24,12 @@ bool TcpTransport::connect(const QString& host, int port) {
         disconnect();
     }
 
+    // connectToHost() is rejected outright unless the socket is unconnected, so a
+    // socket still connecting or closing from a previous attempt has to be dropped
+    if (m_socket.state() != QAbstractSocket::UnconnectedState) {
+        m_socket.abort();
+    }
+
     m_host = host;
     m_port = port;
     m_reconnectAttempts = 0;
@@ -104,7 +110,9 @@ void TcpTransport::onError(QAbstractSocket::SocketError error) {
         }
         break;
     default:
-        errorMsg = m_socket.errorString();
+        // Qt's string for an unmapped errno is a bare "Unknown error"; carry the
+        // enum so the log can still identify the failure
+        errorMsg = QString("%1 (socket error %2)").arg(m_socket.errorString()).arg(error);
         break;
     }
 

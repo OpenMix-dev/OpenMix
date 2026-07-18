@@ -59,6 +59,43 @@ class TestShow : public QObject {
         QCOMPARE(spy.count(), 1);
     }
 
+    void mixerConfig_faderLawRoundTrips() {
+        // the console cannot report its NRPN Fader Law, so the show has to carry it
+        MixerConfig config;
+        config.type = "sq7";
+        config.host = "192.168.1.70";
+        config.faderLaw = "audio";
+
+        const MixerConfig back = MixerConfig::fromJson(config.toJson());
+        QCOMPARE(back.faderLaw, QString("audio"));
+        QVERIFY(back == config);
+
+        // shows written before the setting existed default to the console's
+        // standard mode rather than to nothing
+        QJsonObject legacy;
+        legacy["type"] = "sq7";
+        QCOMPARE(MixerConfig::fromJson(legacy).faderLaw, QString("linear"));
+    }
+
+    void mixerConfig_oscTemplatesRoundTrip() {
+        // DiGiCo's OSC addresses are the operator's to supply, so the show carries
+        // them; a show that has never been configured carries none
+        MixerConfig config;
+        config.type = "sd12";
+        config.oscChannelFader = "/ch/*/fader";
+        config.oscSceneRecall = "/snapshot/fire";
+
+        const MixerConfig back = MixerConfig::fromJson(config.toJson());
+        QCOMPARE(back.oscChannelFader, QString("/ch/*/fader"));
+        QCOMPARE(back.oscSceneRecall, QString("/snapshot/fire"));
+        QVERIFY(back.oscChannelMute.isEmpty());
+        QVERIFY(back == config);
+
+        QJsonObject legacy;
+        legacy["type"] = "sd12";
+        QVERIFY(MixerConfig::fromJson(legacy).oscChannelFader.isEmpty());
+    }
+
     void setMixerConfig_identicalConfig_isNoOp() {
         Show show;
         MixerConfig config = show.mixerConfig();

@@ -96,10 +96,44 @@ QList<TcpIdentify> AllenHeathProbeStrategy::tcpIdentifies() const {
     TcpIdentify ace;
     ace.port = ACE_IDENTIFY_PORT; // 51321
     ace.request = aceRequest(QByteArrayLiteral("DR Box Identification"));
-    ace.minResponseBytes = 13; // F0 + 10 header + at least one payload byte + F7
+    ace.minResponseBytes = 14; // the by-name reply is a fixed 14-byte handle frame
     ace.timeoutMs = 300;
 
     return {sq, ace};
+}
+
+QByteArray AllenHeathProbeStrategy::buildAceHandleRead(const QByteArray& handle) {
+    // F0 <class 00 01> <dest = handle:2> <src 00 01> <opcode 01 00> <len 00 00> F7
+    if (handle.size() != 2) {
+        return {};
+    }
+    QByteArray f;
+    f.append('\xf0');
+    f.append('\0');
+    f.append('\x01');
+    f.append(handle);
+    f.append('\0');
+    f.append('\x01');
+    f.append('\x01');
+    f.append('\0');
+    f.append('\0');
+    f.append('\0');
+    f.append('\xf7');
+    return f;
+}
+
+QByteArray AllenHeathProbeStrategy::identifyFollowUp(int identifyPort,
+                                                     const QByteArray& firstReply) const {
+    // SQ answers the model in one shot; only the ACE families need the read-back
+    if (identifyPort != ACE_IDENTIFY_PORT || firstReply.size() < 14) {
+        return {};
+    }
+    return buildAceHandleRead(firstReply.mid(11, 2));
+}
+
+int AllenHeathProbeStrategy::identifyFollowUpMinBytes(int identifyPort) const {
+    // header + at least one byte of identity string + F7
+    return identifyPort == ACE_IDENTIFY_PORT ? 13 : 0;
 }
 
 DiscoveredConsole AllenHeathProbeStrategy::parseIdentifyResponse(const QByteArray& response,

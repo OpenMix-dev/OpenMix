@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../core/LevelDb.h"
 #include "../MixerCapabilities.h"
 #include "../MixerProtocol.h"
 #include "../transport/TcpTransport.h"
@@ -72,29 +73,44 @@ class AllenHeathMidiProtocol : public MixerProtocol {
     [[nodiscard]] const MixerCapabilities& capabilities() const override { return m_capabilities; }
 
     // Input-channel fader level + mute via NRPN. Parameter numbers verified
-    // against the A&H SQ MIDI Protocol (Firmware V2.0.3) reference tables:
-    // Inputs-to-LR level MSB 0x40, input mute MSB 0x00, DCA level MSB 0x4F /
-    // LSB 0x67+, DCA mute MSB 0x02 (all LSB = 0-based item index). Levels are a
-    // 14-bit position; the console applies its own NRPN Fader Law (Linear/Audio
-    // Taper). Qu shares this map; GLD is close but should be checked per its doc.
-    void setChannelFader(int channel, double level) override;
+    // against the A&H SQ MIDI Protocol Issue 5 reference tables: inputs-to-LR
+    // level MSB 0x40, input mute MSB 0x00, DCA level MSB 0x4F / LSB 0x20+ (Mix
+    // Sends "Control" table), DCA mute MSB 0x02 (all LSB = 0-based item index).
+    void setChannelFaderDb(int channel, double dB) override;
     void setChannelMute(int channel, bool muted) override;
 
+    // Which curve the console maps NRPN levels through, set at Utility > General >
+    // MIDI > NRPN Fader Law and not readable over MIDI, so it has to be told: a
+    // mismatch still moves the fader, just to the wrong dB. Linear is standard.
+    enum class FaderLaw { LinearTaper, AudioTaper };
+    void setFaderLaw(FaderLaw law) { m_faderLaw = law; }
+    [[nodiscard]] FaderLaw faderLaw() const { return m_faderLaw; }
+
   protected:
+    // dB -> the console's 14-bit NRPN level, through the active fader law
+    [[nodiscard]] quint16 encodeLevel14(double dB) const;
+    static quint16 encodeLinearTaper(double dB);
+    static quint16 encodeAudioTaper(double dB);
+
+    // the dB value standing in for -inf; anything at or below encodes to zero
+    static constexpr double NEG_INF_DB = OpenMix::NEG_INF_DB;
+
     // SQ NRPN parameter MSB; the LSB is the 0-based item index unless noted.
     static constexpr int CH_LEVEL_TO_LR_MSB = 0x40; // input N -> LR level (LSB = N-1)
     static constexpr int CH_MUTE_MSB = 0x00;        // input N mute        (LSB = N-1)
-    static constexpr int DCA_LEVEL_MSB = 0x4F;      // DCA N level         (LSB = 0x67 + N-1)
-    static constexpr int DCA_LEVEL_LSB_BASE = 0x67; // per A&H SQ MIDI Protocol, Level table
+    static constexpr int DCA_LEVEL_MSB = 0x4F;      // DCA N level         (LSB = 0x20 + N-1)
+    static constexpr int DCA_LEVEL_LSB_BASE = 0x20; // SQ Iss5 p24 / Qu Iss2 p25: DCA1 = 4F 20
     static constexpr int DCA_MUTE_MSB = 0x02;       // DCA N mute          (LSB = N-1)
 
     // MIDI message builders used by subclasses
     QByteArray buildNRPNMessage(int channel, int nrpnMsb, int nrpnLsb, int valueMsb, int valueLsb);
-    QByteArray buildSceneRecall(int sceneNumber);
+    virtual QByteArray buildSceneRecall(int sceneNumber);
     QByteArray buildControlChange(int channel, int cc, int value);
 
     // parse incoming MIDI data
     virtual void parseMidiData(const QByteArray& data);
+
+    FaderLaw m_faderLaw = FaderLaw::LinearTaper;
 
     // subclass-specific param mapping
     virtual void initializeSnapshotParams() = 0;

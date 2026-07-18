@@ -217,7 +217,7 @@ class TestPlaybackDcaAssign : public QObject {
     void baseDefaults_useGenericPaths() {
         RecordingProtocol proto;
         proto.setDcaMute(3, true);
-        proto.setDcaFader(2, 0.5);
+        proto.setDcaFaderDb(2, 0.5);
         proto.setDcaName(1, "Band");
         proto.setChannelDcaMask(5, 7); // default no-op
 

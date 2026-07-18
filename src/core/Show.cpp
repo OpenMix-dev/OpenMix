@@ -11,6 +11,12 @@ QJsonObject MixerConfig::toJson() const {
     json["host"] = host;
     json["port"] = port;
     json["dcaCount"] = dcaCount;
+    json["faderLaw"] = faderLaw;
+    json["midiChannel"] = midiChannel;
+    json["oscChannelFader"] = oscChannelFader;
+    json["oscChannelMute"] = oscChannelMute;
+    json["oscSceneRecall"] = oscSceneRecall;
+    json["oscReceivePort"] = oscReceivePort;
     return json;
 }
 
@@ -20,12 +26,21 @@ MixerConfig MixerConfig::fromJson(const QJsonObject& json) {
     config.host = json["host"].toString();
     config.port = json["port"].toInt(10023);
     config.dcaCount = json["dcaCount"].toInt(8);
+    config.faderLaw = json["faderLaw"].toString("linear");
+    config.midiChannel = json["midiChannel"].toInt(1);
+    config.oscChannelFader = json["oscChannelFader"].toString();
+    config.oscChannelMute = json["oscChannelMute"].toString();
+    config.oscSceneRecall = json["oscSceneRecall"].toString();
+    config.oscReceivePort = json["oscReceivePort"].toInt(8000);
     return config;
 }
 
 bool MixerConfig::operator==(const MixerConfig& other) const {
     return type == other.type && host == other.host && port == other.port &&
-           dcaCount == other.dcaCount;
+           dcaCount == other.dcaCount && faderLaw == other.faderLaw &&
+           midiChannel == other.midiChannel && oscChannelFader == other.oscChannelFader &&
+           oscChannelMute == other.oscChannelMute && oscSceneRecall == other.oscSceneRecall &&
+           oscReceivePort == other.oscReceivePort;
 }
 
 Show::Show(QObject* parent)

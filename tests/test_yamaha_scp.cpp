@@ -1,3 +1,4 @@
+#include "core/LevelDb.h"
 #include "protocol/yamaha/YamahaDM7Protocol.h"
 #include "protocol/yamaha/YamahaProtocol.h"
 #include <QSignalSpy>
@@ -39,21 +40,23 @@ class TestYamahaScp : public QObject {
     }
 
     void scpSceneRecall_exactString() {
-        QCOMPARE(YamahaProtocol::scpSceneRecall(5),
-                 QByteArray("ssrecall_ex MIXER:Lib/Scene 5\n"));
+        QCOMPARE(YamahaProtocol::scpSceneRecall(5), QByteArray("ssrecall_ex MIXER:Lib/Scene 5\n"));
         QCOMPARE(YamahaProtocol::scpSceneRecall(100),
                  QByteArray("ssrecall_ex MIXER:Lib/Scene 100\n"));
     }
 
     // ---- value scaling ----
 
-    void faderTaper_anchors() {
-        QCOMPARE(YamahaProtocol::faderLevelToScp(0.0), -32768);  // -inf
-        QCOMPARE(YamahaProtocol::faderLevelToScp(0.75), 0);      // 0 dB at unity
-        QCOMPARE(YamahaProtocol::faderLevelToScp(1.0), 1000);    // +10 dB at top
-        // out-of-range clamps
-        QCOMPARE(YamahaProtocol::faderLevelToScp(-0.5), -32768);
-        QCOMPARE(YamahaProtocol::faderLevelToScp(2.0), 1000);
+    void faderLevel_isCentiDb() {
+        // SCP carries centi-dB, so a cue's dB needs no curve: only the console's
+        // -inf sentinel and its range
+        QCOMPARE(YamahaProtocol::faderLevelToScp(NEG_INF_DB), -32768);
+        QCOMPARE(YamahaProtocol::faderLevelToScp(0.0), 0);     // 0 dB
+        QCOMPARE(YamahaProtocol::faderLevelToScp(10.0), 1000); // +10 dB, top of throw
+        QCOMPARE(YamahaProtocol::faderLevelToScp(-12.5), -1250);
+        // out-of-range clamps to the console's own limits
+        QCOMPARE(YamahaProtocol::faderLevelToScp(-150.0), -13800);
+        QCOMPARE(YamahaProtocol::faderLevelToScp(20.0), 1000);
     }
 
     void faderTaper_monotonic() {
@@ -77,9 +80,9 @@ class TestYamahaScp : public QObject {
 
     void buildFader_usesZeroBasedIndex() {
         ScpProbe p;
-        QCOMPARE(p.buildChannelFader(0, 0.75),
+        QCOMPARE(p.buildChannelFader(0, 0.0),
                  QByteArray("set MIXER:Current/InCh/Fader/Level 0 0 0\n"));
-        QCOMPARE(p.buildChannelFader(3, 1.0),
+        QCOMPARE(p.buildChannelFader(3, 10.0),
                  QByteArray("set MIXER:Current/InCh/Fader/Level 3 0 1000\n"));
     }
 
@@ -107,16 +110,14 @@ class TestYamahaScp : public QObject {
 
     void buildHpf() {
         ScpProbe p;
-        QCOMPARE(p.buildChannelHpfOn(1, true),
-                 QByteArray("set MIXER:Current/InCh/HPF/On 1 0 1\n"));
+        QCOMPARE(p.buildChannelHpfOn(1, true), QByteArray("set MIXER:Current/InCh/HPF/On 1 0 1\n"));
         QCOMPARE(p.buildChannelHpfFreq(2, 100.0),
                  QByteArray("set MIXER:Current/InCh/HPF/Freq 2 0 1000\n"));
     }
 
     void buildEqOnAndBands() {
         ScpProbe p;
-        QCOMPARE(p.buildChannelEqOn(0, true),
-                 QByteArray("set MIXER:Current/InCh/PEQ/On 0 0 1\n"));
+        QCOMPARE(p.buildChannelEqOn(0, true), QByteArray("set MIXER:Current/InCh/PEQ/On 0 0 1\n"));
         // band on -> Bypass 0, band off -> Bypass 1 (idx2 = band)
         QCOMPARE(p.buildChannelEqBandBypass(0, 1, true),
                  QByteArray("set MIXER:Current/InCh/PEQ/Band/Bypass 0 1 0\n"));

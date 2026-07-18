@@ -47,9 +47,10 @@ class MixerProtocol : public QObject {
 
     // semantic per-channel setters used by actor-voice recall and timed fades.
     // Default to no-op so drivers opt in; network OSC drivers (X32/Wing) override.
-    // channel is 1-based; level is normalized 0..1; other units are real-world
-    // (dB, Hz, ms) and the driver scales them to the console wire format.
-    virtual void setChannelFader(int channel, double level);
+    // channel is 1-based; every unit here is real-world (dB, Hz, ms) and the
+    // driver encodes it the way its console wants. Levels are dB, with
+    // OpenMix::NEG_INF_DB meaning the fader is fully down.
+    virtual void setChannelFaderDb(int channel, double level);
     virtual void setChannelMute(int channel, bool muted);
     virtual void setChannelPreamp(int channel, double gainDb);
     virtual void setChannelHpf(int channel, bool on, double freqHz);
@@ -67,7 +68,7 @@ class MixerProtocol : public QObject {
     // Defaults send generic /dca paths the A&H MIDI driver parses into NRPN; OSC
     // drivers override (e.g. X32 mute is /dca/N/on, not /dca/N/mute).
     virtual void setDcaMute(int dca, bool muted);
-    virtual void setDcaFader(int dca, double level);
+    virtual void setDcaFaderDb(int dca, double level);
     virtual void setDcaName(int dca, const QString& name);
 
     // DCA-group membership bitmask, bit d-1 = member of DCA d. Default no-op / nullopt.
@@ -80,7 +81,7 @@ class MixerProtocol : public QObject {
         return std::nullopt;
     }
 
-    // read back a channel's current fader (normalized 0..1) from the driver's
+    // read back a channel's current fader (dB) from the driver's
     // parameter cache, or nullopt if unsupported / not yet known. Used to capture
     // live console levels into a cue. channel is 1-based.
     [[nodiscard]] virtual std::optional<double> readChannelFader(int /*channel*/) {
@@ -111,7 +112,7 @@ class MixerProtocol : public QObject {
     void parameterChanged(const QString& path, const QVariant& value);
     // a console snippet (isScene=false) or scene (isScene=true) name was read.
     void consoleNameReceived(bool isScene, int index, const QString& name);
-    // a channel fader moved on the console (channel 1-based, level normalized 0..1).
+    // a channel fader moved on the console (channel 1-based, level in dB).
     void channelFaderChanged(int channel, double level);
     void requestTimeout(const QString& path);
 

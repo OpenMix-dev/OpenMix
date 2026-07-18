@@ -9,11 +9,12 @@ namespace OpenMix {
 // Stage 2: a follow-up TCP handshake reports the exact model. A&H uses two
 // distinct identify protocols:
 //   * SQ family  - TCP 51326, binary 7F 01 / 7F 02 frame with a model byte.
-//   * ACE family - TCP 51321, SysEx "DR Box Identification" request whose reply
-//     string identifies dLive ("TLD..."), Avantis ("Bridge"/"Avantis Solo"),
-//     or GLD ("GLD...").
+//   * ACE family - TCP 51321, SysEx "DR Box Identification" request. The reply is
+//     a handle, not a name; reading that handle back returns the string that
+//     identifies dLive ("TLD...") or Avantis ("Bridge"/"Avantis Solo"). GLD does
+//     not answer this handshake and stays a connect-time selection.
 // Both are attempted; the one the device answers wins. Control ports differ
-// (SQ/GLD MIDI-over-TCP 51325, Avantis/dLive ACE-TCP 51321).
+// (SQ/Qu/GLD MIDI-over-TCP 51325, Avantis/dLive ACE-TCP 51321).
 class AllenHeathProbeStrategy : public OscProbeStrategy {
   public:
     int probePort() const override { return 51320; }
@@ -34,6 +35,11 @@ class AllenHeathProbeStrategy : public OscProbeStrategy {
     bool matchesReplyPort(int senderPort) const override { return senderPort == 51320; }
 
     QList<TcpIdentify> tcpIdentifies() const override;
+
+    QByteArray identifyFollowUp(int identifyPort, const QByteArray& firstReply) const override;
+    int identifyFollowUpMinBytes(int identifyPort) const override;
+
+    static QByteArray buildAceHandleRead(const QByteArray& handle);
 
     DiscoveredConsole parseIdentifyResponse(const QByteArray& response, const QHostAddress& sender,
                                             int identifyPort) const override;

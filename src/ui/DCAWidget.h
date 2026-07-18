@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/LevelDb.h"
+
 #include <QWidget>
 
 class QSlider;
@@ -17,8 +19,8 @@ class DCAWidget : public QWidget {
 
     int dcaNumber() const { return m_dcaNumber; }
 
-    void setLevel(float level);
-    float level() const { return m_level; }
+    void setLevelDb(float dB);
+    float levelDb() const { return m_levelDb; }
 
     void setMuted(bool muted);
     bool isMuted() const { return m_muted; }
@@ -49,7 +51,7 @@ class DCAWidget : public QWidget {
     bool isPreviewMode() const { return m_previewMode; }
 
     void setOriginalLevel(float level);
-    float originalLevel() const { return m_originalLevel; }
+    float originalLevel() const { return m_originalLevelDb; }
 
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override;
@@ -74,10 +76,11 @@ class DCAWidget : public QWidget {
     void updateNameDisplay();
     void finishLabelEdit();
     void cancelLabelEdit();
-    QString levelToDb(float level) const;
+    QString levelText(float dB) const;
+    static int sliderPosition(float dB);
 
     int m_dcaNumber;
-    float m_level = 0.0f;
+    float m_levelDb = NEG_INF_DB;
     bool m_muted = false;
     QString m_mixerName;
     QString m_cueLabel;
@@ -85,7 +88,7 @@ class DCAWidget : public QWidget {
     bool m_editMode = false;
     bool m_previewMode = false;
     bool m_labelEditEnabled = false;
-    float m_originalLevel = 0.0f;
+    float m_originalLevelDb = 0.0f;
 
     QSlider* m_faderSlider;
     QPushButton* m_muteButton;

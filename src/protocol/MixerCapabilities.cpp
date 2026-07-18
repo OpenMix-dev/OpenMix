@@ -128,21 +128,22 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.supportsEffectSends = true;
         break;
 
-    // Qu series shares the SQ MIDI-over-TCP control path (same "Soft" control
-    // family on port 51325). All Qu models run the same 32-channel DSP; only the
-    // physical fader count differs, so capabilities are identical across
-    // Qu-16/24/32 apart from the display name.
+    // Qu is MIDI over TCP 51325 like SQ, but a different message map (see
+    // QuProtocol). All Qu models run the same 32-channel DSP; only the physical
+    // fader count differs, so capabilities are identical across Qu-16/24/32 apart
+    // from the display name. Counts per the Qu MIDI Protocol V1.9+: 4 DCA groups,
+    // 100 scenes.
     case ConsoleType::Qu16:
     case ConsoleType::Qu24:
     case ConsoleType::Qu32:
         caps.manufacturer = Manufacturer::AllenHeath;
         caps.protocol = ProtocolType::MidiTcp;
         caps.defaultPort = 51325;
-        caps.dcaCount = 8;
+        caps.dcaCount = 4;
         caps.inputChannels = 32;
         caps.mixBuses = 12;
         caps.matrixOutputs = 0;
-        caps.scenes = 300;
+        caps.scenes = 100;
         caps.maxDCANameLength = 6;
         caps.eqBandsPerChannel = 4;
         caps.supportsChannelEQ = true;
@@ -161,17 +162,19 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         }
         break;
 
+    // GLD is MIDI over TCP 51325 per the GLD MIDI and TCP/IP Protocol V1.4, which
+    // also gives it 16 DCAs and 500 scenes (4 banks of 128).
     case ConsoleType::GLD80:
         caps.manufacturer = Manufacturer::AllenHeath;
-        caps.protocol = ProtocolType::BinaryTcp;
+        caps.protocol = ProtocolType::MidiTcp;
         caps.displayName = "Allen & Heath GLD-80";
         caps.protocolId = "gld80";
-        caps.defaultPort = 51321;
-        caps.dcaCount = 8;
+        caps.defaultPort = 51325;
+        caps.dcaCount = 16;
         caps.inputChannels = 48;
         caps.mixBuses = 20;
         caps.matrixOutputs = 4;
-        caps.scenes = 250;
+        caps.scenes = 500;
         caps.maxDCANameLength = 8;
         caps.eqBandsPerChannel = 4;
         caps.supportsChannelEQ = true;
@@ -183,15 +186,15 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::GLD112:
         caps.manufacturer = Manufacturer::AllenHeath;
-        caps.protocol = ProtocolType::BinaryTcp;
+        caps.protocol = ProtocolType::MidiTcp;
         caps.displayName = "Allen & Heath GLD-112";
         caps.protocolId = "gld112";
-        caps.defaultPort = 51321;
-        caps.dcaCount = 8;
+        caps.defaultPort = 51325;
+        caps.dcaCount = 16;
         caps.inputChannels = 48;
         caps.mixBuses = 30;
         caps.matrixOutputs = 4;
-        caps.scenes = 250;
+        caps.scenes = 500;
         caps.maxDCANameLength = 8;
         caps.eqBandsPerChannel = 4;
         caps.supportsChannelEQ = true;
@@ -415,13 +418,15 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.supportsEffectSends = true;
         break;
 
-    // DiGiCo SD series (TLV binary over TCP 51321, reverse-engineered)
+    // DiGiCo SD series over the console's Generic OSC (UDP). DiGiCo publishes no
+    // address map, so the driver takes the operator's patterns; see DiGiCoProtocol.
+    // Send/receive ports are paired by the operator, 9000/8000 being the common one.
     case ConsoleType::SD7:
         caps.manufacturer = Manufacturer::DiGiCo;
-        caps.protocol = ProtocolType::BinaryTcp;
+        caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "DiGiCo SD7";
         caps.protocolId = "sd7";
-        caps.defaultPort = 51321;
+        caps.defaultPort = 9000;
         caps.dcaCount = 24;
         caps.inputChannels = 128;
         caps.mixBuses = 48;
@@ -437,10 +442,10 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::SD9:
         caps.manufacturer = Manufacturer::DiGiCo;
-        caps.protocol = ProtocolType::BinaryTcp;
+        caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "DiGiCo SD9";
         caps.protocolId = "sd9";
-        caps.defaultPort = 51321;
+        caps.defaultPort = 9000;
         caps.dcaCount = 12;
         caps.inputChannels = 96;
         caps.mixBuses = 48;
@@ -456,10 +461,10 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::SD11:
         caps.manufacturer = Manufacturer::DiGiCo;
-        caps.protocol = ProtocolType::BinaryTcp;
+        caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "DiGiCo SD11";
         caps.protocolId = "sd11";
-        caps.defaultPort = 51321;
+        caps.defaultPort = 9000;
         caps.dcaCount = 8;
         caps.inputChannels = 32;
         caps.mixBuses = 16;
@@ -475,10 +480,10 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::SD12:
         caps.manufacturer = Manufacturer::DiGiCo;
-        caps.protocol = ProtocolType::BinaryTcp;
+        caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "DiGiCo SD12";
         caps.protocolId = "sd12";
-        caps.defaultPort = 51321;
+        caps.defaultPort = 9000;
         caps.dcaCount = 12;
         caps.inputChannels = 72;
         caps.mixBuses = 36;

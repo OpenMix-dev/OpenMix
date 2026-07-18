@@ -4,6 +4,7 @@
 #include "app/Application.h"
 #include "core/Cue.h"
 #include "core/CueList.h"
+#include "core/LevelDb.h"
 #include "core/PlaybackEngine.h"
 #include "core/Show.h"
 #include "protocol/MixerProtocol.h"
@@ -181,7 +182,7 @@ void MixerFeedbackPanel::onParameterChanged(const QString& path, const QVariant&
         DCAWidget* dca = m_dcaWidgets[number - 1];
 
         if (param == "fader") {
-            dca->setLevel(value.toFloat());
+            dca->setLevelDb(value.toFloat());
             dca->setActive(true);
             QTimer::singleShot(500, [dca]() { dca->setActive(false); });
         } else if (param == "on" || param == "mute") {
@@ -225,7 +226,7 @@ void MixerFeedbackPanel::onMixerConnected() {
 
 void MixerFeedbackPanel::onMixerDisconnected() {
     for (DCAWidget* dca : m_dcaWidgets) {
-        dca->setLevel(0.0f);
+        dca->setLevelDb(static_cast<float>(NEG_INF_DB));
         dca->setMuted(false);
         dca->setMixerName(QString());
         dca->setCueLabel(QString());

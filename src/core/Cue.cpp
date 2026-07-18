@@ -1,8 +1,25 @@
 #include "Cue.h"
 #include "DCAMapping.h"
 #include <QJsonValue>
+#include <algorithm>
 
 namespace OpenMix {
+
+double Cue::dbFromLegacyPosition(double position) {
+    position = std::clamp(position, 0.0, 1.0);
+    if (position <= 0.0) {
+        return NEG_INF_DB;
+    }
+    if (position >= 1.0) {
+        return MAX_DB;
+    }
+    constexpr double unity = 0.75;
+    constexpr double floorDb = -60.0;
+    if (position < unity) {
+        return floorDb - (position / unity) * floorDb;
+    }
+    return (position - unity) / (1.0 - unity) * MAX_DB;
+}
 
 QString cueTypeToString(CueType type) {
     switch (type) {
@@ -409,13 +426,15 @@ QJsonObject Cue::toJson() const {
         json["channelProfiles"] = profilesObj;
     }
 
-    // per-channel level overrides: { "<channel>": level }
+    // per-channel level overrides: { "<channel>": dB }. Written under a key of its
+    // own: "channelLevels" holds 0..1 positions in shows written before levels
+    // were stored in dB, and the two cannot be told apart by value.
     if (!m_channelLevels.isEmpty()) {
         QJsonObject levelsObj;
         for (auto it = m_channelLevels.constBegin(); it != m_channelLevels.constEnd(); ++it) {
             levelsObj[QString::number(it.key())] = it.value();
         }
-        json["channelLevels"] = levelsObj;
+        json["channelLevelsDb"] = levelsObj;
     }
 
     // named-position assignments
@@ -563,11 +582,18 @@ Cue Cue::fromJson(const QJsonObject& json) {
         }
     }
 
-    // per-channel level overrides
-    if (json.contains("channelLevels")) {
-        const QJsonObject levelsObj = json["channelLevels"].toObject();
+    // per-channel level overrides. Shows that store 0..1 positions carry them
+    // under the old key; converting them is the best that can be done, since what
+    // a position meant in dB depended on the console it played back on.
+    if (json.contains("channelLevelsDb")) {
+        const QJsonObject levelsObj = json["channelLevelsDb"].toObject();
         for (auto it = levelsObj.constBegin(); it != levelsObj.constEnd(); ++it) {
             cue.m_channelLevels[it.key().toInt()] = it.value().toDouble();
+        }
+    } else if (json.contains("channelLevels")) {
+        const QJsonObject levelsObj = json["channelLevels"].toObject();
+        for (auto it = levelsObj.constBegin(); it != levelsObj.constEnd(); ++it) {
+            cue.m_channelLevels[it.key().toInt()] = dbFromLegacyPosition(it.value().toDouble());
         }
     }
 
