@@ -94,7 +94,17 @@ jobs:
         run: vcpkg install liblo:x64-windows
 
       - name: Install NSIS
-        run: choco install nsis -y
+        run: |
+          $ErrorActionPreference = "Stop"
+          for ($i = 1; $i -le 3; $i++) {
+            choco install nsis -y --no-progress
+            if (Test-Path "C:\Program Files (x86)\NSIS\makensis.exe") { break }
+            Write-Host "NSIS not found after attempt $i; retrying..."
+            Start-Sleep -Seconds 15
+          }
+          if (-not (Test-Path "C:\Program Files (x86)\NSIS\makensis.exe")) {
+            throw "NSIS install failed: makensis.exe not found"
+          }
 
       - name: Set up MSVC
         uses: ilammy/msvc-dev-cmd@v1

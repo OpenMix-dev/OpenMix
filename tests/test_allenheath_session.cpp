@@ -60,6 +60,17 @@ class StubMixRack : public QObject {
         while (!m_buffer.isEmpty()) {
             const quint8 lead = static_cast<quint8>(m_buffer.at(0));
             if (lead == 0xE0) {
+                // the seed is a fixed 8-byte frame; its port field can carry a
+                // 0xE7 byte, so it must be consumed by length, not by scanning
+                // for the E7 terminator (that would mis-frame ~1% of ports)
+                if (m_buffer.startsWith(QByteArray::fromHex("e000040103"))) {
+                    if (m_buffer.size() < 8) {
+                        return;
+                    }
+                    handleControl(m_buffer.left(8));
+                    m_buffer.remove(0, 8);
+                    continue;
+                }
                 const int end = m_buffer.indexOf('\xe7', 1);
                 if (end < 0) {
                     return;
