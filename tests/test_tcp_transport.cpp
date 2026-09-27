@@ -153,11 +153,24 @@ class TestTcpTransport : public QObject {
         QSignalSpy reconnectSpy(&t, &TcpTransport::reconnecting);
         QSignalSpy disconnectedSpy(&t, &TcpTransport::disconnected);
 
+        QSignalSpy errorSpy(&t, &TcpTransport::connectionError);
+
         QVERIFY(t.connect("127.0.0.1", server.port()));
         QVERIFY(connectedSpy.wait(3000));
 
         server.dropClients();
-        QTRY_COMPARE_WITH_TIMEOUT(connectedSpy.count(), 2, 10000);
+        // stage by stage, so a platform that behaves differently says where
+        QTRY_VERIFY2_WITH_TIMEOUT(lostSpy.count() == 1, "drop not reported as connectionLost",
+                                  5000);
+        QTRY_VERIFY2_WITH_TIMEOUT(reconnectSpy.count() >= 1, "no reconnect attempt made", 5000);
+        QTRY_VERIFY2_WITH_TIMEOUT(
+            connectedSpy.count() == 2,
+            qPrintable(QString("not reconnected: attempts=%1 errors=%2 disconnected=%3 state=%4")
+                           .arg(reconnectSpy.count())
+                           .arg(errorSpy.count())
+                           .arg(disconnectedSpy.count())
+                           .arg(t.isConnected() ? "connected" : "not connected")),
+            10000);
 
         QCOMPARE(lostSpy.count(), 1);
         QCOMPARE(reconnectSpy.count(), 1);
