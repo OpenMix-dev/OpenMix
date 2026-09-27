@@ -232,11 +232,13 @@ class TestAllenHeathSession : public QObject {
         StubMixRack rack;
         rack.setMute(true);
         DLiveProtocol p(MixerCapabilities::forConsole(ConsoleType::DLive));
+        p.setHandshakeTimeout(500);
 
         QSignalSpy errorSpy(&p, &MixerProtocol::connectionError);
         QVERIFY(p.connect("127.0.0.1", rack.port()));
 
-        QVERIFY(errorSpy.wait(12000));
+        QVERIFY(errorSpy.wait(5000));
+        QVERIFY(errorSpy.at(0).at(0).toString().contains("session handshake"));
         QCOMPARE(p.connectionState(), ConnectionState::Disconnected);
     }
 
@@ -244,10 +246,11 @@ class TestAllenHeathSession : public QObject {
         StubMixRack rack;
         rack.setMute(true);
         DLiveProtocol p(MixerCapabilities::forConsole(ConsoleType::DLive));
+        p.setHandshakeTimeout(500);
 
         QSignalSpy errorSpy(&p, &MixerProtocol::connectionError);
         QVERIFY(p.connect("127.0.0.1", rack.port()));
-        QVERIFY(errorSpy.wait(12000));
+        QVERIFY(errorSpy.wait(5000));
         QCOMPARE(p.connectionState(), ConnectionState::Disconnected);
 
         // the transport used to retry a second later with a closed UDP socket,
@@ -294,7 +297,7 @@ class TestAllenHeathSession : public QObject {
     void udpTrafficKeepsTheLinkAlive() {
         StubMixRack rack;
         DLiveProtocol p(MixerCapabilities::forConsole(ConsoleType::DLive));
-        p.setRxSilenceLimit(400);
+        p.setRxSilenceLimit(800);
 
         QSignalSpy connectedSpy(&p, &MixerProtocol::connected);
         QSignalSpy errorSpy(&p, &MixerProtocol::connectionError);

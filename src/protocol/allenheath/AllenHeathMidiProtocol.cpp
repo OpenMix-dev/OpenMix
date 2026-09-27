@@ -23,6 +23,12 @@ AllenHeathMidiProtocol::AllenHeathMidiProtocol(const MixerCapabilities& caps, QO
     QObject::connect(&m_transport, &TcpTransport::reconnecting, this,
                      &AllenHeathMidiProtocol::onReconnecting);
 
+    // wire trace for the connection log
+    QObject::connect(&m_transport, &TcpTransport::bytesSent, this,
+                     [this](const QByteArray& b) { emit wireTrace(true, b); });
+    QObject::connect(&m_transport, &TcpTransport::dataReceived, this,
+                     [this](const QByteArray& b) { emit wireTrace(false, b); });
+
     QObject::connect(&m_keepAliveTimer, &QTimer::timeout, this,
                      &AllenHeathMidiProtocol::onKeepAliveTimeout);
 

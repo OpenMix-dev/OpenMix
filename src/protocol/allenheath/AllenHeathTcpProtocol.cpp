@@ -38,6 +38,12 @@ AllenHeathTcpProtocol::AllenHeathTcpProtocol(const MixerCapabilities& caps, QObj
     QObject::connect(&m_transport, &TcpTransport::reconnecting, this,
                      &AllenHeathTcpProtocol::onReconnecting);
 
+    // wire trace for the connection log
+    QObject::connect(&m_transport, &TcpTransport::bytesSent, this,
+                     [this](const QByteArray& b) { emit wireTrace(true, b); });
+    QObject::connect(&m_transport, &TcpTransport::dataReceived, this,
+                     [this](const QByteArray& b) { emit wireTrace(false, b); });
+
     QObject::connect(&m_keepAliveTimer, &QTimer::timeout, this,
                      &AllenHeathTcpProtocol::onKeepAliveTimeout);
     QObject::connect(&m_rxWatchdogTimer, &QTimer::timeout, this,
@@ -366,7 +372,7 @@ void AllenHeathTcpProtocol::startHandshake() {
     }
 
     m_lastRxTimer.start();
-    m_handshakeTimer.start(HANDSHAKE_TIMEOUT);
+    m_handshakeTimer.start(m_handshakeTimeoutMs);
 
     m_transport.send(buildSessionSeed(m_udpSocket.localPort()));
 }

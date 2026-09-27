@@ -110,6 +110,12 @@ X32Protocol::X32Protocol(const MixerCapabilities& caps, QObject* parent)
     QObject::connect(&m_transport, &OscTransport::messageReceived, this,
                      &X32Protocol::onMessageReceived);
 
+    // wire trace for the connection log
+    QObject::connect(&m_transport, &OscTransport::rawMessageSent, this,
+                     [this](const QByteArray& b) { emit wireTrace(true, b); });
+    QObject::connect(&m_transport, &OscTransport::rawMessageReceived, this,
+                     [this](const QByteArray& b) { emit wireTrace(false, b); });
+
     QObject::connect(&m_keepAliveTimer, &QTimer::timeout, this, &X32Protocol::onKeepAliveTimeout);
 
     m_connectionTimer.setSingleShot(true);

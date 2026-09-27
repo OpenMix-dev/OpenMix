@@ -24,7 +24,7 @@ libs/         vendored RtMidi
 
 The protocol layer is the main extension point:
 
-- `MixerProtocol` is the abstract console interface. One subclass per console family under `protocol/behringer/`, `protocol/allenheath/`, `protocol/yamaha/`, `protocol/digico/`. Wire formats vary per family: OSC over UDP (X32/M32, WING), MIDI over TCP (SQ, GLD), binary TCP (Avantis, dLive, DiGiCo SD), text TCP (Yamaha).
+- `MixerProtocol` is the abstract console interface. One subclass per console family under `protocol/behringer/`, `protocol/allenheath/`, `protocol/yamaha/`, `protocol/digico/`. Wire formats vary per family: OSC over UDP (X32/M32, WING, DiGiCo SD), MIDI over TCP (SQ, Qu, GLD), binary TCP (Avantis, dLive), text TCP (Yamaha).
 - `MixerCapabilities` describes each model: channel and DCA counts, protocol type, port. Adding a model that speaks an existing protocol is mostly a capabilities entry.
 - `ProtocolFactory` maps a `ConsoleType` to a protocol instance.
 - `protocol/transport/` holds the shared OSC (liblo) and TCP transports; `protocol/discovery/` implements network auto-discovery with per-family probe strategies.

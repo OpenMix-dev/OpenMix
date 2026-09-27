@@ -122,6 +122,10 @@ class MixerProtocol : public QObject {
 
     void latencyChanged(int ms);
     void sceneChanged(int sceneNumber);
+
+    // one frame on the wire, as sent (outbound) or received; the log keeps the
+    // first few of a session so a failed connection can be diagnosed from bytes
+    void wireTrace(bool outbound, const QByteArray& bytes);
 };
 
 } // namespace OpenMix

@@ -7,6 +7,12 @@ namespace OpenMix {
 DiGiCoProtocol::DiGiCoProtocol(const MixerCapabilities& caps, QObject* parent)
     : MixerProtocol(parent), m_capabilities(caps), m_transport(this) {
     m_port = caps.defaultPort;
+
+    // wire trace for the connection log
+    QObject::connect(&m_transport, &OscTransport::rawMessageSent, this,
+                     [this](const QByteArray& b) { emit wireTrace(true, b); });
+    QObject::connect(&m_transport, &OscTransport::rawMessageReceived, this,
+                     [this](const QByteArray& b) { emit wireTrace(false, b); });
 }
 
 DiGiCoProtocol::~DiGiCoProtocol() { disconnect(); }

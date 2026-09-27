@@ -41,6 +41,7 @@ class TcpTransport : public QObject {
     void connectionError(const QString& error);
     void connectionLost();
     void dataReceived(const QByteArray& data);
+    void bytesSent(const QByteArray& data);
     void reconnecting(int attempt, int maxAttempts);
 
   private slots:

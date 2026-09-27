@@ -23,6 +23,12 @@ YamahaProtocol::YamahaProtocol(const MixerCapabilities& caps, QObject* parent)
     QObject::connect(&m_transport, &TcpTransport::reconnecting, this,
                      &YamahaProtocol::onReconnecting);
 
+    // wire trace for the connection log
+    QObject::connect(&m_transport, &TcpTransport::bytesSent, this,
+                     [this](const QByteArray& b) { emit wireTrace(true, b); });
+    QObject::connect(&m_transport, &TcpTransport::dataReceived, this,
+                     [this](const QByteArray& b) { emit wireTrace(false, b); });
+
     m_keepAliveTimer.setInterval(KEEPALIVE_INTERVAL);
     QObject::connect(&m_keepAliveTimer, &QTimer::timeout, this,
                      &YamahaProtocol::onKeepAliveTimeout);

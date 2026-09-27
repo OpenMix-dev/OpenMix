@@ -23,6 +23,12 @@ WingProtocol::WingProtocol(const MixerCapabilities& caps, QObject* parent)
     QObject::connect(&m_transport, &OscTransport::messageReceivedAll, this,
                      &WingProtocol::onMessageReceived);
 
+    // wire trace for the connection log
+    QObject::connect(&m_transport, &OscTransport::rawMessageSent, this,
+                     [this](const QByteArray& b) { emit wireTrace(true, b); });
+    QObject::connect(&m_transport, &OscTransport::rawMessageReceived, this,
+                     [this](const QByteArray& b) { emit wireTrace(false, b); });
+
     QObject::connect(&m_keepAliveTimer, &QTimer::timeout, this, &WingProtocol::onKeepAliveTimeout);
 
     m_connectionTimer.setSingleShot(true);

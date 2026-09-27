@@ -82,6 +82,7 @@ class AllenHeathTcpProtocol : public MixerProtocol {
     // tunables, exposed so the session tests can run in milliseconds
     void setRxSilenceLimit(int ms) { m_rxSilenceLimitMs = ms; }
     void setSubscribeReplyTimeout(int ms) { m_subscribeReplyTimeoutMs = ms; }
+    void setHandshakeTimeout(int ms) { m_handshakeTimeoutMs = ms; }
 
   protected:
     // per-console opcodes / plane offsets (differ between Avantis and dLive, and
@@ -215,7 +216,7 @@ class AllenHeathTcpProtocol : public MixerProtocol {
     static constexpr int RX_WATCHDOG_INTERVAL = 500;
     int m_rxSilenceLimitMs = 5000;
     // the whole exchange, seed to last handle, with room for skipped optionals
-    static constexpr int HANDSHAKE_TIMEOUT = 10000;
+    int m_handshakeTimeoutMs = 10000;
     // a console answers a subscribe within milliseconds; this is how long an
     // optional object may stay silent before the chain moves past it
     int m_subscribeReplyTimeoutMs = 1500;

@@ -69,6 +69,9 @@ bool TcpTransport::send(const QByteArray& data) {
         return false;
 
     qint64 written = m_socket.write(data);
+    if (written > 0) {
+        emit bytesSent(data.left(static_cast<int>(written)));
+    }
     return written == data.size();
 }
 
