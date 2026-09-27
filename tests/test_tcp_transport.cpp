@@ -67,19 +67,30 @@ class TestTcpTransport : public QObject {
     Q_OBJECT
 
   private slots:
+    // Windows only reports a refused loopback connect after its own SYN
+    // retries, seconds later, so the refusal tests keep the transport's
+    // connection timeout short: the attempt ends either way, and what is
+    // asserted is that it ends once, as a failure, with no retry
+    static bool isFirstAttemptFailure(const QString& error) {
+        return error == QStringLiteral("Connection refused") ||
+               error == QStringLiteral("Connection timeout");
+    }
+
     void refusedConnect_endsDisconnectedWithoutRetrying() {
         TcpTransport t;
         t.setReconnectDelay(20);
+        t.setConnectionTimeout(1000);
         QSignalSpy errorSpy(&t, &TcpTransport::connectionError);
         QSignalSpy disconnectedSpy(&t, &TcpTransport::disconnected);
         QSignalSpy reconnectSpy(&t, &TcpTransport::reconnecting);
         QSignalSpy lostSpy(&t, &TcpTransport::connectionLost);
 
         QVERIFY(t.connect("127.0.0.1", closedPort()));
-        QVERIFY(disconnectedSpy.wait(3000));
+        QVERIFY(disconnectedSpy.wait(5000));
 
         QCOMPARE(errorSpy.count(), 1);
-        QCOMPARE(errorSpy.at(0).at(0).toString(), QStringLiteral("Connection refused"));
+        QVERIFY2(isFirstAttemptFailure(errorSpy.at(0).at(0).toString()),
+                 qPrintable(errorSpy.at(0).at(0).toString()));
         QCOMPARE(disconnectedSpy.count(), 1);
         QCOMPARE(reconnectSpy.count(), 0);
         QCOMPARE(lostSpy.count(), 0);
@@ -146,7 +157,7 @@ class TestTcpTransport : public QObject {
         QVERIFY(connectedSpy.wait(3000));
 
         server.dropClients();
-        QTRY_COMPARE_WITH_TIMEOUT(connectedSpy.count(), 2, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(connectedSpy.count(), 2, 10000);
 
         QCOMPARE(lostSpy.count(), 1);
         QCOMPARE(reconnectSpy.count(), 1);
@@ -161,6 +172,7 @@ class TestTcpTransport : public QObject {
         TcpTransport t;
         t.setReconnectDelay(20);
         t.setMaxReconnectAttempts(3);
+        t.setConnectionTimeout(500);
         QSignalSpy connectedSpy(&t, &TcpTransport::connected);
         QSignalSpy lostSpy(&t, &TcpTransport::connectionLost);
         QSignalSpy reconnectSpy(&t, &TcpTransport::reconnecting);
@@ -174,7 +186,7 @@ class TestTcpTransport : public QObject {
         server.refuse();
         server.dropClients();
 
-        QVERIFY(disconnectedSpy.wait(5000));
+        QVERIFY(disconnectedSpy.wait(10000));
 
         QCOMPARE(lostSpy.count(), 1);
         // every attempt was made, each one refused, then the link gave up
@@ -192,6 +204,7 @@ class TestTcpTransport : public QObject {
         TcpTransport t;
         t.setReconnectDelay(20);
         t.setMaxReconnectAttempts(3);
+        t.setConnectionTimeout(500);
         QSignalSpy connectedSpy(&t, &TcpTransport::connected);
         QSignalSpy reconnectSpy(&t, &TcpTransport::reconnecting);
         QSignalSpy disconnectedSpy(&t, &TcpTransport::disconnected);
@@ -205,7 +218,7 @@ class TestTcpTransport : public QObject {
         QTRY_COMPARE_WITH_TIMEOUT(reconnectSpy.count(), 1, 3000);
         server.listenAgain();
 
-        QTRY_COMPARE_WITH_TIMEOUT(connectedSpy.count(), 2, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(connectedSpy.count(), 2, 10000);
         QCOMPARE(disconnectedSpy.count(), 0);
         QVERIFY(t.isConnected());
     }
