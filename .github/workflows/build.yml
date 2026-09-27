@@ -337,24 +337,29 @@ jobs:
             echo '</ul></body></html>'
           } > site/download/index.html
 
+      # the VPS only takes SSH over the tailnet: join it as the CI node, then
+      # reach the box by its tailnet name with Tailscale SSH (no key)
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
       - name: Deploy to VPS
         env:
-          SSH_KEY: ${{ secrets.OPENMIX_DEPLOY_SSH_KEY }}
-          SSH_HOST: ${{ secrets.OPENMIX_DEPLOY_HOST }}
+          SSH_HOST: debian-4gb-ash-1
           SSH_USER: ${{ secrets.OPENMIX_DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.OPENMIX_DEPLOY_PATH }}
         run: |
-          if [ -z "$SSH_KEY" ] || [ -z "$SSH_HOST" ]; then
+          if [ -z "$SSH_USER" ] || [ -z "$DEPLOY_PATH" ]; then
             echo "::error::Missing OPENMIX_DEPLOY_* secrets; cannot publish to VPS"
             exit 1
           fi
-          mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
-          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           # keep old release dirs (keep_files-style); appcasts + latest.json overwrite
-          rsync -avz -e "ssh -i ~/.ssh/deploy" site/ "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/"
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no" site/ "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/"
           # prune download/ to the newest 5 release dirs (version-sorted)
-          ssh -i ~/.ssh/deploy "${SSH_USER}@${SSH_HOST}" \
+          ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" \
             "cd '${DEPLOY_PATH}/download' && ls -1d v*/ 2>/dev/null | sed 's:/*\$::' | sort -V | head -n -5 | xargs -r rm -rf --"
 
       - name: Rebuild openmix.dev
