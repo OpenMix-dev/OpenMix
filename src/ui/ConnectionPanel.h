@@ -31,6 +31,7 @@ class ConnectionPanel : public QWidget {
     void onConnectionStateChanged(ConnectionState state);
     void onLatencyChanged(int ms);
     void onRequestTimeout(const QString& path);
+    void onConnectionError(const QString& error);
     void onConnected();
     void onDisconnected();
     void onProtocolTypeChanged(int index);
@@ -43,7 +44,11 @@ class ConnectionPanel : public QWidget {
     void updateUiState();
     void loadFromConfig();
     void saveToConfig();
-    void connectMixerSignals();
+    void connectMixerSignals(MixerProtocol* mixer);
+    // pull the driver's current state/status into the widgets (covers anything
+    // it emitted before we were listening, and a driver that failed to exist)
+    void syncFromMixer();
+    void showDisconnected();
 
     Application* m_app;
 
@@ -78,6 +83,10 @@ class ConnectionPanel : public QWidget {
     QAction* m_refreshDiscoveryAction;
 
     int m_timeoutCount = 0;
+    ConnectionState m_currentState = ConnectionState::Disconnected;
+    // the last failure the driver reported; shown with the Disconnected state so
+    // a refused or timed-out connect does not just read "Disconnected"
+    QString m_lastError;
 };
 
 } // namespace OpenMix

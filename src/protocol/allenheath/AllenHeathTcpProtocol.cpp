@@ -273,8 +273,7 @@ QByteArray AllenHeathTcpProtocol::buildSceneRecall(const QByteArray& handle, int
 // --- connection ---
 
 bool AllenHeathTcpProtocol::connect(const QString& host, int port) {
-    if (m_connectionState == ConnectionState::Connected ||
-        m_connectionState == ConnectionState::Connecting) {
+    if (m_connectionState != ConnectionState::Disconnected) {
         disconnect();
     }
 
@@ -308,6 +307,9 @@ void AllenHeathTcpProtocol::disconnect() {
     if (m_transport.isConnected()) {
         m_transport.send(QByteArray::fromHex("e00003425945e7"));
     }
+    // leave the connected state before the socket closes so the teardown is
+    // not mistaken for a lost link
+    setConnectionState(ConnectionState::Disconnected);
     m_transport.disconnect();
     m_udpSocket.close();
 
@@ -346,14 +348,15 @@ void AllenHeathTcpProtocol::failHandshake(const QString& reason) {
     m_handshakeTimer.stop();
     m_keepAliveTimer.stop();
     m_rxWatchdogTimer.stop();
-    m_transport.disconnect();
-    m_udpSocket.close();
     m_handshakeComplete = false;
     m_sessionOpen = false;
 
     setConnectionState(ConnectionState::Disconnected);
+    m_transport.disconnect();
+    m_udpSocket.close();
     setStatus(reason);
     emit connectionError(reason);
+    emit disconnected();
 }
 
 void AllenHeathTcpProtocol::sendNextSubscribe() {
@@ -569,7 +572,10 @@ void AllenHeathTcpProtocol::onTransportConnected() { startHandshake(); }
 
 void AllenHeathTcpProtocol::onTransportDisconnected() {
     m_keepAliveTimer.stop();
+    m_rxWatchdogTimer.stop();
+    m_handshakeTimer.stop();
     m_handshakeComplete = false;
+    m_sessionOpen = false;
     setConnectionState(ConnectionState::Disconnected);
     setStatus("Disconnected");
     emit disconnected();
@@ -581,7 +587,13 @@ void AllenHeathTcpProtocol::onTransportError(const QString& error) {
 }
 
 void AllenHeathTcpProtocol::onTransportConnectionLost() {
+    // the session is gone with the socket; the transport retries the TCP link
+    // and a fresh handshake starts from onTransportConnected()
+    m_keepAliveTimer.stop();
+    m_rxWatchdogTimer.stop();
+    m_handshakeTimer.stop();
     m_handshakeComplete = false;
+    m_sessionOpen = false;
     setConnectionState(ConnectionState::Reconnecting);
     setStatus("Connection lost, reconnecting...");
     emit connectionLost();

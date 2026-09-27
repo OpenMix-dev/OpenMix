@@ -208,8 +208,7 @@ void YamahaProtocol::setChannelColor(int ch, int color) {
 // --------------------------------------------------------------------------
 
 bool YamahaProtocol::connect(const QString& host, int port) {
-    if (m_connectionState == ConnectionState::Connected ||
-        m_connectionState == ConnectionState::Connecting) {
+    if (m_connectionState != ConnectionState::Disconnected) {
         disconnect();
     }
 
@@ -220,7 +219,6 @@ bool YamahaProtocol::connect(const QString& host, int port) {
     setConnectionState(ConnectionState::Connecting);
     setStatus(QString("Connecting to %1:%2...").arg(m_host).arg(m_port));
 
-    m_transport.setReconnectEnabled(true);
     return m_transport.connect(m_host, m_port); // async; result via signals
 }
 
@@ -228,7 +226,9 @@ void YamahaProtocol::disconnect() {
     m_keepAliveTimer.stop();
     m_requestTimeoutTimer.stop();
 
-    m_transport.setReconnectEnabled(false);
+    // leave the connected state before the socket closes so the teardown is
+    // not mistaken for a lost link
+    setConnectionState(ConnectionState::Disconnected);
     m_transport.disconnect();
 
     m_rxBuffer.clear();

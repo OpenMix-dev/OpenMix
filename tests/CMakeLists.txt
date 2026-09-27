@@ -225,6 +225,14 @@ target_link_libraries(test_osc_remote PRIVATE Qt6::Core Qt6::Test openmix_liblo)
 target_include_directories(test_osc_remote PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME OscRemoteTest COMMAND test_osc_remote)
 
+add_executable(test_tcp_transport
+    test_tcp_transport.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/transport/TcpTransport.cpp
+)
+target_link_libraries(test_tcp_transport PRIVATE Qt6::Core Qt6::Network Qt6::Test)
+target_include_directories(test_tcp_transport PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME TcpTransportTest COMMAND test_tcp_transport)
+
 add_executable(test_osc_transport
     test_osc_transport.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/transport/OscTransport.cpp

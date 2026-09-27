@@ -46,13 +46,16 @@ bool DiGiCoProtocol::connect(const QString& host, int port) {
 }
 
 void DiGiCoProtocol::disconnect() {
+    const bool wasUp = m_connectionState != ConnectionState::Disconnected;
+    setConnectionState(ConnectionState::Disconnected);
     m_transport.disconnect();
     m_parameterCache.clear();
     m_latencyMs = 0;
 
-    setConnectionState(ConnectionState::Disconnected);
     setStatus("Disconnected");
-    emit disconnected();
+    if (wasUp) {
+        emit disconnected();
+    }
 }
 
 void DiGiCoProtocol::setChannelFaderDb(int channel, double dB) {

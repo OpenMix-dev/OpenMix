@@ -118,6 +118,9 @@ class Application : public QObject {
     void startupScan();
 
   signals:
+    // a new driver exists and is about to connect; hook its signals here so
+    // nothing it emits synchronously from connect() is missed
+    void mixerCreated(MixerProtocol* mixer);
     void mixerConnected();
     void mixerDisconnected();
     void recordFadersActiveChanged(bool active);

@@ -360,6 +360,8 @@ void Application::setupMixerConnection(const QString& type, const QString& host,
     // scribble strips push actor names/colors to this console
     m_scribbleController->setMixer(m_mixer);
 
+    emit mixerCreated(m_mixer);
+
     m_mixer->connect(host, port);
 
     QSettings settings;

@@ -28,8 +28,7 @@ AllenHeathMidiProtocol::AllenHeathMidiProtocol(const MixerCapabilities& caps, QO
 AllenHeathMidiProtocol::~AllenHeathMidiProtocol() { disconnect(); }
 
 bool AllenHeathMidiProtocol::connect(const QString& host, int port) {
-    if (m_connectionState == ConnectionState::Connected ||
-        m_connectionState == ConnectionState::Connecting) {
+    if (m_connectionState != ConnectionState::Disconnected) {
         disconnect();
     }
 
@@ -44,6 +43,9 @@ bool AllenHeathMidiProtocol::connect(const QString& host, int port) {
 
 void AllenHeathMidiProtocol::disconnect() {
     m_keepAliveTimer.stop();
+    // leave the connected state before the socket closes so the teardown is
+    // not mistaken for a lost link
+    setConnectionState(ConnectionState::Disconnected);
     m_transport.disconnect();
 
     m_parameterCache.clear();

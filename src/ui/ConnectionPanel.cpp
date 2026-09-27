@@ -31,6 +31,10 @@ ConnectionPanel::ConnectionPanel(Application* app, QWidget* parent) : QWidget(pa
 
     // re-sync the fields when a project is loaded (fromJson emits nameChanged)
     connect(m_app->show(), &Show::nameChanged, this, &ConnectionPanel::loadFromConfig);
+
+    // hook each new driver before it connects, so a driver that answers (or
+    // fails) synchronously inside connect() is not missed
+    connect(m_app, &Application::mixerCreated, this, &ConnectionPanel::connectMixerSignals);
 }
 
 void ConnectionPanel::populateProtocolCombo() {
@@ -235,15 +239,16 @@ void ConnectionPanel::onConnectClicked() {
 
     m_statusLabel->setText(tr("Connecting..."));
     m_stateWidget->setState(ConnectionState::Connecting);
+    m_currentState = ConnectionState::Connecting;
+    m_lastError.clear();
     m_timeoutCount = 0;
 
     m_app->connectToMixer(type, host, port);
-    connectMixerSignals();
+    syncFromMixer();
     updateUiState();
 }
 
-void ConnectionPanel::connectMixerSignals() {
-    MixerProtocol* mixer = m_app->mixer();
+void ConnectionPanel::connectMixerSignals(MixerProtocol* mixer) {
     if (!mixer)
         return;
 
@@ -259,6 +264,9 @@ void ConnectionPanel::connectMixerSignals() {
     connect(mixer, &MixerProtocol::requestTimeout, this, &ConnectionPanel::onRequestTimeout,
             Qt::UniqueConnection);
 
+    connect(mixer, &MixerProtocol::connectionError, this, &ConnectionPanel::onConnectionError,
+            Qt::UniqueConnection);
+
     connect(mixer, &MixerProtocol::connected, this, &ConnectionPanel::onConnected,
             Qt::UniqueConnection);
 
@@ -266,8 +274,30 @@ void ConnectionPanel::connectMixerSignals() {
             Qt::UniqueConnection);
 }
 
+void ConnectionPanel::syncFromMixer() {
+    MixerProtocol* mixer = m_app->mixer();
+    if (!mixer) {
+        m_lastError = tr("No driver for this console type");
+        onConnectionStateChanged(ConnectionState::Disconnected);
+        return;
+    }
+
+    onConnectionStateChanged(mixer->connectionState());
+    if (!mixer->connectionStatus().isEmpty()) {
+        onConnectionStatusChanged(mixer->connectionStatus());
+    }
+}
+
+void ConnectionPanel::showDisconnected() {
+    m_statusLabel->setText(m_lastError.isEmpty() ? tr("Disconnected")
+                                                 : tr("Disconnected: %1").arg(m_lastError));
+    m_latencyLabel->setVisible(false);
+}
+
 void ConnectionPanel::onDisconnectClicked() {
     m_app->disconnectFromMixer();
+    m_lastError.clear();
+    m_currentState = ConnectionState::Disconnected;
     m_statusLabel->setText(tr("Disconnected"));
     m_stateWidget->setState(ConnectionState::Disconnected);
     m_latencyLabel->setVisible(false);
@@ -284,16 +314,30 @@ void ConnectionPanel::onRefreshClicked() {
 }
 
 void ConnectionPanel::onConnectionStatusChanged(const QString& status) {
+    // a driver's generic "Disconnected" must not hide the failure that caused it
+    if (m_currentState == ConnectionState::Disconnected && !m_lastError.isEmpty()) {
+        showDisconnected();
+        return;
+    }
     m_statusLabel->setText(status);
 }
 
+void ConnectionPanel::onConnectionError(const QString& error) {
+    m_lastError = error;
+    if (m_currentState == ConnectionState::Disconnected) {
+        showDisconnected();
+    } else {
+        m_statusLabel->setText(error);
+    }
+}
+
 void ConnectionPanel::onConnectionStateChanged(ConnectionState state) {
+    m_currentState = state;
     m_stateWidget->setState(state);
 
     switch (state) {
     case ConnectionState::Disconnected:
-        m_statusLabel->setText(tr("Disconnected"));
-        m_latencyLabel->setVisible(false);
+        showDisconnected();
         break;
 
     case ConnectionState::Connecting:
@@ -301,6 +345,7 @@ void ConnectionPanel::onConnectionStateChanged(ConnectionState state) {
         break;
 
     case ConnectionState::Connected:
+        m_lastError.clear();
         m_statusLabel->setText(
             tr("Connected to %1:%2").arg(m_hostEdit->text()).arg(m_portEdit->text()));
         m_latencyLabel->setVisible(true);
@@ -351,6 +396,8 @@ void ConnectionPanel::onRequestTimeout(const QString& path) {
 
 void ConnectionPanel::onConnected() {
     MixerProtocol* mixer = m_app->mixer();
+    m_lastError.clear();
+    m_currentState = ConnectionState::Connected;
 
     // use mixer's status message if available
     if (mixer && !mixer->connectionStatus().isEmpty()) {
@@ -373,9 +420,9 @@ void ConnectionPanel::onConnected() {
 }
 
 void ConnectionPanel::onDisconnected() {
-    m_statusLabel->setText(tr("Disconnected"));
+    m_currentState = ConnectionState::Disconnected;
     m_stateWidget->setState(ConnectionState::Disconnected);
-    m_latencyLabel->setVisible(false);
+    showDisconnected();
     updateUiState();
 }
 
@@ -456,10 +503,12 @@ void ConnectionPanel::onDiscoveredConsoleDoubleClicked(const DiscoveredConsole& 
 
     m_statusLabel->setText(tr("Connecting to %1...").arg(console.displayName));
     m_stateWidget->setState(ConnectionState::Connecting);
+    m_currentState = ConnectionState::Connecting;
+    m_lastError.clear();
     m_timeoutCount = 0;
 
     m_app->connectToDiscoveredConsole(console);
-    connectMixerSignals();
+    syncFromMixer();
     updateUiState();
 }
 
