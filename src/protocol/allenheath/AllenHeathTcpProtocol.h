@@ -23,6 +23,9 @@ namespace OpenMix {
 // (E0 00 04 01 03 <port:2> E7), the console answers with its own
 // (E0 00 04 02 03 <port:2> E7), and only then does the subscribe chain start.
 // Metering arrives on that UDP socket and the keep-alive goes back out over it.
+// Liveness counts traffic on either socket: once the handshake is done the
+// console's steady traffic is the UDP meter stream, and the TCP side can go
+// quiet for as long as nothing on the desk changes.
 class AllenHeathTcpProtocol : public MixerProtocol {
     Q_OBJECT
 
@@ -76,6 +79,11 @@ class AllenHeathTcpProtocol : public MixerProtocol {
     void setFirmwareRevision(int rev) { m_firmwareRev = rev; }
     void setFirmwareVersion(const QString& version) { m_firmwareVersion = version; }
 
+    // tunables, exposed so the session tests can run in milliseconds
+    void setRxSilenceLimit(int ms) { m_rxSilenceLimitMs = ms; }
+    void setSubscribeReplyTimeout(int ms) { m_subscribeReplyTimeoutMs = ms; }
+    void setHandshakeTimeout(int ms) { m_handshakeTimeoutMs = ms; }
+
   protected:
     // per-console opcodes / plane offsets (differ between Avantis and dLive, and
     // are firmware-gated). Defaults are the base (older-firmware) opcodes.
@@ -92,6 +100,11 @@ class AllenHeathTcpProtocol : public MixerProtocol {
     // the ordered object names subscribed on connect (control-relevant subset);
     // the console returns a 2-byte handle per name. Overridable for GLD.
     virtual QList<QByteArray> subscribeObjects() const;
+
+    // identity objects are informational: a console that does not answer one
+    // (a MixRack with no surface, an older build) is skipped, not failed. The
+    // control handles and the metering subscribe are required.
+    virtual bool isOptionalObject(const QByteArray& objectName) const;
 
     // dB -> 2-byte encoding. Avantis/dLive use one lookup table; GLD uses a
     // sibling table (overridden). Shared logic in encodeDbTables().
@@ -164,6 +177,7 @@ class AllenHeathTcpProtocol : public MixerProtocol {
     void onKeepAliveTimeout();
     void onRxWatchdogTimeout();
     void onHandshakeTimeout();
+    void onSubscribeTimeout();
     void onReconnecting(int attempt, int maxAttempts);
     void onUdpDataReceived();
 
@@ -172,6 +186,8 @@ class AllenHeathTcpProtocol : public MixerProtocol {
     void setConnectionState(ConnectionState state);
     void startHandshake();
     void sendNextSubscribe();
+    void stopSessionTimers();
+    bool ensureUdpBound();
     void handleAceFrame(const QByteArray& frame);
     void handleControlFrame(const QByteArray& frame);
     void handleMeterDatagram(const QByteArray& datagram);
@@ -190,14 +206,20 @@ class AllenHeathTcpProtocol : public MixerProtocol {
     QTimer m_keepAliveTimer;
     QTimer m_rxWatchdogTimer;
     QTimer m_handshakeTimer;
+    QTimer m_subscribeTimer;
     QElapsedTimer m_lastRxTimer;
 
-    // the console drops a session that goes silent for 1.5 s; any inbound byte
-    // counts as alive
+    // the console drops a session that goes silent for 1.5 s, so we keep-alive
+    // every second. Our own silence limit is looser: any byte on TCP or UDP
+    // counts, and a busy Wi-Fi link can hold a meter datagram for a while
     static constexpr int KEEPALIVE_INTERVAL = 1000;
     static constexpr int RX_WATCHDOG_INTERVAL = 500;
-    static constexpr int RX_SILENCE_LIMIT = 1500;
-    static constexpr int HANDSHAKE_TIMEOUT = 5000;
+    int m_rxSilenceLimitMs = 5000;
+    // the whole exchange, seed to last handle, with room for skipped optionals
+    int m_handshakeTimeoutMs = 10000;
+    // a console answers a subscribe within milliseconds; this is how long an
+    // optional object may stay silent before the chain moves past it
+    int m_subscribeReplyTimeoutMs = 1500;
 
     int m_latencyMs = 0;
     QByteArray m_receiveBuffer;

@@ -82,13 +82,20 @@ jobs:
           path: C:\Qt\6.11.0\msvc2022_64
           key: qt-6.11.0-msvc2022_64
 
-      - name: Download Qt
+      # same source as the Linux and macOS jobs; lands in C:\Qt\6.11.0\msvc2022_64,
+      # the path the cache and the build steps use. Qt 6.11 changed the Windows
+      # repo layout and the released aqtinstall (3.3.0) cannot find it
+      # (miurahr/aqtinstall#959); the fix is only on master, so pin that.
+      - name: Install Qt
         if: steps.cache-qt.outputs.cache-hit != 'true'
-        run: |
-          gh release download qt-deps --pattern "msvc2022_64.zip" --dir $env:TEMP
-          Expand-Archive -Path "$env:TEMP\msvc2022_64.zip" -DestinationPath C:\Qt\6.11.0
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.11.0"
+          host: "windows"
+          target: "desktop"
+          arch: "win64_msvc2022_64"
+          dir: "C:\\"
+          aqtsource: "git+https://github.com/miurahr/aqtinstall.git@076e1659807d0b362a3ed684d54c2e9c775eb9c7"
 
       - name: Install liblo via vcpkg
         run: vcpkg install liblo:x64-windows
@@ -128,6 +135,9 @@ jobs:
           ctest --test-dir build --output-on-failure
         env:
           QT_QPA_PLATFORM: offscreen
+          # QTest on Windows logs to the debugger, not stdout, unless told
+          # otherwise; without this a failing test prints nothing here
+          QT_LOGGING_TO_CONSOLE: 1
 
       - name: Package (NSIS installer)
         run: |
@@ -337,24 +347,29 @@ jobs:
             echo '</ul></body></html>'
           } > site/download/index.html
 
+      # the VPS only takes SSH over the tailnet: join it as the CI node, then
+      # reach the box by its tailnet name with Tailscale SSH (no key)
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
       - name: Deploy to VPS
         env:
-          SSH_KEY: ${{ secrets.OPENMIX_DEPLOY_SSH_KEY }}
-          SSH_HOST: ${{ secrets.OPENMIX_DEPLOY_HOST }}
+          SSH_HOST: debian-4gb-ash-1
           SSH_USER: ${{ secrets.OPENMIX_DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.OPENMIX_DEPLOY_PATH }}
         run: |
-          if [ -z "$SSH_KEY" ] || [ -z "$SSH_HOST" ]; then
+          if [ -z "$SSH_USER" ] || [ -z "$DEPLOY_PATH" ]; then
             echo "::error::Missing OPENMIX_DEPLOY_* secrets; cannot publish to VPS"
             exit 1
           fi
-          mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
-          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           # keep old release dirs (keep_files-style); appcasts + latest.json overwrite
-          rsync -avz -e "ssh -i ~/.ssh/deploy" site/ "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/"
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no" site/ "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/"
           # prune download/ to the newest 5 release dirs (version-sorted)
-          ssh -i ~/.ssh/deploy "${SSH_USER}@${SSH_HOST}" \
+          ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" \
             "cd '${DEPLOY_PATH}/download' && ls -1d v*/ 2>/dev/null | sed 's:/*\$::' | sort -V | head -n -5 | xargs -r rm -rf --"
 
       - name: Rebuild openmix.dev

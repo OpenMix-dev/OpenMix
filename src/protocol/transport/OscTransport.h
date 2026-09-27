@@ -16,7 +16,9 @@ class OscTransport : public QObject {
     explicit OscTransport(QObject* parent = nullptr);
     ~OscTransport() override;
 
-    [[nodiscard]] bool connect(const QString& host, int port);
+    // localPort 0 = any; a console that only answers to a fixed client port
+    // (DiGiCo's paired receive port) needs the real one
+    [[nodiscard]] bool connect(const QString& host, int port, int localPort = 0);
     void disconnect();
     [[nodiscard]] bool isConnected() const noexcept { return m_connected; }
 
@@ -33,8 +35,13 @@ class OscTransport : public QObject {
     void connected();
     void disconnected();
     void connectionError(const QString& error);
+    // first argument only (X32 style); consoles that answer with several
+    // arguments per message (WING's string/normalised/real triplets) get the
+    // whole list from messageReceivedAll
     void messageReceived(const QString& path, const QVariant& value);
+    void messageReceivedAll(const QString& path, const QVariantList& args);
     void rawMessageReceived(const QByteArray& data);
+    void rawMessageSent(const QByteArray& data);
 
   private slots:
     void onReadyRead();

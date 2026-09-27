@@ -33,6 +33,8 @@ void ConnectionLogBridge::attachToMixer(MixerProtocol* mixer) {
     connect(m_mixer, &MixerProtocol::connectionLost, this, &ConnectionLogBridge::onConnectionLost);
     connect(m_mixer, &MixerProtocol::latencyChanged, this, &ConnectionLogBridge::onLatencyChanged);
     connect(m_mixer, &MixerProtocol::requestTimeout, this, &ConnectionLogBridge::onRequestTimeout);
+    connect(m_mixer, &MixerProtocol::wireTrace, this, &ConnectionLogBridge::onWireTrace);
+    m_tracedFrames = 0;
 }
 
 void ConnectionLogBridge::detachFromMixer() {
@@ -60,6 +62,34 @@ void ConnectionLogBridge::onConnected() {
 void ConnectionLogBridge::onDisconnected() {
     if (m_logger) {
         m_logger->logDisconnected(m_protocol, m_host, m_port);
+    }
+}
+
+void ConnectionLogBridge::onWireTrace(bool outbound, const QByteArray& bytes) {
+    if (!m_logger || m_tracedFrames >= MAX_TRACED_FRAMES) {
+        return;
+    }
+    ++m_tracedFrames;
+
+    QString hex = QString::fromLatin1(bytes.left(MAX_TRACED_BYTES).toHex(' '));
+    if (bytes.size() > MAX_TRACED_BYTES) {
+        hex += " ...";
+    }
+
+    QJsonObject meta;
+    meta["protocol"] = m_protocol;
+    meta["host"] = m_host;
+    meta["port"] = m_port;
+    meta["direction"] = outbound ? "tx" : "rx";
+    meta["bytes"] = bytes.size();
+
+    m_logger->debug(LogSource::Connection,
+                    QString("%1 %2 B: %3").arg(outbound ? "TX" : "RX").arg(bytes.size()).arg(hex),
+                    meta);
+
+    if (m_tracedFrames == MAX_TRACED_FRAMES) {
+        m_logger->debug(LogSource::Connection,
+                        QString("Wire trace stopped after %1 frames").arg(MAX_TRACED_FRAMES), meta);
     }
 }
 

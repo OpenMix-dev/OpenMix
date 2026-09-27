@@ -2,7 +2,9 @@
 #include "protocol/MixerCapabilities.h"
 #include "protocol/allenheath/AllenHeathMidiProtocol.h"
 #include "protocol/allenheath/GLDProtocol.h"
+#include "protocol/allenheath/Qu567Protocol.h"
 #include "protocol/allenheath/QuProtocol.h"
+#include <QSignalSpy>
 #include <QtTest/QtTest>
 
 using namespace OpenMix;
@@ -15,7 +17,18 @@ class QuProbe : public QuProtocol {
     using QuProtocol::buildFader;
     using QuProtocol::buildMute;
     using QuProtocol::buildSceneRecall;
+    using QuProtocol::dbFromLevel;
     using QuProtocol::levelFromDb;
+    using QuProtocol::parseMidiData;
+};
+
+// the 2024 Qu on the SQ map
+class Qu567Probe : public Qu567Protocol {
+  public:
+    Qu567Probe() : Qu567Protocol(MixerCapabilities::forConsole(ConsoleType::Qu5)) {}
+    using Qu567Protocol::buildNRPNMessage;
+    using Qu567Protocol::buildSceneRecall;
+    using Qu567Protocol::encodeLevel14;
 };
 
 // exposes GLD's builders; GLD's map is its own again
@@ -26,8 +39,10 @@ class GldProbe : public GLDProtocol {
     using GLDProtocol::buildFader;
     using GLDProtocol::buildMute;
     using GLDProtocol::buildName;
+    using GLDProtocol::buildSceneRecall;
+    using GLDProtocol::dbFromLevel;
     using GLDProtocol::levelFromDb;
-    using GLDProtocol::setMidiChannel;
+    using GLDProtocol::parseMidiData;
 };
 
 // exposes the protected NRPN builder + satisfies the pure virtuals
@@ -36,10 +51,13 @@ class SqProbe : public AllenHeathMidiProtocol {
     using AllenHeathMidiProtocol::AllenHeathMidiProtocol;
     using AllenHeathMidiProtocol::buildNRPNMessage;
     using AllenHeathMidiProtocol::buildSceneRecall;
+    using AllenHeathMidiProtocol::decodeAudioTaper;
+    using AllenHeathMidiProtocol::decodeLinearTaper;
     using AllenHeathMidiProtocol::encodeAudioTaper;
     using AllenHeathMidiProtocol::encodeLevel14;
     using AllenHeathMidiProtocol::encodeLinearTaper;
     using AllenHeathMidiProtocol::FaderLaw;
+    using AllenHeathMidiProtocol::parseMidiData;
     using AllenHeathMidiProtocol::setFaderLaw;
     static constexpr double negInfDb() { return NEG_INF_DB; }
     static constexpr int dcaLevelMsb() { return DCA_LEVEL_MSB; }
@@ -70,19 +88,19 @@ class TestAllenHeathMidi : public QObject {
 
     void nrpn_matchesOfficialMuteExamples() {
         // p11: "Ip1, Mute On, Ch1" = B0 63 00 B0 62 00 B0 06 00 B0 26 01
-        QCOMPARE(p->buildNRPNMessage(0, 0x00, 0x00, 0x00, 0x01),
+        QCOMPARE(p->buildNRPNMessage(0x00, 0x00, 0x00, 0x01),
                  QByteArray::fromHex("B06300B06200B00600B02601"));
         // p11: "LR mix, Mute Off, Ch1" = B0 63 00 B0 62 44 B0 06 00 B0 26 00
-        QCOMPARE(p->buildNRPNMessage(0, 0x00, 0x44, 0x00, 0x00),
+        QCOMPARE(p->buildNRPNMessage(0x00, 0x44, 0x00, 0x00),
                  QByteArray::fromHex("B06300B06244B00600B02600"));
     }
 
     void channelFader_usesVerifiedLrLevelParam() {
         // input ch1 -> LR level at unity: MSB 0x40, LSB 0x00, 14-bit 16383 (VC/VF 7F/7F)
-        QCOMPARE(p->buildNRPNMessage(0, 0x40, 0x00, 0x7F, 0x7F),
+        QCOMPARE(p->buildNRPNMessage(0x40, 0x00, 0x7F, 0x7F),
                  QByteArray::fromHex("B06340B06200B0067FB0267F"));
         // ch5 -> LR uses LSB = 4 (N-1)
-        QCOMPARE(p->buildNRPNMessage(0, 0x40, 0x04, 0x40, 0x00).left(6),
+        QCOMPARE(p->buildNRPNMessage(0x40, 0x04, 0x40, 0x00).left(6),
                  QByteArray::fromHex("B06340B06204"));
     }
 
@@ -91,11 +109,11 @@ class TestAllenHeathMidi : public QObject {
         QCOMPARE(SqProbe::dcaLevelMsb(), 0x4F);
         QCOMPARE(SqProbe::dcaLevelLsbBase(), 0x20);
         QCOMPARE(
-            p->buildNRPNMessage(0, SqProbe::dcaLevelMsb(), SqProbe::dcaLevelLsbBase(), 0x7F, 0x7F)
+            p->buildNRPNMessage(SqProbe::dcaLevelMsb(), SqProbe::dcaLevelLsbBase(), 0x7F, 0x7F)
                 .left(6),
             QByteArray::fromHex("B0634FB06220"));
         QCOMPARE(
-            p->buildNRPNMessage(0, SqProbe::dcaLevelMsb(), SqProbe::dcaLevelLsbBase() + 7, 0, 0)
+            p->buildNRPNMessage(SqProbe::dcaLevelMsb(), SqProbe::dcaLevelLsbBase() + 7, 0, 0)
                 .left(6),
             QByteArray::fromHex("B0634FB06227"));
     }
@@ -188,6 +206,130 @@ class TestAllenHeathMidi : public QObject {
         QCOMPARE(probe.encodeLevel14(0.0), quint16(0x62 << 7));
     }
 
+    void midiChannel_reachesEveryMessage() {
+        // the desk's MIDI channel rides the status byte of every message and the
+        // desk cannot report it: a mismatch is a connected console that ignores
+        // everything. Default is channel 1 (N = 0).
+        QCOMPARE(p->midiChannel(), 1);
+        p->setMidiChannel(3);
+        QCOMPARE(p->midiChannel(), 3);
+        QCOMPARE(p->buildNRPNMessage(0x00, 0x00, 0x00, 0x01),
+                 QByteArray::fromHex("B26300B26200B20600B22601"));
+        QCOMPARE(p->buildSceneRecall(7), QByteArray::fromHex("B20000C206"));
+        // MIDI channel 16 = F, and out-of-range values clamp
+        p->setMidiChannel(16);
+        QCOMPARE(p->buildSceneRecall(1), QByteArray::fromHex("BF0000CF00"));
+        p->setMidiChannel(99);
+        QCOMPARE(p->midiChannel(), 16);
+    }
+
+    void feedback_decodesTheSqMap() {
+        // console -> app: an input fader move (Ip1 to LR, 0 dB, linear taper),
+        // an input mute, a DCA level and a DCA mute, from the doc's own examples
+        QSignalSpy paramSpy(p, &MixerProtocol::parameterChanged);
+        QSignalSpy faderSpy(p, &MixerProtocol::channelFaderChanged);
+
+        p->parseMidiData(QByteArray::fromHex("B06340B06200B00676B0265C"));
+        QCOMPARE(paramSpy.count(), 1);
+        QCOMPARE(paramSpy.at(0).at(0).toString(), QStringLiteral("/ch/1/fader"));
+        QVERIFY(std::abs(paramSpy.at(0).at(1).toDouble()) < 0.05);
+        QCOMPARE(faderSpy.count(), 1);
+        QCOMPARE(faderSpy.at(0).at(0).toInt(), 1);
+        QVERIFY(p->readChannelFader(1).has_value());
+
+        p->parseMidiData(QByteArray::fromHex("B06300B06200B00600B02601")); // Ip1 mute on
+        QCOMPARE(paramSpy.count(), 2);
+        QCOMPARE(paramSpy.at(1).at(0).toString(), QStringLiteral("/ch/1/mute"));
+        QCOMPARE(paramSpy.at(1).at(1).toBool(), true);
+
+        p->parseMidiData(QByteArray::fromHex("B0634FB06221B0067FB0267F")); // DCA2 +10 dB
+        QCOMPARE(paramSpy.count(), 3);
+        QCOMPARE(paramSpy.at(2).at(0).toString(), QStringLiteral("/dca/2/fader"));
+        QVERIFY(std::abs(paramSpy.at(2).at(1).toDouble() - 10.0) < 0.05);
+
+        p->parseMidiData(QByteArray::fromHex("B06302B06203B00600B02600")); // DCA4 mute off
+        QCOMPARE(paramSpy.count(), 4);
+        QCOMPARE(paramSpy.at(3).at(0).toString(), QStringLiteral("/dca/4/mute"));
+        QCOMPARE(paramSpy.at(3).at(1).toBool(), false);
+    }
+
+    void feedback_survivesActiveSensingAndSplitPackets() {
+        // a Qu sends FE every 300 ms; it is one byte, not the start of a
+        // three-byte message, and must not shift what follows. TCP also splits
+        // messages anywhere.
+        QSignalSpy paramSpy(p, &MixerProtocol::parameterChanged);
+        p->parseMidiData(QByteArray::fromHex("FEFE"));
+        p->parseMidiData(QByteArray::fromHex("B06340B062"));
+        p->parseMidiData(QByteArray::fromHex("FE"));
+        p->parseMidiData(QByteArray::fromHex("00B00676B026"));
+        p->parseMidiData(QByteArray::fromHex("5CFE"));
+        QCOMPARE(paramSpy.count(), 1);
+        QCOMPARE(paramSpy.at(0).at(0).toString(), QStringLiteral("/ch/1/fader"));
+        QVERIFY(std::abs(paramSpy.at(0).at(1).toDouble()) < 0.05);
+
+        // system common and other channel voice messages are framed by length
+        p->parseMidiData(QByteArray::fromHex("F80DF1" "00" "C005" "F2" "0000" "F6" "A0" "2001"));
+        p->parseMidiData(QByteArray::fromHex("B06300B06200B00600B02601"));
+        QCOMPARE(paramSpy.count(), 2);
+        QCOMPARE(paramSpy.at(1).at(0).toString(), QStringLiteral("/ch/1/mute"));
+    }
+
+    void feedback_ignoresOtherMidiChannels() {
+        // MIDI strips and DAW control live on other channels
+        QSignalSpy paramSpy(p, &MixerProtocol::parameterChanged);
+        p->parseMidiData(QByteArray::fromHex("B16340B16200B10676B1265C"));
+        QCOMPARE(paramSpy.count(), 0);
+        p->setMidiChannel(2);
+        p->parseMidiData(QByteArray::fromHex("B16340B16200B10676B1265C"));
+        QCOMPARE(paramSpy.count(), 1);
+    }
+
+    void tapers_roundTrip() {
+        for (double dB : {-60.0, -30.0, -10.0, -3.0, 0.0, 5.0, 10.0}) {
+            QVERIFY(std::abs(SqProbe::decodeLinearTaper(SqProbe::encodeLinearTaper(dB)) - dB) <
+                    0.05);
+            QVERIFY(std::abs(SqProbe::decodeAudioTaper(SqProbe::encodeAudioTaper(dB)) - dB) <
+                    0.5);
+        }
+        QCOMPARE(SqProbe::decodeLinearTaper(0), SqProbe::negInfDb());
+        QCOMPARE(SqProbe::decodeAudioTaper(0), SqProbe::negInfDb());
+    }
+
+    // --- Qu-5/6/7, per the Qu-5/6/7 MIDI Protocol Issue 2 ---
+
+    void qu567_speaksTheSqSchemeNotTheOldQuOne() {
+        // the doc's own examples: "Ip1 to LR, 0dB, Ch1" linear = B0 63 40 B0 62
+        // 00 B0 06 76 B0 26 5C, audio = ... B0 06 62 B0 26 00; "Ip1, Mute On,
+        // Ch1" = B0 63 00 B0 62 00 B0 06 00 B0 26 01
+        Qu567Probe q;
+        const quint16 lin = q.encodeLevel14(0.0);
+        QCOMPARE(q.buildNRPNMessage(0x40, 0x00, (lin >> 7) & 0x7F, lin & 0x7F),
+                 QByteArray::fromHex("B06340B06200B00676B0265C"));
+        q.setFaderLaw(Qu567Probe::FaderLaw::AudioTaper);
+        const quint16 aud = q.encodeLevel14(0.0);
+        QCOMPARE(q.buildNRPNMessage(0x40, 0x00, (aud >> 7) & 0x7F, aud & 0x7F),
+                 QByteArray::fromHex("B06340B06200B00662B02600"));
+        QCOMPARE(q.buildNRPNMessage(0x00, 0x00, 0x00, 0x01),
+                 QByteArray::fromHex("B06300B06200B00600B02601"));
+        // scenes in banks of 128, like SQ (scene 264 = bank 2, program 7)
+        QCOMPARE(q.buildSceneRecall(264), QByteArray::fromHex("B00002C007"));
+    }
+
+    void qu567_capabilitiesMatchTheDoc() {
+        for (ConsoleType type : {ConsoleType::Qu5, ConsoleType::Qu6, ConsoleType::Qu7}) {
+            const auto caps = MixerCapabilities::forConsole(type);
+            QCOMPARE(caps.defaultPort, 51325);
+            QCOMPARE(caps.protocol, ProtocolType::MidiTcp);
+            QCOMPARE(caps.dcaCount, 8);        // DCA1..DCA8 in the mute/level tables
+            QCOMPARE(caps.scenes, 300);        // three banks of 128
+            QCOMPARE(caps.inputChannels, 32);  // Ip1..Ip32
+            QCOMPARE(caps.mixBuses, 12);       // MIX1..MIX12
+        }
+        QCOMPARE(MixerCapabilities::forProtocolId("qu7").type, ConsoleType::Qu7);
+        QCOMPARE(MixerCapabilities::forConsole(ConsoleType::Qu5).displayName,
+                 QStringLiteral("Allen & Heath Qu-5"));
+    }
+
     // --- Qu, per the Qu Mixer MIDI Protocol V1.9+ ---
 
     void qu_faderPutsTheChannelInTheMsb() {
@@ -247,6 +389,37 @@ class TestAllenHeathMidi : public QObject {
         QVERIFY(q.buildSceneRecall(0).isEmpty());
     }
 
+    void qu_midiChannelReachesEveryMessage() {
+        QuProbe q;
+        q.setMidiChannel(5); // N = 4
+        QCOMPARE(q.buildFader(0x20, 0.0), QByteArray::fromHex("B46320B46217B40662B42607"));
+        QCOMPARE(q.buildMute(0x20, true), QByteArray::fromHex("94207F942000"));
+        QCOMPARE(q.buildSceneRecall(1), QByteArray::fromHex("B40000B42000C400"));
+    }
+
+    void qu_feedbackUsesItsOwnMap() {
+        // channel in the MSB, parameter in the LSB, 7-bit level; mutes as notes
+        QuProbe q;
+        QSignalSpy paramSpy(&q, &MixerProtocol::parameterChanged);
+        q.parseMidiData(QByteArray::fromHex("FE" "B06320B06217B00662B02607")); // Ip1 0 dB
+        QCOMPARE(paramSpy.count(), 1);
+        QCOMPARE(paramSpy.at(0).at(0).toString(), QStringLiteral("/ch/1/fader"));
+        QVERIFY(std::abs(paramSpy.at(0).at(1).toDouble()) < 0.05);
+        q.parseMidiData(QByteArray::fromHex("90217F902100")); // Ip2 mute on + note off
+        QCOMPARE(paramSpy.count(), 2);
+        QCOMPARE(paramSpy.at(1).at(0).toString(), QStringLiteral("/ch/2/mute"));
+        QCOMPARE(paramSpy.at(1).at(1).toBool(), true);
+        q.parseMidiData(QByteArray::fromHex("90103F901000")); // DCA1 mute off
+        QCOMPARE(paramSpy.count(), 3);
+        QCOMPARE(paramSpy.at(2).at(0).toString(), QStringLiteral("/dca/1/mute"));
+        QCOMPARE(paramSpy.at(2).at(1).toBool(), false);
+        // the SQ-shaped message a Qu-5/6/7 would send is not in this map
+        q.parseMidiData(QByteArray::fromHex("B06340B06200B00676B0265C"));
+        QCOMPARE(paramSpy.count(), 3);
+        QVERIFY(std::abs(QuProbe::dbFromLevel(0x62)) < 0.01);
+        QCOMPARE(QuProbe::dbFromLevel(0x00), SqProbe::negInfDb());
+    }
+
     void qu_capabilitiesMatchTheDoc() {
         const auto caps = MixerCapabilities::forConsole(ConsoleType::Qu32);
         QCOMPARE(caps.defaultPort, 51325);
@@ -304,9 +477,32 @@ class TestAllenHeathMidi : public QObject {
         QCOMPARE(g.buildFader(0x20, 0.0), QByteArray::fromHex("B26320B26217B2066B"));
         QCOMPARE(g.buildMute(0x20, true), QByteArray::fromHex("92207F922000"));
         QCOMPARE(g.buildColour(0x20, 0x02), QByteArray::fromHex("f000001a5010010002062002f7"));
+        // scene recall too: BN 00 bank, CN SS (scene 129 = bank 1, program 0)
+        QCOMPARE(g.buildSceneRecall(129), QByteArray::fromHex("B20001C200"));
 
         g.setMidiChannel(1); // the default: N = 0
         QCOMPARE(g.buildFader(0x20, 0.0), QByteArray::fromHex("B06320B06217B0066B"));
+    }
+
+    void gld_feedbackTakesTheThreeMessageFader() {
+        // BN 63 CH, BN 62 17, BN 06 LV and nothing after it: the sequence is
+        // closed by the next one, or by a short wait
+        GldProbe g;
+        QSignalSpy paramSpy(&g, &MixerProtocol::parameterChanged);
+        g.parseMidiData(QByteArray::fromHex("B06320B06217B0066B")); // Ip1 0 dB
+        QCOMPARE(paramSpy.count(), 0);
+        QTRY_COMPARE_WITH_TIMEOUT(paramSpy.count(), 1, 1000);
+        QCOMPARE(paramSpy.at(0).at(0).toString(), QStringLiteral("/ch/1/fader"));
+        QVERIFY(std::abs(paramSpy.at(0).at(1).toDouble()) < 0.05);
+
+        // back to back: the second sequence closes the first at once
+        g.parseMidiData(QByteArray::fromHex("B06321B06217B00600" "B06310B06217B0067F"));
+        QCOMPARE(paramSpy.count(), 2);
+        QCOMPARE(paramSpy.at(1).at(0).toString(), QStringLiteral("/ch/2/fader"));
+        QCOMPARE(paramSpy.at(1).at(1).toDouble(), SqProbe::negInfDb());
+        QTRY_COMPARE_WITH_TIMEOUT(paramSpy.count(), 3, 1000);
+        QCOMPARE(paramSpy.at(2).at(0).toString(), QStringLiteral("/dca/1/fader"));
+        QVERIFY(std::abs(paramSpy.at(2).at(1).toDouble() - 10.0) < 0.05);
     }
 
     void gld_capabilitiesMatchTheDoc() {

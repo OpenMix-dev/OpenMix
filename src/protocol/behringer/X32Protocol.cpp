@@ -110,6 +110,12 @@ X32Protocol::X32Protocol(const MixerCapabilities& caps, QObject* parent)
     QObject::connect(&m_transport, &OscTransport::messageReceived, this,
                      &X32Protocol::onMessageReceived);
 
+    // wire trace for the connection log
+    QObject::connect(&m_transport, &OscTransport::rawMessageSent, this,
+                     [this](const QByteArray& b) { emit wireTrace(true, b); });
+    QObject::connect(&m_transport, &OscTransport::rawMessageReceived, this,
+                     [this](const QByteArray& b) { emit wireTrace(false, b); });
+
     QObject::connect(&m_keepAliveTimer, &QTimer::timeout, this, &X32Protocol::onKeepAliveTimeout);
 
     m_connectionTimer.setSingleShot(true);
@@ -205,8 +211,7 @@ void X32Protocol::rebuildSnapshotParams() {
 }
 
 bool X32Protocol::connect(const QString& host, int port) {
-    if (m_connectionState == ConnectionState::Connected ||
-        m_connectionState == ConnectionState::Connecting) {
+    if (m_connectionState != ConnectionState::Disconnected) {
         disconnect();
     }
 
@@ -240,6 +245,9 @@ void X32Protocol::disconnect() {
     m_reconnectTimer.stop();
     m_requestTimeoutTimer.stop();
 
+    // leave the connected state first so nothing the transport does while
+    // closing reads as a lost link
+    setConnectionState(ConnectionState::Disconnected);
     m_transport.disconnect();
 
     m_parameterCache.clear();

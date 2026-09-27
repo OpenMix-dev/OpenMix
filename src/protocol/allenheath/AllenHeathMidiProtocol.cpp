@@ -1,5 +1,7 @@
 #include "AllenHeathMidiProtocol.h"
 #include "../../core/Cue.h"
+#include <algorithm>
+#include <cmath>
 
 namespace OpenMix {
 
@@ -21,15 +23,29 @@ AllenHeathMidiProtocol::AllenHeathMidiProtocol(const MixerCapabilities& caps, QO
     QObject::connect(&m_transport, &TcpTransport::reconnecting, this,
                      &AllenHeathMidiProtocol::onReconnecting);
 
+    // wire trace for the connection log
+    QObject::connect(&m_transport, &TcpTransport::bytesSent, this,
+                     [this](const QByteArray& b) { emit wireTrace(true, b); });
+    QObject::connect(&m_transport, &TcpTransport::dataReceived, this,
+                     [this](const QByteArray& b) { emit wireTrace(false, b); });
+
     QObject::connect(&m_keepAliveTimer, &QTimer::timeout, this,
                      &AllenHeathMidiProtocol::onKeepAliveTimeout);
+
+    m_nrpnFlushTimer.setSingleShot(true);
+    m_nrpnFlushTimer.setInterval(NRPN_TIMEOUT_MS);
+    QObject::connect(&m_nrpnFlushTimer, &QTimer::timeout, this,
+                     &AllenHeathMidiProtocol::onNrpnFlush);
 }
 
 AllenHeathMidiProtocol::~AllenHeathMidiProtocol() { disconnect(); }
 
+void AllenHeathMidiProtocol::setMidiChannel(int channel1To16) {
+    m_midiChannel = std::clamp(channel1To16, 1, 16) - 1;
+}
+
 bool AllenHeathMidiProtocol::connect(const QString& host, int port) {
-    if (m_connectionState == ConnectionState::Connected ||
-        m_connectionState == ConnectionState::Connecting) {
+    if (m_connectionState != ConnectionState::Disconnected) {
         disconnect();
     }
 
@@ -44,13 +60,17 @@ bool AllenHeathMidiProtocol::connect(const QString& host, int port) {
 
 void AllenHeathMidiProtocol::disconnect() {
     m_keepAliveTimer.stop();
+    m_nrpnFlushTimer.stop();
+    // leave the connected state before the socket closes so the teardown is
+    // not mistaken for a lost link
+    setConnectionState(ConnectionState::Disconnected);
     m_transport.disconnect();
 
     m_parameterCache.clear();
     m_receiveBuffer.clear();
+    m_nrpnState.reset();
     m_latencyMs = 0;
 
-    setConnectionState(ConnectionState::Disconnected);
     setStatus("Disconnected");
     emit disconnected();
 }
@@ -68,13 +88,13 @@ void AllenHeathMidiProtocol::sendParameter(const QString& path, const QVariant& 
             if (param == "fader") {
                 // DCA level: 14-bit NRPN (SQ Issue 5, Master Sends/Control p24)
                 const quint16 midiValue = encodeLevel14(value.toDouble());
-                QByteArray msg = buildNRPNMessage(0, DCA_LEVEL_MSB, DCA_LEVEL_LSB_BASE + dca - 1,
+                QByteArray msg = buildNRPNMessage(DCA_LEVEL_MSB, DCA_LEVEL_LSB_BASE + dca - 1,
                                                   (midiValue >> 7) & 0x7F, midiValue & 0x7F);
                 m_transport.send(msg);
             } else if (param == "mute") {
                 // SQ mute is an NRPN; value-fine 1 = muted, 0 = unmuted (p11/p21)
                 QByteArray msg =
-                    buildNRPNMessage(0, DCA_MUTE_MSB, dca - 1, 0x00, value.toBool() ? 0x01 : 0x00);
+                    buildNRPNMessage(DCA_MUTE_MSB, dca - 1, 0x00, value.toBool() ? 0x01 : 0x00);
                 m_transport.send(msg);
             }
         }
@@ -87,12 +107,12 @@ void AllenHeathMidiProtocol::sendParameter(const QString& path, const QVariant& 
             if (param == "fader") {
                 // input-channel level to LR: 14-bit NRPN (SQ Issue 5 p22)
                 const quint16 midiValue = encodeLevel14(value.toDouble());
-                QByteArray msg = buildNRPNMessage(0, CH_LEVEL_TO_LR_MSB, ch - 1,
+                QByteArray msg = buildNRPNMessage(CH_LEVEL_TO_LR_MSB, ch - 1,
                                                   (midiValue >> 7) & 0x7F, midiValue & 0x7F);
                 m_transport.send(msg);
             } else if (param == "mute") {
                 QByteArray msg =
-                    buildNRPNMessage(0, CH_MUTE_MSB, ch - 1, 0x00, value.toBool() ? 0x01 : 0x00);
+                    buildNRPNMessage(CH_MUTE_MSB, ch - 1, 0x00, value.toBool() ? 0x01 : 0x00);
                 m_transport.send(msg);
             }
         }
@@ -108,6 +128,13 @@ void AllenHeathMidiProtocol::setChannelFaderDb(int channel, double dB) {
 
 void AllenHeathMidiProtocol::setChannelMute(int channel, bool muted) {
     sendParameter(QString("/ch/%1/mute").arg(channel), muted);
+}
+
+std::optional<double> AllenHeathMidiProtocol::readChannelFader(int channel) {
+    const QVariant value = m_parameterCache.value(QString("/ch/%1/fader").arg(channel));
+    if (!value.isValid())
+        return std::nullopt;
+    return value.toDouble();
 }
 
 QVariant AllenHeathMidiProtocol::getParameter(const QString& path) {
@@ -186,16 +213,26 @@ constexpr TaperPoint kAudioTaper[] = {
 
 quint16 taperValue(const TaperPoint& p) { return static_cast<quint16>((p.vc << 7) | p.vf); }
 
+// the printed linear table is exactly linear in dB: 0 dB = 15196, +10 dB = 16383
+constexpr double kLinearZeroDb = 15196.0;
+constexpr double kLinearStepsPerDb = 118.7;
+
 } // namespace
 
 quint16 AllenHeathMidiProtocol::encodeLinearTaper(double dB) {
-    // the printed table is exactly linear in dB: 0 dB = 15196, +10 dB = 16383,
-    // so 118.7 steps per dB. Anchors reproduce to within the doc's own rounding.
+    // Anchors reproduce to within the doc's own rounding.
     if (dB <= NEG_INF_DB) {
         return 0;
     }
-    const int v = static_cast<int>(std::lround(15196.0 + 118.7 * dB));
+    const int v = static_cast<int>(std::lround(kLinearZeroDb + kLinearStepsPerDb * dB));
     return static_cast<quint16>(std::clamp(v, 0, 16383));
+}
+
+double AllenHeathMidiProtocol::decodeLinearTaper(quint16 value) {
+    if (value == 0) {
+        return NEG_INF_DB;
+    }
+    return (value - kLinearZeroDb) / kLinearStepsPerDb;
 }
 
 quint16 AllenHeathMidiProtocol::encodeAudioTaper(double dB) {
@@ -223,32 +260,61 @@ quint16 AllenHeathMidiProtocol::encodeAudioTaper(double dB) {
     return taperValue(*last);
 }
 
+double AllenHeathMidiProtocol::decodeAudioTaper(quint16 value) {
+    if (value == 0) {
+        return NEG_INF_DB;
+    }
+    const auto* first = std::begin(kAudioTaper);
+    const auto* last = std::end(kAudioTaper) - 1;
+    if (value <= taperValue(*first)) {
+        return first->dB;
+    }
+    if (value >= taperValue(*last)) {
+        return last->dB;
+    }
+    for (const TaperPoint* p = first; p < last; ++p) {
+        const TaperPoint* next = p + 1;
+        const double lo = taperValue(*p);
+        const double hi = taperValue(*next);
+        if (value >= lo && value <= hi) {
+            const double t = hi > lo ? (value - lo) / (hi - lo) : 0.0;
+            return p->dB + t * (next->dB - p->dB);
+        }
+    }
+    return last->dB;
+}
+
 quint16 AllenHeathMidiProtocol::encodeLevel14(double dB) const {
     return m_faderLaw == FaderLaw::AudioTaper ? encodeAudioTaper(dB) : encodeLinearTaper(dB);
 }
 
-QByteArray AllenHeathMidiProtocol::buildNRPNMessage(int channel, int nrpnMsb, int nrpnLsb,
-                                                    int valueMsb, int valueLsb) {
+double AllenHeathMidiProtocol::decodeLevel14(quint16 value) const {
+    return m_faderLaw == FaderLaw::AudioTaper ? decodeAudioTaper(value)
+                                              : decodeLinearTaper(value);
+}
+
+QByteArray AllenHeathMidiProtocol::buildNRPNMessage(int nrpnMsb, int nrpnLsb, int valueMsb,
+                                                    int valueLsb) const {
     QByteArray msg;
-    channel = channel & 0x0F;
+    const char status = static_cast<char>(0xB0 | (m_midiChannel & 0x0F));
 
     // NRPN MSB (CC 99)
-    msg.append(static_cast<char>(0xB0 | channel));
+    msg.append(status);
     msg.append(static_cast<char>(99));
     msg.append(static_cast<char>(nrpnMsb & 0x7F));
 
     // NRPN LSB (CC 98)
-    msg.append(static_cast<char>(0xB0 | channel));
+    msg.append(status);
     msg.append(static_cast<char>(98));
     msg.append(static_cast<char>(nrpnLsb & 0x7F));
 
     // data entry MSB (CC 6)
-    msg.append(static_cast<char>(0xB0 | channel));
+    msg.append(status);
     msg.append(static_cast<char>(6));
     msg.append(static_cast<char>(valueMsb & 0x7F));
 
     // data entry LSB (CC 38)
-    msg.append(static_cast<char>(0xB0 | channel));
+    msg.append(status);
     msg.append(static_cast<char>(38));
     msg.append(static_cast<char>(valueLsb & 0x7F));
 
@@ -258,7 +324,8 @@ QByteArray AllenHeathMidiProtocol::buildNRPNMessage(int channel, int nrpnMsb, in
 // Allen & Heath scene recall over MIDI is a Bank Select (CC0) followed by a
 // Program Change, per the A&H MIDI Protocol. sceneNumber is the 1-based scene as
 // shown on the console; MIDI values are offset by -1, and scenes split into
-// banks of 128 (1-128 -> bank 0, 129-256 -> bank 1, 257-300 -> bank 2).
+// banks of 128 (1-128 -> bank 0, 129-256 -> bank 1, 257-300 -> bank 2; GLD has
+// a fourth bank for 385-500).
 QByteArray AllenHeathMidiProtocol::buildSceneRecall(int sceneNumber) {
     const int index = sceneNumber - 1;
     if (index < 0)
@@ -266,7 +333,7 @@ QByteArray AllenHeathMidiProtocol::buildSceneRecall(int sceneNumber) {
 
     const int bank = index / 128;
     const int program = index % 128;
-    const int channel = 0; // MIDI channel 1
+    const int channel = m_midiChannel & 0x0F;
 
     QByteArray msg;
     msg.append(static_cast<char>(0xB0 | channel)); // Control Change
@@ -278,9 +345,9 @@ QByteArray AllenHeathMidiProtocol::buildSceneRecall(int sceneNumber) {
     return msg;
 }
 
-QByteArray AllenHeathMidiProtocol::buildControlChange(int channel, int cc, int value) {
+QByteArray AllenHeathMidiProtocol::buildControlChange(int cc, int value) const {
     QByteArray msg;
-    msg.append(static_cast<char>(0xB0 | (channel & 0x0F)));
+    msg.append(static_cast<char>(0xB0 | (m_midiChannel & 0x0F)));
     msg.append(static_cast<char>(cc & 0x7F));
     msg.append(static_cast<char>(value & 0x7F));
     return msg;
@@ -290,10 +357,17 @@ void AllenHeathMidiProtocol::parseMidiData(const QByteArray& data) {
     m_receiveBuffer.append(data);
 
     while (!m_receiveBuffer.isEmpty()) {
-        unsigned char status = static_cast<unsigned char>(m_receiveBuffer[0]);
+        const unsigned char status = static_cast<unsigned char>(m_receiveBuffer[0]);
+
+        if ((status & 0x80) == 0) {
+            // a data byte with no status: running status is not used on this
+            // link, so it is noise or the tail of something already consumed
+            m_receiveBuffer.remove(0, 1);
+            continue;
+        }
 
         if (status == 0xF0) {
-            int endPos = m_receiveBuffer.indexOf(static_cast<char>(0xF7));
+            const int endPos = m_receiveBuffer.indexOf(static_cast<char>(0xF7));
             if (endPos < 0)
                 break; // incomplete
 
@@ -301,41 +375,81 @@ void AllenHeathMidiProtocol::parseMidiData(const QByteArray& data) {
             m_receiveBuffer.remove(0, endPos + 1);
 
             processSysEx(sysex);
-        } else if ((status & 0xF0) == 0xB0) {
-            if (m_receiveBuffer.size() < 3)
-                break;
+            continue;
+        }
 
-            int channel = status & 0x0F;
-            int cc = static_cast<unsigned char>(m_receiveBuffer[1]);
-            int value = static_cast<unsigned char>(m_receiveBuffer[2]);
-            m_receiveBuffer.remove(0, 3);
-
-            processControlChange(channel, cc, value);
-        } else if ((status & 0x80) == 0) {
+        if (status >= 0xF8) {
+            // system real-time is a single byte: Active Sensing (FE), which Qu
+            // sends every 300 ms, clock, start/stop. Nothing to decode, and
+            // treating it as a 3-byte message would shift everything after it.
             m_receiveBuffer.remove(0, 1);
-        } else {
-            int len = 3;
-            if ((status & 0xF0) == 0xC0 || (status & 0xF0) == 0xD0) {
-                len = 2;
+            continue;
+        }
+
+        // message length from the status byte
+        int len = 3;
+        if (status >= 0xF1) {
+            // system common: F1 quarter-frame, F3 song select = 2; F2 song
+            // position = 3; F4/F5 undefined, F6 tune request, stray F7 = 1
+            len = (status == 0xF1 || status == 0xF3) ? 2 : (status == 0xF2 ? 3 : 1);
+        } else if ((status & 0xF0) == 0xC0 || (status & 0xF0) == 0xD0) {
+            len = 2; // program change, channel pressure
+        }
+
+        // collect the data bytes; real-time bytes may be interleaved anywhere,
+        // and a fresh status byte means the message was cut short
+        unsigned char data[2] = {0, 0};
+        int have = 0;
+        int pos = 1;
+        bool truncated = false;
+        while (have < len - 1 && pos < m_receiveBuffer.size()) {
+            const unsigned char b = static_cast<unsigned char>(m_receiveBuffer[pos]);
+            if (b >= 0xF8) {
+                ++pos;
+                continue;
             }
-            if (m_receiveBuffer.size() < len)
+            if (b & 0x80) {
+                truncated = true;
                 break;
-            m_receiveBuffer.remove(0, len);
+            }
+            data[have++] = b;
+            ++pos;
+        }
+
+        if (truncated) {
+            m_receiveBuffer.remove(0, pos); // drop the partial message, keep the new status
+            continue;
+        }
+        if (have < len - 1)
+            break; // the rest is still in flight
+
+        m_receiveBuffer.remove(0, pos);
+
+        const int channel = status & 0x0F;
+        if ((status & 0xF0) == 0xB0) {
+            processControlChange(channel, data[0], data[1]);
+        } else if ((status & 0xF0) == 0x90 && channel == m_midiChannel) {
+            handleNoteOn(data[0], data[1]);
         }
     }
 }
 
 void AllenHeathMidiProtocol::processControlChange(int channel, int cc, int value) {
+    if (channel != m_midiChannel) {
+        return; // another channel: MIDI strips, DAW control, not the desk
+    }
+
     qint64 now = QDateTime::currentMSecsSinceEpoch();
 
     if (m_nrpnState.timestamp > 0 && (now - m_nrpnState.timestamp) > NRPN_TIMEOUT_MS) {
-        m_nrpnState.reset();
+        finishNrpn();
     }
 
     // NRPN message sequence: CC 99 (MSB), CC 98 (LSB), CC 6 (data MSB), CC 38 (data LSB)
     switch (cc) {
     case 99:
-        m_nrpnState.reset();
+        // a new sequence closes whatever three-message one is still open
+        finishNrpn();
         m_nrpnState.channel = channel;
         m_nrpnState.nrpnMsb = value;
         m_nrpnState.timestamp = now;
@@ -352,9 +466,8 @@ void AllenHeathMidiProtocol::processControlChange(int channel, int cc, int value
         if (m_nrpnState.channel == channel) {
             m_nrpnState.dataMsb = value;
             m_nrpnState.timestamp = now;
-            if (m_nrpnState.isComplete()) {
-                processNRPNComplete();
-            }
+            // GLD faders stop here; wait briefly for a data LSB before deciding
+            m_nrpnFlushTimer.start();
         }
         break;
 
@@ -362,40 +475,55 @@ void AllenHeathMidiProtocol::processControlChange(int channel, int cc, int value
         if (m_nrpnState.channel == channel && m_nrpnState.dataMsb >= 0) {
             m_nrpnState.dataLsb = value;
             m_nrpnState.timestamp = now;
-            if (m_nrpnState.isComplete()) {
-                processNRPNComplete();
-            }
+            finishNrpn();
         }
         break;
 
     default:
-        // Allen & Heath DCA mutes: CC 0x50-0x57 (80-87) for DCAs 1-8
-        if (cc >= 0x50 && cc <= 0x57) {
-            int dca = cc - 0x50 + 1;
-            bool muted = value >= 64;
-            QString path = QString("/dca/%1/mute").arg(dca);
-            m_parameterCache[path] = muted;
-            emit parameterChanged(path, muted);
-        }
         break;
     }
 }
 
-void AllenHeathMidiProtocol::processNRPNComplete() {
-    int dataValue =
-        (m_nrpnState.dataMsb << 7) | (m_nrpnState.dataLsb >= 0 ? m_nrpnState.dataLsb : 0);
+void AllenHeathMidiProtocol::onNrpnFlush() { finishNrpn(); }
 
-    // Allen & Heath NRPN mapping for DCA faders
-    // NRPN MSB 0x63 (99), LSB = DCA index (0-7 for DCAs 1-8)
-    if (m_nrpnState.nrpnMsb == 0x63 && m_nrpnState.nrpnLsb >= 0 && m_nrpnState.nrpnLsb <= 7) {
-        int dca = m_nrpnState.nrpnLsb + 1;
-        float level = dataValue / 16383.0f;
-        QString path = QString("/dca/%1/fader").arg(dca);
-        m_parameterCache[path] = level;
-        emit parameterChanged(path, level);
+void AllenHeathMidiProtocol::finishNrpn() {
+    m_nrpnFlushTimer.stop();
+    if (!m_nrpnState.isComplete()) {
+        m_nrpnState.reset();
+        return;
     }
-
+    const NRPNState done = m_nrpnState;
     m_nrpnState.reset();
+    handleNrpn(done.nrpnMsb, done.nrpnLsb, done.dataMsb, done.dataLsb);
+}
+
+void AllenHeathMidiProtocol::reportParameter(const QString& path, const QVariant& value) {
+    m_parameterCache[path] = value;
+    emit parameterChanged(path, value);
+}
+
+void AllenHeathMidiProtocol::handleNrpn(int msb, int lsb, int dataMsb, int dataLsb) {
+    // SQ map (SQ Iss5 / Qu-5/6/7 Iss2 reference tables)
+    const quint16 value14 = static_cast<quint16>((dataMsb << 7) | (dataLsb >= 0 ? dataLsb : 0));
+
+    if (msb == CH_LEVEL_TO_LR_MSB && lsb < m_capabilities.inputChannels) {
+        const int channel = lsb + 1;
+        const double dB = decodeLevel14(value14);
+        reportParameter(QString("/ch/%1/fader").arg(channel), dB);
+        emit channelFaderChanged(channel, dB);
+    } else if (msb == DCA_LEVEL_MSB && lsb >= DCA_LEVEL_LSB_BASE &&
+               lsb < DCA_LEVEL_LSB_BASE + m_capabilities.dcaCount) {
+        reportParameter(dcaFaderPath(lsb - DCA_LEVEL_LSB_BASE + 1), decodeLevel14(value14));
+    } else if (msb == CH_MUTE_MSB && lsb < m_capabilities.inputChannels) {
+        reportParameter(QString("/ch/%1/mute").arg(lsb + 1), dataLsb == 0x01);
+    } else if (msb == DCA_MUTE_MSB && lsb < m_capabilities.dcaCount) {
+        reportParameter(dcaMutePath(lsb + 1), dataLsb == 0x01);
+    }
+}
+
+void AllenHeathMidiProtocol::handleNoteOn(int note, int velocity) {
+    Q_UNUSED(note);
+    Q_UNUSED(velocity);
 }
 
 void AllenHeathMidiProtocol::processSysEx(const QByteArray& sysex) {
@@ -440,6 +568,7 @@ void AllenHeathMidiProtocol::onTransportError(const QString& error) {
 }
 
 void AllenHeathMidiProtocol::onTransportConnectionLost() {
+    m_keepAliveTimer.stop();
     setConnectionState(ConnectionState::Reconnecting);
     setStatus("Connection lost, reconnecting...");
     emit connectionLost();
@@ -449,7 +578,8 @@ void AllenHeathMidiProtocol::onDataReceived(const QByteArray& data) { parseMidiD
 
 void AllenHeathMidiProtocol::onKeepAliveTimeout() {
     if (m_connectionState == ConnectionState::Connected) {
-        // send active sensing (0xFE) as keep-alive
+        // Active Sensing (FE) as keep-alive: a Qu closes a link that has been
+        // silent for 12 s once it has seen one of these, so keep them coming
         QByteArray keepAlive;
         keepAlive.append(static_cast<char>(0xFE));
         m_transport.send(keepAlive);

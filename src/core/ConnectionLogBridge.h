@@ -31,6 +31,7 @@ class ConnectionLogBridge : public QObject {
     void onConnectionLost();
     void onLatencyChanged(int ms);
     void onRequestTimeout(const QString& path);
+    void onWireTrace(bool outbound, const QByteArray& bytes);
 
   private:
     AppLogger* m_logger;
@@ -43,6 +44,12 @@ class ConnectionLogBridge : public QObject {
     // throttle latency logging
     qint64 m_lastLatencyLogTime = 0;
     static constexpr int LATENCY_LOG_THROTTLE_MS = 5000;
+
+    // the first frames of each connection attempt go to the log as hex; after
+    // that the wire is quiet in the log so a meter stream cannot flood it
+    int m_tracedFrames = 0;
+    static constexpr int MAX_TRACED_FRAMES = 40;
+    static constexpr int MAX_TRACED_BYTES = 64;
 };
 
 } // namespace OpenMix

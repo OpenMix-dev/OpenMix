@@ -8,7 +8,8 @@ namespace OpenMix {
 // "Find" string to UDP 51320; A&H devices answer from source port 51320.
 // Stage 2: a follow-up TCP handshake reports the exact model. A&H uses two
 // distinct identify protocols:
-//   * SQ family  - TCP 51326, binary 7F 01 / 7F 02 frame with a model byte.
+//   * SQ family  - TCP 51326, binary 7F 01 / 7F 02 frame with a model byte
+//     (SQ-5/6/7 and the 2024 Qu-5/6/7; the older Qu-16/24/32 do not answer).
 //   * ACE family - TCP 51321, SysEx "DR Box Identification" request. The reply is
 //     a handle, not a name; reading that handle back returns the string that
 //     identifies dLive ("TLD...") or Avantis ("Bridge"/"Avantis Solo"). GLD does

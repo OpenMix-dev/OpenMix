@@ -7,6 +7,12 @@ namespace OpenMix {
 DiGiCoProtocol::DiGiCoProtocol(const MixerCapabilities& caps, QObject* parent)
     : MixerProtocol(parent), m_capabilities(caps), m_transport(this) {
     m_port = caps.defaultPort;
+
+    // wire trace for the connection log
+    QObject::connect(&m_transport, &OscTransport::rawMessageSent, this,
+                     [this](const QByteArray& b) { emit wireTrace(true, b); });
+    QObject::connect(&m_transport, &OscTransport::rawMessageReceived, this,
+                     [this](const QByteArray& b) { emit wireTrace(false, b); });
 }
 
 DiGiCoProtocol::~DiGiCoProtocol() { disconnect(); }
@@ -28,10 +34,14 @@ bool DiGiCoProtocol::connect(const QString& host, int port) {
     setConnectionState(ConnectionState::Connecting);
     setStatus(QString("Connecting to %1:%2...").arg(host).arg(port));
 
-    if (!m_transport.connect(host, port)) {
-        setStatus("Failed to initialize transport");
+    if (!m_transport.connect(host, port, m_receivePort)) {
+        const QString error =
+            m_receivePort > 0
+                ? QString("Could not listen on UDP port %1 (already in use?)").arg(m_receivePort)
+                : QString("Failed to initialize transport");
+        setStatus(error);
         setConnectionState(ConnectionState::Disconnected);
-        emit connectionError("Failed to initialize transport");
+        emit connectionError(error);
         return false;
     }
 
@@ -46,13 +56,16 @@ bool DiGiCoProtocol::connect(const QString& host, int port) {
 }
 
 void DiGiCoProtocol::disconnect() {
+    const bool wasUp = m_connectionState != ConnectionState::Disconnected;
+    setConnectionState(ConnectionState::Disconnected);
     m_transport.disconnect();
     m_parameterCache.clear();
     m_latencyMs = 0;
 
-    setConnectionState(ConnectionState::Disconnected);
     setStatus("Disconnected");
-    emit disconnected();
+    if (wasUp) {
+        emit disconnected();
+    }
 }
 
 void DiGiCoProtocol::setChannelFaderDb(int channel, double dB) {

@@ -28,6 +28,10 @@ class StubMixRack : public QObject {
     const QList<QByteArray>& subscribesSeen() const { return m_subscribesSeen; }
     quint16 clientUdpPort() const { return m_clientUdpPort; }
     bool sawSeed() const { return m_sawSeed; }
+    int seedsSeen() const { return m_seedsSeen; }
+
+    // a console that hands back no handle for this object
+    void ignoreSubscribe(const QByteArray& objectName) { m_ignored.append(objectName); }
 
     // one 8-byte record per channel; only byte 0 is a level
     void sendMeters(const QMap<int, quint8>& levels) {
@@ -102,6 +106,7 @@ class StubMixRack : public QObject {
             return;
         }
         m_sawSeed = true;
+        ++m_seedsSeen;
         m_clientUdpPort = static_cast<quint16>((static_cast<quint8>(frame.at(5)) << 8) |
                                                static_cast<quint8>(frame.at(6)));
         if (m_mute) {
@@ -116,6 +121,11 @@ class StubMixRack : public QObject {
 
     void handleSubscribe(const QByteArray& frame) {
         m_subscribesSeen.append(frame);
+        for (const QByteArray& name : m_ignored) {
+            if (frame.contains(name)) {
+                return;
+            }
+        }
 
         // 14-byte handle reply: F0 00 01 <6 bytes> 00 02 <handle:2> F7
         QByteArray reply = QByteArray::fromHex("f00001000000010002");
@@ -132,8 +142,10 @@ class StubMixRack : public QObject {
     QTcpSocket* m_client = nullptr;
     QByteArray m_buffer;
     QList<QByteArray> m_subscribesSeen;
+    QList<QByteArray> m_ignored;
     quint16 m_clientUdpPort = 0;
     bool m_sawSeed = false;
+    int m_seedsSeen = 0;
     bool m_mute = false;
 };
 
@@ -220,11 +232,90 @@ class TestAllenHeathSession : public QObject {
         StubMixRack rack;
         rack.setMute(true);
         DLiveProtocol p(MixerCapabilities::forConsole(ConsoleType::DLive));
+        p.setHandshakeTimeout(500);
 
         QSignalSpy errorSpy(&p, &MixerProtocol::connectionError);
         QVERIFY(p.connect("127.0.0.1", rack.port()));
 
-        QVERIFY(errorSpy.wait(8000));
+        QVERIFY(errorSpy.wait(5000));
+        QVERIFY(errorSpy.at(0).at(0).toString().contains("session handshake"));
+        QCOMPARE(p.connectionState(), ConnectionState::Disconnected);
+    }
+
+    void failedHandshake_doesNotReconnectByItself() {
+        StubMixRack rack;
+        rack.setMute(true);
+        DLiveProtocol p(MixerCapabilities::forConsole(ConsoleType::DLive));
+        p.setHandshakeTimeout(500);
+
+        QSignalSpy errorSpy(&p, &MixerProtocol::connectionError);
+        QVERIFY(p.connect("127.0.0.1", rack.port()));
+        QVERIFY(errorSpy.wait(5000));
+        QCOMPARE(p.connectionState(), ConnectionState::Disconnected);
+
+        // the transport used to retry a second later with a closed UDP socket,
+        // looping the failure; the failed session must stay down
+        QTest::qWait(1500);
+        QCOMPARE(rack.seedsSeen(), 1);
+        QCOMPARE(p.connectionState(), ConnectionState::Disconnected);
+    }
+
+    void unansweredIdentitySubscribe_stillConnects() {
+        StubMixRack rack;
+        rack.ignoreSubscribe("Surface Identification");
+        DLiveProtocol p(MixerCapabilities::forConsole(ConsoleType::DLive));
+        p.setSubscribeReplyTimeout(200);
+
+        QSignalSpy connectedSpy(&p, &MixerProtocol::connected);
+        QSignalSpy errorSpy(&p, &MixerProtocol::connectionError);
+        QVERIFY(p.connect("127.0.0.1", rack.port()));
+        QVERIFY(connectedSpy.wait(5000));
+
+        QVERIFY(p.isConnected());
+        QCOMPARE(errorSpy.count(), 0);
+        // the chain moved past the silent object and still subscribed the rest
+        QCOMPARE(rack.subscribesSeen().size(), 6);
+        QVERIFY(rack.subscribesSeen().last().contains("Metering Sources"));
+    }
+
+    void unansweredControlSubscribe_failsWithItsName() {
+        StubMixRack rack;
+        rack.ignoreSubscribe("Input Mixer");
+        DLiveProtocol p(MixerCapabilities::forConsole(ConsoleType::DLive));
+        p.setSubscribeReplyTimeout(200);
+
+        QSignalSpy connectedSpy(&p, &MixerProtocol::connected);
+        QSignalSpy errorSpy(&p, &MixerProtocol::connectionError);
+        QVERIFY(p.connect("127.0.0.1", rack.port()));
+        QVERIFY(errorSpy.wait(5000));
+
+        QVERIFY(errorSpy.at(0).at(0).toString().contains("Input Mixer"));
+        QCOMPARE(connectedSpy.count(), 0);
+        QCOMPARE(p.connectionState(), ConnectionState::Disconnected);
+    }
+
+    void udpTrafficKeepsTheLinkAlive() {
+        StubMixRack rack;
+        DLiveProtocol p(MixerCapabilities::forConsole(ConsoleType::DLive));
+        p.setRxSilenceLimit(800);
+
+        QSignalSpy connectedSpy(&p, &MixerProtocol::connected);
+        QSignalSpy errorSpy(&p, &MixerProtocol::connectionError);
+        QVERIFY(p.connect("127.0.0.1", rack.port()));
+        QVERIFY(connectedSpy.wait(5000));
+
+        // the TCP side goes quiet, as it does on an idle desk, while meters keep
+        // arriving on UDP: that is a healthy session
+        for (int i = 0; i < 12; ++i) {
+            rack.sendMeters({{1, 0x40}});
+            QTest::qWait(100);
+        }
+        QVERIFY(p.isConnected());
+        QCOMPARE(errorSpy.count(), 0);
+
+        // and total silence on both sockets is what a dead console looks like
+        QVERIFY(errorSpy.wait(3000));
+        QVERIFY(errorSpy.at(0).at(0).toString().contains("stopped responding"));
         QCOMPARE(p.connectionState(), ConnectionState::Disconnected);
     }
 };

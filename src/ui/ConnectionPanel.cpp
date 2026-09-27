@@ -31,6 +31,10 @@ ConnectionPanel::ConnectionPanel(Application* app, QWidget* parent) : QWidget(pa
 
     // re-sync the fields when a project is loaded (fromJson emits nameChanged)
     connect(m_app->show(), &Show::nameChanged, this, &ConnectionPanel::loadFromConfig);
+
+    // hook each new driver before it connects, so a driver that answers (or
+    // fails) synchronously inside connect() is not missed
+    connect(m_app, &Application::mixerCreated, this, &ConnectionPanel::connectMixerSignals);
 }
 
 void ConnectionPanel::populateProtocolCombo() {
@@ -114,7 +118,9 @@ void ConnectionPanel::setupUi() {
     m_midiChannelLabel = new QLabel(tr("MIDI Channel:"), this);
     m_midiChannelSpin = new QSpinBox(this);
     m_midiChannelSpin->setRange(1, 16);
-    m_midiChannelSpin->setToolTip(tr("Must match the console: Setup / Control / MIDI channel."));
+    m_midiChannelSpin->setToolTip(
+        tr("Must match the console's MIDI channel (Utility > General > MIDI on SQ and Qu, "
+           "Setup / Control on GLD). A mismatch is silently ignored by the desk."));
     formLayout->addRow(m_midiChannelLabel, m_midiChannelSpin);
 
     // DiGiCo publishes no OSC address map, so the operator supplies the patterns
@@ -141,6 +147,16 @@ void ConnectionPanel::setupUi() {
     m_oscSceneEdit = new QLineEdit(this);
     m_oscSceneEdit->setPlaceholderText(tr("/snapshot/fire"));
     formLayout->addRow(m_oscSceneLabel, m_oscSceneEdit);
+
+    // the console pairs a Send and a Receive port per device: the Port field
+    // above is its Receive port (where we send), this is its Send port (where
+    // it answers), so replies have somewhere to land
+    m_oscReceivePortLabel = new QLabel(tr("Console Send Port:"), this);
+    m_oscReceivePortEdit = new QLineEdit(this);
+    m_oscReceivePortEdit->setPlaceholderText(tr("9000"));
+    m_oscReceivePortEdit->setToolTip(
+        tr("The Send port set for this device in the console's External Control panel."));
+    formLayout->addRow(m_oscReceivePortLabel, m_oscReceivePortEdit);
 
     m_loopbackLabel = new QLabel(tr("No hardware connection required."), this);
     m_loopbackLabel->setStyleSheet("color: gray; font-style: italic;");
@@ -235,15 +251,16 @@ void ConnectionPanel::onConnectClicked() {
 
     m_statusLabel->setText(tr("Connecting..."));
     m_stateWidget->setState(ConnectionState::Connecting);
+    m_currentState = ConnectionState::Connecting;
+    m_lastError.clear();
     m_timeoutCount = 0;
 
     m_app->connectToMixer(type, host, port);
-    connectMixerSignals();
+    syncFromMixer();
     updateUiState();
 }
 
-void ConnectionPanel::connectMixerSignals() {
-    MixerProtocol* mixer = m_app->mixer();
+void ConnectionPanel::connectMixerSignals(MixerProtocol* mixer) {
     if (!mixer)
         return;
 
@@ -259,6 +276,9 @@ void ConnectionPanel::connectMixerSignals() {
     connect(mixer, &MixerProtocol::requestTimeout, this, &ConnectionPanel::onRequestTimeout,
             Qt::UniqueConnection);
 
+    connect(mixer, &MixerProtocol::connectionError, this, &ConnectionPanel::onConnectionError,
+            Qt::UniqueConnection);
+
     connect(mixer, &MixerProtocol::connected, this, &ConnectionPanel::onConnected,
             Qt::UniqueConnection);
 
@@ -266,8 +286,30 @@ void ConnectionPanel::connectMixerSignals() {
             Qt::UniqueConnection);
 }
 
+void ConnectionPanel::syncFromMixer() {
+    MixerProtocol* mixer = m_app->mixer();
+    if (!mixer) {
+        m_lastError = tr("No driver for this console type");
+        onConnectionStateChanged(ConnectionState::Disconnected);
+        return;
+    }
+
+    onConnectionStateChanged(mixer->connectionState());
+    if (!mixer->connectionStatus().isEmpty()) {
+        onConnectionStatusChanged(mixer->connectionStatus());
+    }
+}
+
+void ConnectionPanel::showDisconnected() {
+    m_statusLabel->setText(m_lastError.isEmpty() ? tr("Disconnected")
+                                                 : tr("Disconnected: %1").arg(m_lastError));
+    m_latencyLabel->setVisible(false);
+}
+
 void ConnectionPanel::onDisconnectClicked() {
     m_app->disconnectFromMixer();
+    m_lastError.clear();
+    m_currentState = ConnectionState::Disconnected;
     m_statusLabel->setText(tr("Disconnected"));
     m_stateWidget->setState(ConnectionState::Disconnected);
     m_latencyLabel->setVisible(false);
@@ -284,16 +326,30 @@ void ConnectionPanel::onRefreshClicked() {
 }
 
 void ConnectionPanel::onConnectionStatusChanged(const QString& status) {
+    // a driver's generic "Disconnected" must not hide the failure that caused it
+    if (m_currentState == ConnectionState::Disconnected && !m_lastError.isEmpty()) {
+        showDisconnected();
+        return;
+    }
     m_statusLabel->setText(status);
 }
 
+void ConnectionPanel::onConnectionError(const QString& error) {
+    m_lastError = error;
+    if (m_currentState == ConnectionState::Disconnected) {
+        showDisconnected();
+    } else {
+        m_statusLabel->setText(error);
+    }
+}
+
 void ConnectionPanel::onConnectionStateChanged(ConnectionState state) {
+    m_currentState = state;
     m_stateWidget->setState(state);
 
     switch (state) {
     case ConnectionState::Disconnected:
-        m_statusLabel->setText(tr("Disconnected"));
-        m_latencyLabel->setVisible(false);
+        showDisconnected();
         break;
 
     case ConnectionState::Connecting:
@@ -301,6 +357,7 @@ void ConnectionPanel::onConnectionStateChanged(ConnectionState state) {
         break;
 
     case ConnectionState::Connected:
+        m_lastError.clear();
         m_statusLabel->setText(
             tr("Connected to %1:%2").arg(m_hostEdit->text()).arg(m_portEdit->text()));
         m_latencyLabel->setVisible(true);
@@ -351,6 +408,8 @@ void ConnectionPanel::onRequestTimeout(const QString& path) {
 
 void ConnectionPanel::onConnected() {
     MixerProtocol* mixer = m_app->mixer();
+    m_lastError.clear();
+    m_currentState = ConnectionState::Connected;
 
     // use mixer's status message if available
     if (mixer && !mixer->connectionStatus().isEmpty()) {
@@ -373,9 +432,9 @@ void ConnectionPanel::onConnected() {
 }
 
 void ConnectionPanel::onDisconnected() {
-    m_statusLabel->setText(tr("Disconnected"));
+    m_currentState = ConnectionState::Disconnected;
     m_stateWidget->setState(ConnectionState::Disconnected);
-    m_latencyLabel->setVisible(false);
+    showDisconnected();
     updateUiState();
 }
 
@@ -392,12 +451,15 @@ void ConnectionPanel::onProtocolTypeChanged(int index) {
     m_portEdit->setVisible(!isLoopback);
     m_loopbackLabel->setVisible(isLoopback);
 
-    const bool hasFaderLaw = type.startsWith("sq");
+    // the SQ scheme's selectable NRPN Fader Law: SQ and the 2024 Qu-5/6/7
+    // (the Qu-16/24/32 have one fixed 7-bit table)
+    const bool hasFaderLaw =
+        type.startsWith("sq") || type == "qu5" || type == "qu6" || type == "qu7";
     m_faderLawLabel->setVisible(hasFaderLaw);
     m_faderLawCombo->setVisible(hasFaderLaw);
 
-    // GLD stamps its MIDI channel into every message it sends
-    const bool hasMidiChannel = type.startsWith("gld");
+    // every A&H MIDI desk stamps its MIDI channel into every message
+    const bool hasMidiChannel = caps.protocol == ProtocolType::MidiTcp;
     m_midiChannelLabel->setVisible(hasMidiChannel);
     m_midiChannelSpin->setVisible(hasMidiChannel);
 
@@ -409,6 +471,8 @@ void ConnectionPanel::onProtocolTypeChanged(int index) {
     m_oscMuteEdit->setVisible(hasOscTemplates);
     m_oscSceneLabel->setVisible(hasOscTemplates);
     m_oscSceneEdit->setVisible(hasOscTemplates);
+    m_oscReceivePortLabel->setVisible(hasOscTemplates);
+    m_oscReceivePortEdit->setVisible(hasOscTemplates);
 
     if (!isLoopback) {
         m_portEdit->setText(QString::number(caps.defaultPort));
@@ -456,10 +520,12 @@ void ConnectionPanel::onDiscoveredConsoleDoubleClicked(const DiscoveredConsole& 
 
     m_statusLabel->setText(tr("Connecting to %1...").arg(console.displayName));
     m_stateWidget->setState(ConnectionState::Connecting);
+    m_currentState = ConnectionState::Connecting;
+    m_lastError.clear();
     m_timeoutCount = 0;
 
     m_app->connectToDiscoveredConsole(console);
-    connectMixerSignals();
+    syncFromMixer();
     updateUiState();
 }
 
@@ -496,6 +562,8 @@ void ConnectionPanel::loadFromConfig() {
     m_oscFaderEdit->setText(config.oscChannelFader);
     m_oscMuteEdit->setText(config.oscChannelMute);
     m_oscSceneEdit->setText(config.oscSceneRecall);
+    m_oscReceivePortEdit->setText(config.oscReceivePort > 0 ? QString::number(config.oscReceivePort)
+                                                            : QString());
 }
 
 void ConnectionPanel::saveToConfig() {
@@ -509,6 +577,7 @@ void ConnectionPanel::saveToConfig() {
     config.oscChannelFader = m_oscFaderEdit->text().trimmed();
     config.oscChannelMute = m_oscMuteEdit->text().trimmed();
     config.oscSceneRecall = m_oscSceneEdit->text().trimmed();
+    config.oscReceivePort = m_oscReceivePortEdit->text().trimmed().toInt();
     m_app->show()->setMixerConfig(config);
 }
 

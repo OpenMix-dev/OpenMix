@@ -225,6 +225,14 @@ target_link_libraries(test_osc_remote PRIVATE Qt6::Core Qt6::Test openmix_liblo)
 target_include_directories(test_osc_remote PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME OscRemoteTest COMMAND test_osc_remote)
 
+add_executable(test_tcp_transport
+    test_tcp_transport.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/transport/TcpTransport.cpp
+)
+target_link_libraries(test_tcp_transport PRIVATE Qt6::Core Qt6::Network Qt6::Test)
+target_include_directories(test_tcp_transport PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME TcpTransportTest COMMAND test_tcp_transport)
+
 add_executable(test_osc_transport
     test_osc_transport.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/transport/OscTransport.cpp
@@ -232,6 +240,23 @@ add_executable(test_osc_transport
 target_link_libraries(test_osc_transport PRIVATE Qt6::Core Qt6::Network Qt6::Test openmix_liblo)
 target_include_directories(test_osc_transport PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME OscTransportTest COMMAND test_osc_transport)
+
+add_executable(test_wing_protocol
+    test_wing_protocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/behringer/WingProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/transport/OscTransport.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Cue.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/CueList.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/DCAMapping.cpp
+)
+target_link_libraries(test_wing_protocol PRIVATE Qt6::Core Qt6::Network Qt6::Test openmix_liblo)
+target_include_directories(test_wing_protocol PRIVATE ${CMAKE_SOURCE_DIR}/src)
+if(WIN32)
+    target_compile_definitions(test_wing_protocol PRIVATE NOMINMAX)
+endif()
+add_test(NAME WingProtocolTest COMMAND test_wing_protocol)
 
 add_executable(test_qlab_client
     test_qlab_client.cpp
@@ -376,6 +401,8 @@ add_executable(test_allenheath_midi
     ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/AllenHeathMidiProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/GLDProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/QuProtocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/Qu567Protocol.cpp
+    ${CMAKE_SOURCE_DIR}/src/protocol/allenheath/SQProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/transport/TcpTransport.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerProtocol.cpp
     ${CMAKE_SOURCE_DIR}/src/protocol/MixerCapabilities.cpp

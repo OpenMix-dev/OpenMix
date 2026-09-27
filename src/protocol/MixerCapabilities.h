@@ -14,9 +14,12 @@ enum class ConsoleType {
     SQ5,     // SQ-5
     SQ6,     // SQ-6
     SQ7,     // SQ-7
-    Qu16,    // Qu-16 (discovery family byte 8)
-    Qu24,    // Qu-24 (discovery family byte 9)
-    Qu32,    // Qu-32 (discovery family byte 10)
+    Qu16,    // Qu-16 (2013 Qu, MIDI Protocol V1.9 map; not discoverable)
+    Qu24,    // Qu-24 (same)
+    Qu32,    // Qu-32 (same)
+    Qu5,     // Qu-5 (2024 Qu, SQ-style NRPN map; discovery family byte 8)
+    Qu6,     // Qu-6 (discovery family byte 9)
+    Qu7,     // Qu-7 (discovery family byte 10)
     GLD80,   // GLD-80
     GLD112,  // GLD-112
     Avantis, // Avantis / Avantis Solo

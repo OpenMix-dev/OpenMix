@@ -86,11 +86,24 @@ class AllenHeathMidiProtocol : public MixerProtocol {
     void setFaderLaw(FaderLaw law) { m_faderLaw = law; }
     [[nodiscard]] FaderLaw faderLaw() const { return m_faderLaw; }
 
+    // The console's MIDI channel (Utility > General > MIDI on SQ/Qu, Setup /
+    // Control on GLD) rides the status byte of every message and cannot be read
+    // back: a mismatch is a connected desk that ignores everything. 1-16.
+    void setMidiChannel(int channel1To16);
+    [[nodiscard]] int midiChannel() const { return m_midiChannel + 1; }
+
+    // read back a level the console reported, in dB
+    [[nodiscard]] std::optional<double> readChannelFader(int channel) override;
+
   protected:
-    // dB -> the console's 14-bit NRPN level, through the active fader law
+    // dB -> the console's 14-bit NRPN level, through the active fader law, and
+    // back for what the console reports
     [[nodiscard]] quint16 encodeLevel14(double dB) const;
+    [[nodiscard]] double decodeLevel14(quint16 value) const;
     static quint16 encodeLinearTaper(double dB);
     static quint16 encodeAudioTaper(double dB);
+    static double decodeLinearTaper(quint16 value);
+    static double decodeAudioTaper(quint16 value);
 
     // the dB value standing in for -inf; anything at or below encodes to zero
     static constexpr double NEG_INF_DB = OpenMix::NEG_INF_DB;
@@ -102,15 +115,28 @@ class AllenHeathMidiProtocol : public MixerProtocol {
     static constexpr int DCA_LEVEL_LSB_BASE = 0x20; // SQ Iss5 p24 / Qu Iss2 p25: DCA1 = 4F 20
     static constexpr int DCA_MUTE_MSB = 0x02;       // DCA N mute          (LSB = N-1)
 
-    // MIDI message builders used by subclasses
-    QByteArray buildNRPNMessage(int channel, int nrpnMsb, int nrpnLsb, int valueMsb, int valueLsb);
+    // MIDI message builders used by subclasses; every one carries m_midiChannel
+    QByteArray buildNRPNMessage(int nrpnMsb, int nrpnLsb, int valueMsb, int valueLsb) const;
     virtual QByteArray buildSceneRecall(int sceneNumber);
-    QByteArray buildControlChange(int channel, int cc, int value);
+    QByteArray buildControlChange(int cc, int value) const;
 
     // parse incoming MIDI data
     virtual void parseMidiData(const QByteArray& data);
 
+    // one decoded NRPN (msb/lsb = parameter, data = 14-bit value halves; dataLsb
+    // is -1 when the console sent only three messages). The base reads the SQ
+    // map; the channel-in-MSB families (Qu-16/24/32, GLD) override.
+    virtual void handleNrpn(int msb, int lsb, int dataMsb, int dataLsb);
+
+    // a Note On on the console's channel: the mute feedback of the
+    // channel-in-MSB families. Default ignores it.
+    virtual void handleNoteOn(int note, int velocity);
+
+    // publish a value the console reported
+    void reportParameter(const QString& path, const QVariant& value);
+
     FaderLaw m_faderLaw = FaderLaw::LinearTaper;
+    int m_midiChannel = 0; // 0-based, as it goes on the wire; console channel 1 by default
 
     // subclass-specific param mapping
     virtual void initializeSnapshotParams() = 0;
@@ -130,12 +156,13 @@ class AllenHeathMidiProtocol : public MixerProtocol {
     void onDataReceived(const QByteArray& data);
     void onKeepAliveTimeout();
     void onReconnecting(int attempt, int maxAttempts);
+    void onNrpnFlush();
 
   private:
     void setStatus(const QString& status);
     void setConnectionState(ConnectionState state);
     void processControlChange(int channel, int cc, int value);
-    void processNRPNComplete();
+    void finishNrpn();
     void processSysEx(const QByteArray& sysex);
 
     QString m_host;
@@ -149,8 +176,11 @@ class AllenHeathMidiProtocol : public MixerProtocol {
     int m_latencyMs = 0;
     QByteArray m_receiveBuffer;
 
-    // NRPN tracking for multi-message sequences
+    // NRPN tracking for multi-message sequences. A sequence is finished by its
+    // data LSB, by the start of the next sequence, or by this timer for the
+    // three-message form (GLD faders) that never sends one.
     NRPNState m_nrpnState;
+    QTimer m_nrpnFlushTimer;
     static constexpr int NRPN_TIMEOUT_MS = 100; // max time between NRPN messages
 };
 

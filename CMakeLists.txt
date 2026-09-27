@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(OpenMix
-    VERSION 1.0.7
+    VERSION 1.0.8
     DESCRIPTION "Stage mixing software for live theatre that lets engineers program, automate, and run cues seamlessly across 30+ digital mixing consoles"
     LANGUAGES CXX
 )
@@ -179,6 +179,7 @@ set(SOURCES
     src/protocol/allenheath/AllenHeathMidiProtocol.cpp
     src/protocol/allenheath/SQProtocol.cpp
     src/protocol/allenheath/QuProtocol.cpp
+    src/protocol/allenheath/Qu567Protocol.cpp
     src/protocol/allenheath/GLDProtocol.cpp
     src/protocol/allenheath/AllenHeathTcpProtocol.cpp
     src/protocol/allenheath/AvantisProtocol.cpp
@@ -302,6 +303,7 @@ set(HEADERS
     src/protocol/allenheath/AllenHeathMidiProtocol.h
     src/protocol/allenheath/SQProtocol.h
     src/protocol/allenheath/QuProtocol.h
+    src/protocol/allenheath/Qu567Protocol.h
     src/protocol/allenheath/GLDProtocol.h
     src/protocol/allenheath/AllenHeathTcpProtocol.h
     src/protocol/allenheath/AvantisProtocol.h

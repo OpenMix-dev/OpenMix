@@ -23,10 +23,6 @@ class GLDProtocol : public AllenHeathMidiProtocol {
     void setChannelName(int channel, const QString& name) override;
     void setChannelColor(int channel, int color) override;
 
-    // MIDI channel 1-16 as set on the console; held 0-based, as it goes on the wire
-    void setMidiChannel(int channel1To16);
-    [[nodiscard]] int midiChannel() const { return m_midiChannel + 1; }
-
   protected:
     void initializeSnapshotParams() override;
     QString dcaFaderPath(int dca) const override;
@@ -53,10 +49,16 @@ class GLDProtocol : public AllenHeathMidiProtocol {
     // F0 00 00 1A 50 10 <MV> <mV> <0N>, the prefix of every GLD SysEx
     QByteArray sysexHeader() const;
 
-    // dB -> the console's 7-bit level, through its Fader level table
+    // dB <-> the console's 7-bit level, through its Fader level table
     static int levelFromDb(double dB);
+    static double dbFromLevel(int lv);
 
-    int m_midiChannel = 0; // 0-based; console MIDI channel 1 by default
+    // feedback: the channel is the NRPN MSB and the parameter the LSB; mutes
+    // arrive as Note On
+    void handleNrpn(int msb, int lsb, int dataMsb, int dataLsb) override;
+    void handleNoteOn(int note, int velocity) override;
+
+    QString pathForChannelId(int channelId, const QString& param) const;
 };
 
 } // namespace OpenMix

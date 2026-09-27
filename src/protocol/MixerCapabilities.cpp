@@ -162,6 +162,40 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         }
         break;
 
+    // The 2024 Qu-5/6/7 are not the old Qu with new numbers: their MIDI Protocol
+    // (Issue 2) is the SQ scheme (parameter number in the NRPN MSB/LSB, 14-bit
+    // levels, NRPN mutes, selectable Fader Law), with 32 inputs, 12 mixes, 4 FX
+    // sends, 3 matrices, 8 DCAs and 300 scenes in 3 banks. They are the Qu that
+    // answers the SQ-style TCP identify, so they are the discoverable ones.
+    case ConsoleType::Qu5:
+    case ConsoleType::Qu6:
+    case ConsoleType::Qu7:
+        caps.manufacturer = Manufacturer::AllenHeath;
+        caps.protocol = ProtocolType::MidiTcp;
+        caps.defaultPort = 51325;
+        caps.dcaCount = 8;
+        caps.inputChannels = 32;
+        caps.mixBuses = 12;
+        caps.matrixOutputs = 3;
+        caps.scenes = 300;
+        caps.maxDCANameLength = 6;
+        caps.eqBandsPerChannel = 4;
+        caps.supportsChannelEQ = true;
+        caps.eqBandTypes = {"LShv", "PEQ", "PEQ", "HShv"};
+        caps.effectSendBuses = 4;
+        caps.supportsEffectSends = true;
+        if (type == ConsoleType::Qu5) {
+            caps.displayName = "Allen & Heath Qu-5";
+            caps.protocolId = "qu5";
+        } else if (type == ConsoleType::Qu6) {
+            caps.displayName = "Allen & Heath Qu-6";
+            caps.protocolId = "qu6";
+        } else {
+            caps.displayName = "Allen & Heath Qu-7";
+            caps.protocolId = "qu7";
+        }
+        break;
+
     // GLD is MIDI over TCP 51325 per the GLD MIDI and TCP/IP Protocol V1.4, which
     // also gives it 16 DCAs and 500 scenes (4 banks of 128).
     case ConsoleType::GLD80:
@@ -247,7 +281,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
     // Yamaha
     case ConsoleType::TF1:
         caps.manufacturer = Manufacturer::Yamaha;
-        caps.protocol = ProtocolType::OscUdp;
+        caps.protocol = ProtocolType::TextTcp;
         caps.displayName = "Yamaha TF1";
         caps.protocolId = "tf1";
         caps.defaultPort = 49280;
@@ -266,7 +300,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::TF3:
         caps.manufacturer = Manufacturer::Yamaha;
-        caps.protocol = ProtocolType::OscUdp;
+        caps.protocol = ProtocolType::TextTcp;
         caps.displayName = "Yamaha TF3";
         caps.protocolId = "tf3";
         caps.defaultPort = 49280;
@@ -285,7 +319,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::TF5:
         caps.manufacturer = Manufacturer::Yamaha;
-        caps.protocol = ProtocolType::OscUdp;
+        caps.protocol = ProtocolType::TextTcp;
         caps.displayName = "Yamaha TF5";
         caps.protocolId = "tf5";
         caps.defaultPort = 49280;
@@ -304,7 +338,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::QL1:
         caps.manufacturer = Manufacturer::Yamaha;
-        caps.protocol = ProtocolType::OscUdp;
+        caps.protocol = ProtocolType::TextTcp;
         caps.displayName = "Yamaha QL1";
         caps.protocolId = "ql1";
         caps.defaultPort = 49280;
@@ -324,7 +358,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::QL5:
         caps.manufacturer = Manufacturer::Yamaha;
-        caps.protocol = ProtocolType::OscUdp;
+        caps.protocol = ProtocolType::TextTcp;
         caps.displayName = "Yamaha QL5";
         caps.protocolId = "ql5";
         caps.defaultPort = 49280;
@@ -344,7 +378,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::CL1:
         caps.manufacturer = Manufacturer::Yamaha;
-        caps.protocol = ProtocolType::OscUdp;
+        caps.protocol = ProtocolType::TextTcp;
         caps.displayName = "Yamaha CL1";
         caps.protocolId = "cl1";
         caps.defaultPort = 49280;
@@ -363,7 +397,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::CL3:
         caps.manufacturer = Manufacturer::Yamaha;
-        caps.protocol = ProtocolType::OscUdp;
+        caps.protocol = ProtocolType::TextTcp;
         caps.displayName = "Yamaha CL3";
         caps.protocolId = "cl3";
         caps.defaultPort = 49280;
@@ -382,7 +416,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::CL5:
         caps.manufacturer = Manufacturer::Yamaha;
-        caps.protocol = ProtocolType::OscUdp;
+        caps.protocol = ProtocolType::TextTcp;
         caps.displayName = "Yamaha CL5";
         caps.protocolId = "cl5";
         caps.defaultPort = 49280;
@@ -401,7 +435,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     case ConsoleType::DM7:
         caps.manufacturer = Manufacturer::Yamaha;
-        caps.protocol = ProtocolType::OscUdp;
+        caps.protocol = ProtocolType::TextTcp;
         caps.displayName = "Yamaha DM7";
         caps.protocolId = "dm7";
         caps.defaultPort = 49280;
@@ -420,13 +454,15 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
 
     // DiGiCo SD series over the console's Generic OSC (UDP). DiGiCo publishes no
     // address map, so the driver takes the operator's patterns; see DiGiCoProtocol.
-    // Send/receive ports are paired by the operator, 9000/8000 being the common one.
+    // The console's External Control panel pairs a Send and a Receive port per
+    // device (TN324's example: Send 9000, Receive 8000). We talk to its Receive
+    // port, so that is the default; the console's Send port is where it answers.
     case ConsoleType::SD7:
         caps.manufacturer = Manufacturer::DiGiCo;
         caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "DiGiCo SD7";
         caps.protocolId = "sd7";
-        caps.defaultPort = 9000;
+        caps.defaultPort = 8000;
         caps.dcaCount = 24;
         caps.inputChannels = 128;
         caps.mixBuses = 48;
@@ -445,7 +481,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "DiGiCo SD9";
         caps.protocolId = "sd9";
-        caps.defaultPort = 9000;
+        caps.defaultPort = 8000;
         caps.dcaCount = 12;
         caps.inputChannels = 96;
         caps.mixBuses = 48;
@@ -464,7 +500,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "DiGiCo SD11";
         caps.protocolId = "sd11";
-        caps.defaultPort = 9000;
+        caps.defaultPort = 8000;
         caps.dcaCount = 8;
         caps.inputChannels = 32;
         caps.mixBuses = 16;
@@ -483,7 +519,7 @@ MixerCapabilities MixerCapabilities::forConsole(ConsoleType type) {
         caps.protocol = ProtocolType::OscUdp;
         caps.displayName = "DiGiCo SD12";
         caps.protocolId = "sd12";
-        caps.defaultPort = 9000;
+        caps.defaultPort = 8000;
         caps.dcaCount = 12;
         caps.inputChannels = 72;
         caps.mixBuses = 36;
@@ -551,6 +587,12 @@ MixerCapabilities MixerCapabilities::forProtocolId(const QString& protocolId) {
         return forConsole(ConsoleType::Qu24);
     if (id == "qu32" || id == "qu-32")
         return forConsole(ConsoleType::Qu32);
+    if (id == "qu5" || id == "qu-5")
+        return forConsole(ConsoleType::Qu5);
+    if (id == "qu6" || id == "qu-6")
+        return forConsole(ConsoleType::Qu6);
+    if (id == "qu7" || id == "qu-7")
+        return forConsole(ConsoleType::Qu7);
 
     // Allen & Heath GLD
     if (id == "gld80" || id == "gld-80")
@@ -621,6 +663,9 @@ QVector<MixerCapabilities> MixerCapabilities::allSupported() {
     all.append(forConsole(ConsoleType::Qu16));
     all.append(forConsole(ConsoleType::Qu24));
     all.append(forConsole(ConsoleType::Qu32));
+    all.append(forConsole(ConsoleType::Qu5));
+    all.append(forConsole(ConsoleType::Qu6));
+    all.append(forConsole(ConsoleType::Qu7));
     all.append(forConsole(ConsoleType::GLD80));
     all.append(forConsole(ConsoleType::GLD112));
 
@@ -674,6 +719,9 @@ bool MixerCapabilities::isSupported() const {
     case ConsoleType::Qu16:
     case ConsoleType::Qu24:
     case ConsoleType::Qu32:
+    case ConsoleType::Qu5:
+    case ConsoleType::Qu6:
+    case ConsoleType::Qu7:
     case ConsoleType::GLD80:
     case ConsoleType::GLD112:
         return true;

@@ -38,6 +38,12 @@ AllenHeathTcpProtocol::AllenHeathTcpProtocol(const MixerCapabilities& caps, QObj
     QObject::connect(&m_transport, &TcpTransport::reconnecting, this,
                      &AllenHeathTcpProtocol::onReconnecting);
 
+    // wire trace for the connection log
+    QObject::connect(&m_transport, &TcpTransport::bytesSent, this,
+                     [this](const QByteArray& b) { emit wireTrace(true, b); });
+    QObject::connect(&m_transport, &TcpTransport::dataReceived, this,
+                     [this](const QByteArray& b) { emit wireTrace(false, b); });
+
     QObject::connect(&m_keepAliveTimer, &QTimer::timeout, this,
                      &AllenHeathTcpProtocol::onKeepAliveTimeout);
     QObject::connect(&m_rxWatchdogTimer, &QTimer::timeout, this,
@@ -46,6 +52,10 @@ AllenHeathTcpProtocol::AllenHeathTcpProtocol(const MixerCapabilities& caps, QObj
     m_handshakeTimer.setSingleShot(true);
     QObject::connect(&m_handshakeTimer, &QTimer::timeout, this,
                      &AllenHeathTcpProtocol::onHandshakeTimeout);
+
+    m_subscribeTimer.setSingleShot(true);
+    QObject::connect(&m_subscribeTimer, &QTimer::timeout, this,
+                     &AllenHeathTcpProtocol::onSubscribeTimeout);
 
     QObject::connect(&m_udpSocket, &QUdpSocket::readyRead, this,
                      &AllenHeathTcpProtocol::onUdpDataReceived);
@@ -96,6 +106,10 @@ QByteArray AllenHeathTcpProtocol::encodeDb(double dB) const {
     static const quint8 kPosLo[10] = {0x00, 0x1C, 0x36, 0x4F, 0x69, 0x82, 0x9C, 0xB6, 0xCF, 0xE9};
     static const quint8 kNegLo[10] = {0x00, 0xD9, 0xBF, 0xA6, 0x8C, 0x73, 0x59, 0x40, 0x26, 0x0C};
     return encodeDbTables(dB, kPosLo, kNegLo);
+}
+
+bool AllenHeathTcpProtocol::isOptionalObject(const QByteArray& objectName) const {
+    return objectName.endsWith("Identification");
 }
 
 QList<QByteArray> AllenHeathTcpProtocol::subscribeObjects() const {
@@ -273,8 +287,7 @@ QByteArray AllenHeathTcpProtocol::buildSceneRecall(const QByteArray& handle, int
 // --- connection ---
 
 bool AllenHeathTcpProtocol::connect(const QString& host, int port) {
-    if (m_connectionState == ConnectionState::Connected ||
-        m_connectionState == ConnectionState::Connecting) {
+    if (m_connectionState != ConnectionState::Disconnected) {
         disconnect();
     }
 
@@ -285,9 +298,7 @@ bool AllenHeathTcpProtocol::connect(const QString& host, int port) {
     setStatus(QString("Connecting to %1:%2...").arg(host).arg(port));
 
     // the seed carries our UDP local port, so bind before connecting
-    if (m_udpSocket.state() != QAbstractSocket::BoundState &&
-        !m_udpSocket.bind(QHostAddress::Any, 0,
-                          QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint)) {
+    if (!ensureUdpBound()) {
         const QString error =
             QString("Failed to bind metering socket: %1").arg(m_udpSocket.errorString());
         setStatus(error);
@@ -299,15 +310,31 @@ bool AllenHeathTcpProtocol::connect(const QString& host, int port) {
     return m_transport.connect(host, port);
 }
 
-void AllenHeathTcpProtocol::disconnect() {
+bool AllenHeathTcpProtocol::ensureUdpBound() {
+    if (m_udpSocket.state() == QAbstractSocket::BoundState) {
+        return true;
+    }
+    return m_udpSocket.bind(QHostAddress::Any, 0,
+                            QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint);
+}
+
+void AllenHeathTcpProtocol::stopSessionTimers() {
     m_keepAliveTimer.stop();
     m_rxWatchdogTimer.stop();
     m_handshakeTimer.stop();
+    m_subscribeTimer.stop();
+}
+
+void AllenHeathTcpProtocol::disconnect() {
+    stopSessionTimers();
 
     // ACE teardown: E0 00 03 "BYE" E7
     if (m_transport.isConnected()) {
         m_transport.send(QByteArray::fromHex("e00003425945e7"));
     }
+    // leave the connected state before the socket closes so the teardown is
+    // not mistaken for a lost link
+    setConnectionState(ConnectionState::Disconnected);
     m_transport.disconnect();
     m_udpSocket.close();
 
@@ -336,24 +363,31 @@ void AllenHeathTcpProtocol::startHandshake() {
     m_sessionOpen = false;
     m_consoleUdpPort = 0;
 
+    // a reconnect after a failed session arrives here with the UDP socket
+    // closed; the seed must carry a real port
+    if (!ensureUdpBound()) {
+        failHandshake(
+            QString("Failed to bind metering socket: %1").arg(m_udpSocket.errorString()));
+        return;
+    }
+
     m_lastRxTimer.start();
-    m_handshakeTimer.start(HANDSHAKE_TIMEOUT);
+    m_handshakeTimer.start(m_handshakeTimeoutMs);
 
     m_transport.send(buildSessionSeed(m_udpSocket.localPort()));
 }
 
 void AllenHeathTcpProtocol::failHandshake(const QString& reason) {
-    m_handshakeTimer.stop();
-    m_keepAliveTimer.stop();
-    m_rxWatchdogTimer.stop();
-    m_transport.disconnect();
-    m_udpSocket.close();
+    stopSessionTimers();
     m_handshakeComplete = false;
     m_sessionOpen = false;
 
     setConnectionState(ConnectionState::Disconnected);
+    m_transport.disconnect();
+    m_udpSocket.close();
     setStatus(reason);
     emit connectionError(reason);
+    emit disconnected();
 }
 
 void AllenHeathTcpProtocol::sendNextSubscribe() {
@@ -361,12 +395,29 @@ void AllenHeathTcpProtocol::sendNextSubscribe() {
         // all handles learned: ready to control
         m_handshakeComplete = true;
         m_handshakeTimer.stop();
+        m_subscribeTimer.stop();
         setConnectionState(ConnectionState::Connected);
         setStatus(QString("Connected to %1:%2").arg(m_host).arg(m_port));
         emit connected();
         return;
     }
     m_transport.send(buildSubscribe(m_subscribeQueue.at(m_subscribeIndex)));
+    m_subscribeTimer.start(m_subscribeReplyTimeoutMs);
+}
+
+void AllenHeathTcpProtocol::onSubscribeTimeout() {
+    if (m_handshakeComplete || !m_sessionOpen || m_subscribeIndex >= m_subscribeQueue.size()) {
+        return;
+    }
+    const QByteArray name = m_subscribeQueue.at(m_subscribeIndex);
+    if (isOptionalObject(name)) {
+        // no handle for this one; nothing on the control path needs it
+        ++m_subscribeIndex;
+        sendNextSubscribe();
+        return;
+    }
+    failHandshake(QString("Console did not answer the '%1' subscribe")
+                      .arg(QString::fromLatin1(name)));
 }
 
 // --- parameter operations ---
@@ -504,6 +555,9 @@ void AllenHeathTcpProtocol::onUdpDataReceived() {
         // the socket is dual-stack, so the console's IPv4 address can arrive
         // v4-mapped; compare tolerantly or every datagram is discarded as foreign
         if (sender.isEqual(QHostAddress(m_host), QHostAddress::TolerantConversion)) {
+            // anything from the console, meters or its keep-alive, proves it is
+            // still there
+            m_lastRxTimer.restart();
             handleMeterDatagram(datagram);
         }
     }
@@ -541,6 +595,7 @@ void AllenHeathTcpProtocol::handleAceFrame(const QByteArray& frame) {
                                static_cast<quint8>(frame.at(2)) == 0x01;
 
     if (!m_handshakeComplete && m_subscribeIndex < m_subscribeQueue.size() && isHandleReply) {
+        m_subscribeTimer.stop();
         m_handles.insert(m_subscribeQueue.at(m_subscribeIndex), frame.mid(11, 2));
         ++m_subscribeIndex;
         sendNextSubscribe();
@@ -568,8 +623,9 @@ int AllenHeathTcpProtocol::parseSceneChanged(const QByteArray& frame) {
 void AllenHeathTcpProtocol::onTransportConnected() { startHandshake(); }
 
 void AllenHeathTcpProtocol::onTransportDisconnected() {
-    m_keepAliveTimer.stop();
+    stopSessionTimers();
     m_handshakeComplete = false;
+    m_sessionOpen = false;
     setConnectionState(ConnectionState::Disconnected);
     setStatus("Disconnected");
     emit disconnected();
@@ -581,7 +637,11 @@ void AllenHeathTcpProtocol::onTransportError(const QString& error) {
 }
 
 void AllenHeathTcpProtocol::onTransportConnectionLost() {
+    // the session is gone with the socket; the transport retries the TCP link
+    // and a fresh handshake starts from onTransportConnected()
+    stopSessionTimers();
     m_handshakeComplete = false;
+    m_sessionOpen = false;
     setConnectionState(ConnectionState::Reconnecting);
     setStatus("Connection lost, reconnecting...");
     emit connectionLost();
@@ -594,9 +654,10 @@ void AllenHeathTcpProtocol::onKeepAliveTimeout() {
 }
 
 void AllenHeathTcpProtocol::onRxWatchdogTimeout() {
-    if (m_sessionOpen && m_lastRxTimer.isValid() && m_lastRxTimer.elapsed() > RX_SILENCE_LIMIT) {
+    if (m_sessionOpen && m_lastRxTimer.isValid() &&
+        m_lastRxTimer.elapsed() > m_rxSilenceLimitMs) {
         failHandshake(
-            QString("Console stopped responding (no data for %1ms)").arg(RX_SILENCE_LIMIT));
+            QString("Console stopped responding (no data for %1ms)").arg(m_rxSilenceLimitMs));
     }
 }
 

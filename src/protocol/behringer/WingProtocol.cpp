@@ -20,8 +20,14 @@ WingProtocol::WingProtocol(const MixerCapabilities& caps, QObject* parent)
                      &WingProtocol::onTransportDisconnected);
     QObject::connect(&m_transport, &OscTransport::connectionError, this,
                      &WingProtocol::onTransportError);
-    QObject::connect(&m_transport, &OscTransport::messageReceived, this,
+    QObject::connect(&m_transport, &OscTransport::messageReceivedAll, this,
                      &WingProtocol::onMessageReceived);
+
+    // wire trace for the connection log
+    QObject::connect(&m_transport, &OscTransport::rawMessageSent, this,
+                     [this](const QByteArray& b) { emit wireTrace(true, b); });
+    QObject::connect(&m_transport, &OscTransport::rawMessageReceived, this,
+                     [this](const QByteArray& b) { emit wireTrace(false, b); });
 
     QObject::connect(&m_keepAliveTimer, &QTimer::timeout, this, &WingProtocol::onKeepAliveTimeout);
 
@@ -116,8 +122,7 @@ void WingProtocol::initializeSnapshotParams() {
 }
 
 bool WingProtocol::connect(const QString& host, int port) {
-    if (m_connectionState == ConnectionState::Connected ||
-        m_connectionState == ConnectionState::Connecting) {
+    if (m_connectionState != ConnectionState::Disconnected) {
         disconnect();
     }
 
@@ -137,7 +142,8 @@ bool WingProtocol::connect(const QString& host, int port) {
 
     // request device info to verify connection
     m_waitingForInfo = true;
-    m_transport.send("/?");
+    m_lastResponseTime = 0;
+    m_transport.send(INFO_COMMAND);
 
     m_connectionTimer.start(m_connectionTimeoutMs);
 
@@ -150,6 +156,9 @@ void WingProtocol::disconnect() {
     m_reconnectTimer.stop();
     m_requestTimeoutTimer.stop();
 
+    // leave the connected state first so nothing the transport does while
+    // closing reads as a lost link
+    setConnectionState(ConnectionState::Disconnected);
     m_transport.disconnect();
 
     m_parameterCache.clear();
@@ -382,22 +391,39 @@ void WingProtocol::onTransportError(const QString& error) {
     }
 }
 
-void WingProtocol::onMessageReceived(const QString& path, const QVariant& value) {
-    processResponse(path, value);
+QVariant WingProtocol::pickValue(const QVariantList& args) {
+    // reads come back as (string, normalised float, real value): the last
+    // numeric argument is the one in real-world units. A lone string (the "/?"
+    // reply, node listings) is returned as is.
+    for (int i = args.size() - 1; i >= 0; --i) {
+        const QVariant& arg = args.at(i);
+        const int type = arg.typeId();
+        if (type == QMetaType::Float || type == QMetaType::Double || type == QMetaType::Int) {
+            return arg;
+        }
+    }
+    return args.value(0);
+}
+
+void WingProtocol::onMessageReceived(const QString& path, const QVariantList& args) {
+    processResponse(path, pickValue(args));
 }
 
 void WingProtocol::onKeepAliveTimeout() {
     if (m_connectionState == ConnectionState::Connected) {
         qint64 now = QDateTime::currentMSecsSinceEpoch();
-        if (m_lastResponseTime > 0 && (now - m_lastResponseTime) > (KEEPALIVE_INTERVAL * 3)) {
+        if (m_lastResponseTime > 0 &&
+            (now - m_lastResponseTime) > (m_keepAliveInterval * MISSED_PROBES_BEFORE_LOST)) {
             setStatus("Connection lost - no response from mixer");
             emit connectionLost();
             startReconnection();
             return;
         }
 
-        // send keep-alive
+        // renew the subscription and probe: the probe's reply is what proves
+        // the console is still there when nothing on it is changing
         m_transport.send(SUBSCRIBE_COMMAND);
+        m_transport.send(INFO_COMMAND);
     }
 }
 
@@ -464,7 +490,7 @@ void WingProtocol::onReconnectAttempt() {
     }
 
     m_waitingForInfo = true;
-    m_transport.send("/?");
+    m_transport.send(INFO_COMMAND);
     m_connectionTimer.start(m_connectionTimeoutMs);
 }
 
@@ -472,8 +498,14 @@ void WingProtocol::processResponse(const QString& path, const QVariant& value) {
     qint64 now = QDateTime::currentMSecsSinceEpoch();
     m_lastResponseTime = now;
 
-    if (path == "/?") {
+    if (path == QLatin1String(INFO_COMMAND)) {
         handleInfoResponse(value);
+        return;
+    }
+
+    // "/*" carries the console's verdict on a node write (OK / NODE NOT FOUND
+    // / VALUE ERROR ...): worth the log, not a parameter
+    if (path == QLatin1String("/*")) {
         return;
     }
 
@@ -502,7 +534,7 @@ void WingProtocol::handleInfoResponse([[maybe_unused]] const QVariant& value) {
         setConnectionState(ConnectionState::Connected);
         setStatus(QString("Connected to %1:%2").arg(m_host).arg(m_port));
 
-        m_keepAliveTimer.start(KEEPALIVE_INTERVAL);
+        m_keepAliveTimer.start(m_keepAliveInterval);
         m_requestTimeoutTimer.start();
         m_reconnectAttempts = 0;
 
