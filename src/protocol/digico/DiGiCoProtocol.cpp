@@ -28,10 +28,14 @@ bool DiGiCoProtocol::connect(const QString& host, int port) {
     setConnectionState(ConnectionState::Connecting);
     setStatus(QString("Connecting to %1:%2...").arg(host).arg(port));
 
-    if (!m_transport.connect(host, port)) {
-        setStatus("Failed to initialize transport");
+    if (!m_transport.connect(host, port, m_receivePort)) {
+        const QString error =
+            m_receivePort > 0
+                ? QString("Could not listen on UDP port %1 (already in use?)").arg(m_receivePort)
+                : QString("Failed to initialize transport");
+        setStatus(error);
         setConnectionState(ConnectionState::Disconnected);
-        emit connectionError("Failed to initialize transport");
+        emit connectionError(error);
         return false;
     }
 

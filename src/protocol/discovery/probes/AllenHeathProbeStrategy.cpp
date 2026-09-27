@@ -161,7 +161,7 @@ DiscoveredConsole AllenHeathProbeStrategy::parseSqIdentify(const QByteArray& res
     const int family = static_cast<quint8>(response.at(6));
     const ConsoleType type = consoleForSqFamily(family);
     if (type == ConsoleType::Unknown) {
-        return console; // e.g. Qu, which OpenMix does not model
+        return console;
     }
 
     const int major = static_cast<quint8>(response.at(7));
@@ -188,13 +188,15 @@ ConsoleType AllenHeathProbeStrategy::consoleForSqFamily(int family) const {
         return ConsoleType::SQ6;
     case 3:
         return ConsoleType::SQ7;
-    // families 8/9/10 are the reference's Qu-5/6/7 = Qu-16/24/32 by fader count
+    // families 8/9/10 are the 2024 Qu-5/6/7, which share the SQ identify and
+    // the SQ MIDI scheme. The older Qu-16/24/32 do not answer this handshake
+    // and stay a connect-time selection.
     case 8:
-        return ConsoleType::Qu16;
+        return ConsoleType::Qu5;
     case 9:
-        return ConsoleType::Qu24;
+        return ConsoleType::Qu6;
     case 10:
-        return ConsoleType::Qu32;
+        return ConsoleType::Qu7;
     default:
         return ConsoleType::Unknown;
     }

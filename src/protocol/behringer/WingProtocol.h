@@ -21,8 +21,10 @@ struct WingPendingRequest {
 // other interface, native binary on 2222, is not used here).
 //
 // "/?" returns "WING,<ip>,<name>,<model>,<serial>,<firmware>" and stands in for a
-// connection check. Unsolicited updates require a subscription ("/*s~") that the
-// console drops after 10 s unless renewed, and only one client may hold it.
+// connection check. Unsolicited updates require a subscription (the "/*s"
+// address) that the console drops after 10 s unless renewed, and only one client
+// may hold it. The console answers reads with up to three arguments (string,
+// normalised, real-world); the last numeric one is the value in our units.
 // Paths follow the console's node tree: /ch/N/fdr, /ch/N/mute, /dca/N/fdr, ...
 class WingProtocol : public MixerProtocol {
     Q_OBJECT
@@ -86,6 +88,9 @@ class WingProtocol : public MixerProtocol {
 
     // keep-alive
     void refresh() override;
+    // how often the subscription is renewed and the console probed (tests
+    // shorten it); the link counts as lost after three unanswered probes
+    void setKeepAliveInterval(int ms) { m_keepAliveInterval = ms; }
 
     // latency monitoring
     [[nodiscard]] int latencyMs() const override { return m_latencyMs; }
@@ -98,7 +103,7 @@ class WingProtocol : public MixerProtocol {
     void onTransportConnected();
     void onTransportDisconnected();
     void onTransportError(const QString& error);
-    void onMessageReceived(const QString& path, const QVariant& value);
+    void onMessageReceived(const QString& path, const QVariantList& args);
     void onKeepAliveTimeout();
     void onConnectionTimeout();
     void onRequestTimeoutCheck();
@@ -110,6 +115,9 @@ class WingProtocol : public MixerProtocol {
     void setStatus(const QString& status);
     void setConnectionState(ConnectionState state);
     void handleInfoResponse(const QVariant& value);
+    // the argument that carries the value in our units, from WING's
+    // (string, normalised, real) reply triplets
+    static QVariant pickValue(const QVariantList& args);
     void startReconnection();
     void updateLatency(qint64 roundTripMs);
     void processResponse(const QString& path, const QVariant& value);
@@ -124,9 +132,14 @@ class WingProtocol : public MixerProtocol {
 
     QTimer m_keepAliveTimer;
     // the subscription dies 10 s after the last request, so renew at 4.5 s: one
-    // dropped renew still leaves a further one inside the window
-    static constexpr int KEEPALIVE_INTERVAL = 4500;
-    static constexpr auto SUBSCRIBE_COMMAND = "/*s~";
+    // dropped renew still leaves a further one inside the window. Each renew
+    // also probes with "/?": an idle console sends nothing unsolicited, so
+    // silence alone must not read as a dead link
+    int m_keepAliveInterval = 4500;
+    static constexpr int MISSED_PROBES_BEFORE_LOST = 3;
+    // the doc writes this as "/*s~" with "~" standing for the NUL terminator
+    static constexpr auto SUBSCRIBE_COMMAND = "/*s";
+    static constexpr auto INFO_COMMAND = "/?";
 
     // connection timeout
     QTimer m_connectionTimer;

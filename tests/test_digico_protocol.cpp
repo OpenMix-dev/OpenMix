@@ -53,11 +53,12 @@ class TestDiGiCoProtocol : public QObject {
     }
 
     void capabilities_areGenericOsc() {
-        // Generic OSC is UDP, and the port is whatever the operator paired; 9000
-        // is only the common default.
+        // Generic OSC is UDP, and the port is whatever the operator paired on the
+        // desk. We send to the console's Receive port; TN324's worked example
+        // pairs Send 9000 with Receive 8000, so 8000 is the default.
         const auto caps = MixerCapabilities::forConsole(ConsoleType::SD12);
         QCOMPARE(caps.protocol, ProtocolType::OscUdp);
-        QCOMPARE(caps.defaultPort, 9000);
+        QCOMPARE(caps.defaultPort, 8000);
         QCOMPARE(caps.manufacturer, Manufacturer::DiGiCo);
     }
 };

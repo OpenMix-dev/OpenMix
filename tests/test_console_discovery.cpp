@@ -342,8 +342,10 @@ class TestConsoleDiscovery : public QObject {
             quint8 family;
             ConsoleType type;
         };
+        // the SQ-style identify is answered by the 2024 Qu-5/6/7, which speak
+        // the SQ scheme; the older Qu-16/24/32 never answer it
         const QList<Case> cases{
-            {8, ConsoleType::Qu16}, {9, ConsoleType::Qu24}, {10, ConsoleType::Qu32}};
+            {8, ConsoleType::Qu5}, {9, ConsoleType::Qu6}, {10, ConsoleType::Qu7}};
         for (const Case& c : cases) {
             const auto console = parseAh(buildAhIdentify(c.family, 1, 9, 4, 0));
             QVERIFY2(console.isValid(), QByteArray::number(c.family).constData());

@@ -11,7 +11,7 @@ OscTransport::OscTransport(QObject* parent) : QObject(parent) {
 
 OscTransport::~OscTransport() { disconnect(); }
 
-bool OscTransport::connect(const QString& host, int port) {
+bool OscTransport::connect(const QString& host, int port, int localPort) {
     if (m_connected) {
         disconnect();
     }
@@ -30,8 +30,10 @@ bool OscTransport::connect(const QString& host, int port) {
         return false;
     }
 
-    if (!m_socket.bind(QHostAddress::AnyIPv4, 0)) {
-        emit connectionError("Failed to bind UDP socket");
+    if (!m_socket.bind(QHostAddress::AnyIPv4, static_cast<quint16>(localPort))) {
+        emit connectionError(localPort > 0
+                                 ? QString("Failed to bind UDP port %1 (in use?)").arg(localPort)
+                                 : QString("Failed to bind UDP socket"));
         return false;
     }
 
@@ -41,9 +43,10 @@ bool OscTransport::connect(const QString& host, int port) {
 }
 
 void OscTransport::disconnect() {
+    // silent: the caller asked for this, so it is not a lost link. Only the
+    // console going quiet (detected by the driver) counts as one.
     m_socket.close();
     m_connected = false;
-    emit disconnected();
 }
 
 void OscTransport::send(const QString& path) {
@@ -85,6 +88,7 @@ void OscTransport::sendMessage(const QString& path, lo_message msg) {
 
     m_socket.writeDatagram(static_cast<const char*>(buffer), static_cast<qint64>(length), m_target,
                            static_cast<quint16>(m_port));
+    emit rawMessageSent(QByteArray(static_cast<const char*>(buffer), static_cast<int>(length)));
     std::free(buffer);
 }
 
@@ -154,10 +158,24 @@ void OscTransport::parseOscMessage(const QByteArray& data) {
     if (argOffset > data.size())
         return;
 
-    if (!types.isEmpty()) {
-        QVariant value = parseOscArgument(data, argOffset, types.at(0).toLatin1());
-        emit messageReceived(path, value);
+    if (types.isEmpty()) {
+        emit messageReceived(path, QVariant());
+        emit messageReceivedAll(path, {});
+        return;
     }
+
+    QVariantList args;
+    for (const QChar& type : types) {
+        if (argOffset > data.size())
+            break;
+        QVariant value = parseOscArgument(data, argOffset, type.toLatin1());
+        if (!value.isValid())
+            break;
+        args.append(value);
+    }
+
+    emit messageReceived(path, args.value(0));
+    emit messageReceivedAll(path, args);
 }
 
 QVariant OscTransport::parseOscArgument(const QByteArray& data, int& offset, char type) {
@@ -189,7 +207,7 @@ QVariant OscTransport::parseOscArgument(const QByteArray& data, int& offset, cha
     }
     case 's': {
         int strEnd = data.indexOf('\0', offset);
-        if (strEnd > offset) {
+        if (strEnd >= offset) {
             QString str = QString::fromUtf8(data.mid(offset, strEnd - offset));
             // advance offset to next 4-byte boundary
             offset = ((strEnd + 4) / 4) * 4;

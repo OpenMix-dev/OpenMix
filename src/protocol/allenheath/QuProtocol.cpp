@@ -44,6 +44,29 @@ constexpr LevelPoint kQuLevels[] = {
 
 } // namespace
 
+double QuProtocol::dbFromLevel(int va) {
+    if (va <= 0) {
+        return NEG_INF_DB;
+    }
+    const auto* first = std::begin(kQuLevels);
+    const auto* last = std::end(kQuLevels) - 1;
+    if (va <= first->va) {
+        return first->dB;
+    }
+    if (va >= last->va) {
+        return last->dB;
+    }
+    for (const LevelPoint* p = first; p < last; ++p) {
+        const LevelPoint* next = p + 1;
+        if (va >= p->va && va <= next->va) {
+            const double span = next->va - p->va;
+            const double t = span > 0.0 ? (va - p->va) / span : 0.0;
+            return p->dB + t * (next->dB - p->dB);
+        }
+    }
+    return last->dB;
+}
+
 int QuProtocol::levelFromDb(double dB) {
     if (dB <= NEG_INF_DB) {
         return 0x00;
@@ -68,20 +91,21 @@ int QuProtocol::levelFromDb(double dB) {
     return last->va;
 }
 
-QByteArray QuProtocol::buildFader(int channelId, double dB) {
+QByteArray QuProtocol::buildFader(int channelId, double dB) const {
     // BN 63 <CH> | BN 62 17 | BN 06 <VA> | BN 26 07
-    return buildNRPNMessage(0, channelId, ID_FADER, levelFromDb(dB), ID_FADER_VX);
+    return buildNRPNMessage(channelId, ID_FADER, levelFromDb(dB), ID_FADER_VX);
 }
 
-QByteArray QuProtocol::buildMute(int channelId, bool muted) {
+QByteArray QuProtocol::buildMute(int channelId, bool muted) const {
     // a Note On carrying the state, then a Note Off. Received velocity 40-7F
     // mutes and 01-3F unmutes; velocity 0 and Note Off are ignored, so the state
     // has to ride the first message.
+    const char status = static_cast<char>(0x90 | (m_midiChannel & 0x0F));
     QByteArray msg;
-    msg.append(static_cast<char>(0x90));
+    msg.append(status);
     msg.append(static_cast<char>(channelId & 0x7F));
     msg.append(static_cast<char>(muted ? 0x7F : 0x3F));
-    msg.append(static_cast<char>(0x90));
+    msg.append(status);
     msg.append(static_cast<char>(channelId & 0x7F));
     msg.append(static_cast<char>(0x00));
     return msg;
@@ -92,16 +116,54 @@ QByteArray QuProtocol::buildSceneRecall(int sceneNumber) {
     if (sceneNumber < 1) {
         return {};
     }
+    const char cc = static_cast<char>(0xB0 | (m_midiChannel & 0x0F));
     QByteArray msg;
-    msg.append(static_cast<char>(0xB0));
+    msg.append(cc);
     msg.append(static_cast<char>(0x00));
     msg.append(static_cast<char>(0x00));
-    msg.append(static_cast<char>(0xB0));
+    msg.append(cc);
     msg.append(static_cast<char>(0x20));
     msg.append(static_cast<char>(0x00));
-    msg.append(static_cast<char>(0xC0));
+    msg.append(static_cast<char>(0xC0 | (m_midiChannel & 0x0F)));
     msg.append(static_cast<char>((sceneNumber - 1) & 0x7F));
     return msg;
+}
+
+QString QuProtocol::pathForChannelId(int channelId, const QString& param) const {
+    if (channelId >= CH_INPUT_BASE && channelId < CH_INPUT_BASE + 32) {
+        return QString("/ch/%1/%2").arg(channelId - CH_INPUT_BASE + 1).arg(param);
+    }
+    if (channelId >= CH_DCA_BASE && channelId < CH_DCA_BASE + 4) {
+        return QString("/dca/%1/%2").arg(channelId - CH_DCA_BASE + 1).arg(param);
+    }
+    return {};
+}
+
+void QuProtocol::handleNrpn(int msb, int lsb, int dataMsb, int dataLsb) {
+    Q_UNUSED(dataLsb);
+    if (lsb != ID_FADER) {
+        return;
+    }
+    const QString path = pathForChannelId(msb, "fader");
+    if (path.isEmpty()) {
+        return;
+    }
+    const double dB = dbFromLevel(dataMsb);
+    reportParameter(path, dB);
+    if (msb >= CH_INPUT_BASE) {
+        emit channelFaderChanged(msb - CH_INPUT_BASE + 1, dB);
+    }
+}
+
+void QuProtocol::handleNoteOn(int note, int velocity) {
+    // velocity 40-7F = mute on, 01-3F = mute off, 00 = the trailing note off
+    if (velocity == 0) {
+        return;
+    }
+    const QString path = pathForChannelId(note, "mute");
+    if (!path.isEmpty()) {
+        reportParameter(path, velocity >= 0x40);
+    }
 }
 
 void QuProtocol::sendParameter(const QString& path, const QVariant& value) {

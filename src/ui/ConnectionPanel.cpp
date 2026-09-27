@@ -118,7 +118,9 @@ void ConnectionPanel::setupUi() {
     m_midiChannelLabel = new QLabel(tr("MIDI Channel:"), this);
     m_midiChannelSpin = new QSpinBox(this);
     m_midiChannelSpin->setRange(1, 16);
-    m_midiChannelSpin->setToolTip(tr("Must match the console: Setup / Control / MIDI channel."));
+    m_midiChannelSpin->setToolTip(
+        tr("Must match the console's MIDI channel (Utility > General > MIDI on SQ and Qu, "
+           "Setup / Control on GLD). A mismatch is silently ignored by the desk."));
     formLayout->addRow(m_midiChannelLabel, m_midiChannelSpin);
 
     // DiGiCo publishes no OSC address map, so the operator supplies the patterns
@@ -145,6 +147,16 @@ void ConnectionPanel::setupUi() {
     m_oscSceneEdit = new QLineEdit(this);
     m_oscSceneEdit->setPlaceholderText(tr("/snapshot/fire"));
     formLayout->addRow(m_oscSceneLabel, m_oscSceneEdit);
+
+    // the console pairs a Send and a Receive port per device: the Port field
+    // above is its Receive port (where we send), this is its Send port (where
+    // it answers), so replies have somewhere to land
+    m_oscReceivePortLabel = new QLabel(tr("Console Send Port:"), this);
+    m_oscReceivePortEdit = new QLineEdit(this);
+    m_oscReceivePortEdit->setPlaceholderText(tr("9000"));
+    m_oscReceivePortEdit->setToolTip(
+        tr("The Send port set for this device in the console's External Control panel."));
+    formLayout->addRow(m_oscReceivePortLabel, m_oscReceivePortEdit);
 
     m_loopbackLabel = new QLabel(tr("No hardware connection required."), this);
     m_loopbackLabel->setStyleSheet("color: gray; font-style: italic;");
@@ -439,12 +451,15 @@ void ConnectionPanel::onProtocolTypeChanged(int index) {
     m_portEdit->setVisible(!isLoopback);
     m_loopbackLabel->setVisible(isLoopback);
 
-    const bool hasFaderLaw = type.startsWith("sq");
+    // the SQ scheme's selectable NRPN Fader Law: SQ and the 2024 Qu-5/6/7
+    // (the Qu-16/24/32 have one fixed 7-bit table)
+    const bool hasFaderLaw =
+        type.startsWith("sq") || type == "qu5" || type == "qu6" || type == "qu7";
     m_faderLawLabel->setVisible(hasFaderLaw);
     m_faderLawCombo->setVisible(hasFaderLaw);
 
-    // GLD stamps its MIDI channel into every message it sends
-    const bool hasMidiChannel = type.startsWith("gld");
+    // every A&H MIDI desk stamps its MIDI channel into every message
+    const bool hasMidiChannel = caps.protocol == ProtocolType::MidiTcp;
     m_midiChannelLabel->setVisible(hasMidiChannel);
     m_midiChannelSpin->setVisible(hasMidiChannel);
 
@@ -456,6 +471,8 @@ void ConnectionPanel::onProtocolTypeChanged(int index) {
     m_oscMuteEdit->setVisible(hasOscTemplates);
     m_oscSceneLabel->setVisible(hasOscTemplates);
     m_oscSceneEdit->setVisible(hasOscTemplates);
+    m_oscReceivePortLabel->setVisible(hasOscTemplates);
+    m_oscReceivePortEdit->setVisible(hasOscTemplates);
 
     if (!isLoopback) {
         m_portEdit->setText(QString::number(caps.defaultPort));
@@ -545,6 +562,8 @@ void ConnectionPanel::loadFromConfig() {
     m_oscFaderEdit->setText(config.oscChannelFader);
     m_oscMuteEdit->setText(config.oscChannelMute);
     m_oscSceneEdit->setText(config.oscSceneRecall);
+    m_oscReceivePortEdit->setText(config.oscReceivePort > 0 ? QString::number(config.oscReceivePort)
+                                                            : QString());
 }
 
 void ConnectionPanel::saveToConfig() {
@@ -558,6 +577,7 @@ void ConnectionPanel::saveToConfig() {
     config.oscChannelFader = m_oscFaderEdit->text().trimmed();
     config.oscChannelMute = m_oscMuteEdit->text().trimmed();
     config.oscSceneRecall = m_oscSceneEdit->text().trimmed();
+    config.oscReceivePort = m_oscReceivePortEdit->text().trimmed().toInt();
     m_app->show()->setMixerConfig(config);
 }
 

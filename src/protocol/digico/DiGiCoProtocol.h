@@ -61,6 +61,12 @@ class DiGiCoProtocol : public MixerProtocol {
     void setTemplates(const OscTemplates& templates) { m_templates = templates; }
     [[nodiscard]] const OscTemplates& templates() const { return m_templates; }
 
+    // the console's Send port for this device, i.e. the local UDP port it
+    // answers to (TN324's example pairs Send 9000 with Receive 8000). 0 = any,
+    // which is fine for a console that never answers.
+    void setReceivePort(int port) { m_receivePort = port; }
+    [[nodiscard]] int receivePort() const { return m_receivePort; }
+
     // "/ch/*/fader" + channel 3 -> "/ch/3/fader"; empty in, empty out
     static QString expand(const QString& pattern, int channel);
 
@@ -74,6 +80,7 @@ class DiGiCoProtocol : public MixerProtocol {
 
     QString m_host;
     int m_port = 0;
+    int m_receivePort = 0;
     ConnectionState m_connectionState = ConnectionState::Disconnected;
     QString m_statusMessage;
     int m_latencyMs = 0;

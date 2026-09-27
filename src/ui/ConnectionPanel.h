@@ -65,9 +65,11 @@ class ConnectionPanel : public QWidget {
     QLineEdit* m_oscFaderEdit;
     QLineEdit* m_oscMuteEdit;
     QLineEdit* m_oscSceneEdit;
+    QLineEdit* m_oscReceivePortEdit;
     QLabel* m_oscFaderLabel;
     QLabel* m_oscMuteLabel;
     QLabel* m_oscSceneLabel;
+    QLabel* m_oscReceivePortLabel;
     QLabel* m_oscHintLabel;
     QLabel* m_loopbackLabel;
     QPushButton* m_connectButton;

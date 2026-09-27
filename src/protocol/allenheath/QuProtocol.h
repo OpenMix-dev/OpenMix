@@ -36,12 +36,22 @@ class QuProtocol : public AllenHeathMidiProtocol {
     static constexpr int ID_FADER_VX = 0x07; // the data-entry LSB the fader wants
     static constexpr int FADER_UNITY = 0x62; // 0 dB
 
-    QByteArray buildFader(int channelId, double dB);
-    static QByteArray buildMute(int channelId, bool muted);
+    QByteArray buildFader(int channelId, double dB) const;
+    QByteArray buildMute(int channelId, bool muted) const;
     QByteArray buildSceneRecall(int sceneNumber) override;
 
-    // dB -> the console's 7-bit level, through the Fader / Send Level table
+    // dB <-> the console's 7-bit level, through the Fader / Send Level table
     static int levelFromDb(double dB);
+    static double dbFromLevel(int va);
+
+    // feedback: the channel is the NRPN MSB and the parameter the LSB; mutes
+    // arrive as Note On
+    void handleNrpn(int msb, int lsb, int dataMsb, int dataLsb) override;
+    void handleNoteOn(int note, int velocity) override;
+
+    // "/ch/N/..." or "/dca/N/..." for one of the console's channel numbers,
+    // empty for one this driver does not model
+    QString pathForChannelId(int channelId, const QString& param) const;
 };
 
 } // namespace OpenMix

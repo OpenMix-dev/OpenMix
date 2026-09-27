@@ -29,7 +29,6 @@
 #include "protocol/ProtocolFactory.h"
 #include "protocol/allenheath/AllenHeathMidiProtocol.h"
 #include "protocol/allenheath/AllenHeathTcpProtocol.h"
-#include "protocol/allenheath/GLDProtocol.h"
 #include "protocol/digico/DiGiCoProtocol.h"
 #include "protocol/discovery/ConsoleDiscoveryService.h"
 #include "protocol/discovery/DiscoveredConsole.h"
@@ -379,16 +378,14 @@ void Application::connectToMixer(const QString& type, const QString& host, int p
     if (!m_mixer)
         return;
 
-    // the console cannot report which fader law it is in, so hand the driver the
-    // one the show says the desk is set to
+    // the console cannot report which fader law it is in, nor which MIDI
+    // channel it listens on, so hand the driver what the show says the desk
+    // is set to
     if (auto* midi = dynamic_cast<AllenHeathMidiProtocol*>(m_mixer)) {
         midi->setFaderLaw(m_show->mixerConfig().faderLaw == "audio"
                               ? AllenHeathMidiProtocol::FaderLaw::AudioTaper
                               : AllenHeathMidiProtocol::FaderLaw::LinearTaper);
-    }
-
-    if (auto* gld = dynamic_cast<GLDProtocol*>(m_mixer)) {
-        gld->setMidiChannel(m_show->mixerConfig().midiChannel);
+        midi->setMidiChannel(m_show->mixerConfig().midiChannel);
     }
 
     // DiGiCo has no published address map, so the console's own patterns come
@@ -396,6 +393,7 @@ void Application::connectToMixer(const QString& type, const QString& host, int p
     if (auto* digico = dynamic_cast<DiGiCoProtocol*>(m_mixer)) {
         const MixerConfig cfg = m_show->mixerConfig();
         digico->setTemplates({cfg.oscChannelFader, cfg.oscChannelMute, cfg.oscSceneRecall});
+        digico->setReceivePort(cfg.oscReceivePort);
     }
 
     setupMixerConnection(type, host, port);

@@ -26,10 +26,6 @@ GLDProtocol::GLDProtocol(const MixerCapabilities& caps, QObject* parent)
     initializeSnapshotParams();
 }
 
-void GLDProtocol::setMidiChannel(int channel1To16) {
-    m_midiChannel = std::clamp(channel1To16, 1, 16) - 1;
-}
-
 void GLDProtocol::initializeSnapshotParams() {
     m_snapshotParams.clear();
 
@@ -46,6 +42,29 @@ void GLDProtocol::initializeSnapshotParams() {
 QString GLDProtocol::dcaFaderPath(int dca) const { return QString("/dca/%1/fader").arg(dca); }
 
 QString GLDProtocol::dcaMutePath(int dca) const { return QString("/dca/%1/mute").arg(dca); }
+
+double GLDProtocol::dbFromLevel(int lv) {
+    if (lv <= 0) {
+        return NEG_INF_DB;
+    }
+    const auto* first = std::begin(kGldLevels);
+    const auto* last = std::end(kGldLevels) - 1;
+    if (lv <= first->lv) {
+        return first->dB;
+    }
+    if (lv >= last->lv) {
+        return last->dB;
+    }
+    for (const LevelPoint* p = first; p < last; ++p) {
+        const LevelPoint* next = p + 1;
+        if (lv >= p->lv && lv <= next->lv) {
+            const double span = next->lv - p->lv;
+            const double t = span > 0.0 ? (lv - p->lv) / span : 0.0;
+            return p->dB + t * (next->dB - p->dB);
+        }
+    }
+    return last->dB;
+}
 
 int GLDProtocol::levelFromDb(double dB) {
     if (dB <= NEG_INF_DB) {
@@ -141,6 +160,43 @@ void GLDProtocol::setChannelColor(int channel, int color) {
         return;
     }
     m_transport.send(buildColour(CH_INPUT_BASE + channel - 1, color));
+}
+
+QString GLDProtocol::pathForChannelId(int channelId, const QString& param) const {
+    if (channelId >= CH_INPUT_BASE && channelId < CH_INPUT_BASE + m_capabilities.inputChannels) {
+        return QString("/ch/%1/%2").arg(channelId - CH_INPUT_BASE + 1).arg(param);
+    }
+    if (channelId >= CH_DCA_BASE && channelId < CH_DCA_BASE + m_capabilities.dcaCount) {
+        return QString("/dca/%1/%2").arg(channelId - CH_DCA_BASE + 1).arg(param);
+    }
+    return {};
+}
+
+void GLDProtocol::handleNrpn(int msb, int lsb, int dataMsb, int dataLsb) {
+    Q_UNUSED(dataLsb); // the GLD fader carries no data-entry LSB
+    if (lsb != ID_FADER) {
+        return;
+    }
+    const QString path = pathForChannelId(msb, "fader");
+    if (path.isEmpty()) {
+        return;
+    }
+    const double dB = dbFromLevel(dataMsb);
+    reportParameter(path, dB);
+    if (msb >= CH_INPUT_BASE) {
+        emit channelFaderChanged(msb - CH_INPUT_BASE + 1, dB);
+    }
+}
+
+void GLDProtocol::handleNoteOn(int note, int velocity) {
+    // velocity 40-7F = mute on, 01-3F = mute off, 00 = the trailing note off
+    if (velocity == 0) {
+        return;
+    }
+    const QString path = pathForChannelId(note, "mute");
+    if (!path.isEmpty()) {
+        reportParameter(path, velocity >= 0x40);
+    }
 }
 
 void GLDProtocol::sendParameter(const QString& path, const QVariant& value) {

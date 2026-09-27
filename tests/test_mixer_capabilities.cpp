@@ -3,6 +3,14 @@
 
 using namespace OpenMix;
 
+namespace {
+struct Case2 {
+    const char* id;
+    ConsoleType type;
+    const char* name;
+};
+} // namespace
+
 class TestMixerCapabilities : public QObject {
     Q_OBJECT
 
@@ -48,6 +56,35 @@ class TestMixerCapabilities : public QObject {
         }
         // bare "qu" resolves to the base Qu-16
         QCOMPARE(MixerCapabilities::forProtocolId("qu").type, ConsoleType::Qu16);
+    }
+
+    void qu567_isItsOwnGeneration() {
+        // the 2024 Qu-5/6/7: SQ scheme, 8 DCAs, 300 scenes, and the ones that
+        // discovery can find
+        const Case2 cases[] = {{"qu5", ConsoleType::Qu5, "Allen & Heath Qu-5"},
+                               {"qu6", ConsoleType::Qu6, "Allen & Heath Qu-6"},
+                               {"qu7", ConsoleType::Qu7, "Allen & Heath Qu-7"}};
+        for (const Case2& c : cases) {
+            const MixerCapabilities caps = MixerCapabilities::forProtocolId(c.id);
+            QCOMPARE(caps.type, c.type);
+            QCOMPARE(caps.displayName, QString(c.name));
+            QCOMPARE(caps.protocol, ProtocolType::MidiTcp);
+            QCOMPARE(caps.defaultPort, 51325);
+            QCOMPARE(caps.inputChannels, 32);
+            QCOMPARE(caps.dcaCount, 8);
+            QCOMPARE(caps.scenes, 300);
+            QCOMPARE(caps.mixBuses, 12);
+        }
+    }
+
+    void yamaha_isTextOverTcp() {
+        // SCP is an ASCII line protocol on TCP 49280, not OSC: anything that
+        // gates on OscUdp (DCA sync) must leave Yamaha out
+        for (const char* id : {"tf5", "ql5", "cl5", "dm7"}) {
+            const MixerCapabilities caps = MixerCapabilities::forProtocolId(id);
+            QCOMPARE(caps.protocol, ProtocolType::TextTcp);
+            QCOMPARE(caps.defaultPort, 49280);
+        }
     }
 
     void unknownId_fallsBackToDefaults() {
